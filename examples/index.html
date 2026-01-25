@@ -1,0 +1,376 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Passkeys Demo</title>
+        <style>
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }
+
+            body {
+                font-family:
+                    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+                    Oxygen, Ubuntu, Cantarell, sans-serif;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                min-height: 100vh;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                padding: 20px;
+            }
+
+            .container {
+                background: white;
+                border-radius: 16px;
+                box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+                padding: 40px;
+                max-width: 400px;
+                width: 100%;
+            }
+
+            h1 {
+                color: #333;
+                margin-bottom: 10px;
+                font-size: 28px;
+            }
+
+            .subtitle {
+                color: #666;
+                margin-bottom: 30px;
+                font-size: 14px;
+            }
+
+            .form-section {
+                margin-bottom: 30px;
+            }
+
+            .form-section h2 {
+                color: #667eea;
+                font-size: 18px;
+                margin-bottom: 15px;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            }
+
+            .icon {
+                font-size: 20px;
+            }
+
+            .input-group {
+                margin-bottom: 15px;
+            }
+
+            label {
+                display: block;
+                margin-bottom: 6px;
+                color: #555;
+                font-size: 14px;
+                font-weight: 500;
+            }
+
+            input[type="text"] {
+                width: 100%;
+                padding: 12px;
+                border: 2px solid #e0e0e0;
+                border-radius: 8px;
+                font-size: 14px;
+                transition: border-color 0.3s;
+            }
+
+            input[type="text"]:focus {
+                outline: none;
+                border-color: #667eea;
+            }
+
+            button {
+                width: 100%;
+                padding: 12px;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+                border: none;
+                border-radius: 8px;
+                font-size: 16px;
+                font-weight: 600;
+                cursor: pointer;
+                transition:
+                    transform 0.2s,
+                    box-shadow 0.2s;
+            }
+
+            button:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+            }
+
+            button:active {
+                transform: translateY(0);
+            }
+
+            button:disabled {
+                opacity: 0.6;
+                cursor: not-allowed;
+                transform: none;
+            }
+
+            .message {
+                margin-top: 15px;
+                padding: 12px;
+                border-radius: 8px;
+                font-size: 14px;
+                display: none;
+            }
+
+            .message.success {
+                background: #d4edda;
+                color: #155724;
+                border: 1px solid #c3e6cb;
+            }
+
+            .message.error {
+                background: #f8d7da;
+                color: #721c24;
+                border: 1px solid #f5c6cb;
+            }
+
+            .message.show {
+                display: block;
+            }
+
+            .divider {
+                height: 1px;
+                background: #e0e0e0;
+                margin: 30px 0;
+            }
+
+            .fingerprint {
+                text-align: center;
+                font-size: 48px;
+                margin-bottom: 20px;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="fingerprint">&#128274;</div>
+            <h1>Passkeys Demo</h1>
+            <p class="subtitle">Secure authentication without passwords</p>
+
+            <div class="form-section">
+                <h2><span class="icon">&#10024;</span> Register</h2>
+                <div class="input-group">
+                    <label for="register-username">Username</label>
+                    <input
+                        type="text"
+                        id="register-username"
+                        placeholder="Enter your username"
+                        required
+                    />
+                </div>
+                <button id="register-btn">Register with Passkey</button>
+                <div id="register-message" class="message"></div>
+            </div>
+
+            <div class="divider"></div>
+
+            <div class="form-section">
+                <h2><span class="icon">&#128275;</span> Login</h2>
+                <div class="input-group">
+                    <label for="login-username">Username (optional)</label>
+                    <input
+                        type="text"
+                        id="login-username"
+                        placeholder="Leave empty for usernameless login"
+                    />
+                </div>
+                <button id="login-btn">Login with Passkey</button>
+                <div id="login-message" class="message"></div>
+            </div>
+        </div>
+
+        <script>
+            function showMessage(elementId, message, isSuccess) {
+                const msgEl = document.getElementById(elementId);
+                msgEl.innerHTML = message;
+                msgEl.className = `message ${isSuccess ? "success" : "error"} show`;
+                setTimeout(() => msgEl.classList.remove("show"), 5000);
+            }
+
+            function bufferToBase64url(buffer) {
+                const bytes = new Uint8Array(buffer);
+                let str = "";
+                for (const byte of bytes) {
+                    str += String.fromCharCode(byte);
+                }
+                return btoa(str)
+                    .replace(/\+/g, "-")
+                    .replace(/\//g, "_")
+                    .replace(/=/g, "");
+            }
+
+            async function register() {
+                const username = document
+                    .getElementById("register-username")
+                    .value.trim();
+                if (!username) {
+                    showMessage(
+                        "register-message",
+                        "Please enter a username",
+                        false,
+                    );
+                    return;
+                }
+
+                const registerBtn = document.getElementById("register-btn");
+                registerBtn.disabled = true;
+
+                try {
+                    // Start registration
+                    const startRes = await fetch("/register/start", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ username }),
+                    });
+
+                    if (!startRes.ok)
+                        throw new Error("Registration start failed");
+
+                    const options = await startRes.json();
+
+                    // Parse creation options using WebAuthn JSON API
+                    const credential = await navigator.credentials.create({
+                        publicKey:
+                            PublicKeyCredential.parseCreationOptionsFromJSON(
+                                options,
+                            ),
+                    });
+
+                    // Finish registration
+                    const finishRes = await fetch("/register/finish", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            username,
+                            credential_id: bufferToBase64url(credential.rawId),
+                            public_key: bufferToBase64url(
+                                credential.response.attestationObject,
+                            ),
+                            client_data_json: bufferToBase64url(
+                                credential.response.clientDataJSON,
+                            ),
+                        }),
+                    });
+
+                    if (!finishRes.ok)
+                        throw new Error("Registration finish failed");
+
+                    showMessage(
+                        "register-message",
+                        "&#10003; Registration successful!",
+                        true,
+                    );
+                    document.getElementById("register-username").value = "";
+                } catch (err) {
+                    console.error(err);
+                    showMessage(
+                        "register-message",
+                        `Registration failed: ${err.message}`,
+                        false,
+                    );
+                } finally {
+                    registerBtn.disabled = false;
+                }
+            }
+
+            async function login() {
+                const username = document
+                    .getElementById("login-username")
+                    .value.trim();
+                const loginBtn = document.getElementById("login-btn");
+                loginBtn.disabled = true;
+
+                try {
+                    const body = username ? { username } : {};
+                    const result = await authenticate(body);
+                    showMessage(
+                        "login-message",
+                        `&#10003; ${result.message}`,
+                        true,
+                    );
+                    document.getElementById("login-username").value = "";
+                } catch (err) {
+                    console.error(err);
+                    showMessage(
+                        "login-message",
+                        `Login failed: ${err.message}`,
+                        false,
+                    );
+                } finally {
+                    loginBtn.disabled = false;
+                }
+            }
+
+            async function authenticate(startBody) {
+                const startRes = await fetch("/auth/start", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(startBody),
+                });
+
+                if (!startRes.ok) throw new Error("Authentication start failed");
+
+                const options = await startRes.json();
+                const credential = await navigator.credentials.get({
+                    publicKey:
+                        PublicKeyCredential.parseRequestOptionsFromJSON(options),
+                });
+
+                const finishRes = await fetch("/auth/finish", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        ...startBody,
+                        credential_id: bufferToBase64url(credential.rawId),
+                        authenticator_data: bufferToBase64url(
+                            credential.response.authenticatorData,
+                        ),
+                        client_data_json: bufferToBase64url(
+                            credential.response.clientDataJSON,
+                        ),
+                        signature: bufferToBase64url(
+                            credential.response.signature,
+                        ),
+                    }),
+                });
+
+                if (!finishRes.ok)
+                    throw new Error("Authentication finish failed");
+
+                return await finishRes.json();
+            }
+
+            document
+                .getElementById("register-btn")
+                .addEventListener("click", register);
+            document
+                .getElementById("login-btn")
+                .addEventListener("click", login);
+
+            // Allow Enter key to submit
+            document
+                .getElementById("register-username")
+                .addEventListener("keypress", (e) => {
+                    if (e.key === "Enter") register();
+                });
+            document
+                .getElementById("login-username")
+                .addEventListener("keypress", (e) => {
+                    if (e.key === "Enter") login();
+                });
+        </script>
+    </body>
+</html>

@@ -1,0 +1,24 @@
+[package]
+name = "passki"
+version = "0.1.0"
+edition = "2024"
+description = "A simple and secure WebAuthn/Passkey authentication library"
+license = "Apache-2.0"
+repository = "https://github.com/gblach/passki"
+documentation = "https://docs.rs/passki"
+readme = "README.md"
+keywords = ["webauthn", "passkey", "authentication", "fido2", "cryptography"]
+categories = ["authentication", "cryptography", "web-programming"]
+
+[dependencies]
+aws-lc-rs = "1"
+base64 = "0.22"
+ciborium = "0.2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[dev-dependencies]
+poem = "3"
+tokio = { version = "1", features = ["full"] }
+tracing-subscriber = "0.3"
+uuid = { version = "1", features = ["v4"] }
