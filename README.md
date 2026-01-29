@@ -120,13 +120,16 @@ This design keeps state management simple and allows you to store session data h
 
 ## Examples
 
-Check out the `examples/` directory for a complete working example:
+Check out the `examples/` directory for complete working examples:
 
+- `axum.rs` - Full integration with Axum web framework showing registration and authentication flows
 - `poem.rs` - Full integration with Poem web framework showing registration and authentication flows
 
-Run the example:
+Run an example:
 
 ```bash
+cargo run --example axum
+# or
 cargo run --example poem
 ```
 
