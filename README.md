@@ -151,10 +151,10 @@ or http://www.apache.org/licenses/LICENSE-2.0).
 
 Passki is built on top of excellent Rust cryptography libraries:
 
+- [aws-lc-rs](https://github.com/aws/aws-lc-rs) - Cryptographic operations
 - [ed25519-dalek](https://github.com/dalek-cryptography/curve25519-dalek) - EdDSA signatures
 - [p256](https://github.com/RustCrypto/elliptic-curves) - ECDSA with P-256
 - [rsa](https://github.com/RustCrypto/RSA) - RSA signatures
-- [ciborium](https://github.com/enarx/ciborium) - CBOR encoding/decoding
 
 ## Resources
 
