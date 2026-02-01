@@ -122,12 +122,15 @@ This design keeps state management simple and allows you to store session data h
 
 Check out the `examples/` directory for complete working examples:
 
+- `actix-web.rs` - Full integration with Actix-web framework showing registration and authentication flows
 - `axum.rs` - Full integration with Axum web framework showing registration and authentication flows
 - `poem.rs` - Full integration with Poem web framework showing registration and authentication flows
 
 Run an example:
 
 ```bash
+cargo run --example actix-web
+# or
 cargo run --example axum
 # or
 cargo run --example poem
