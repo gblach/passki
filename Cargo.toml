@@ -22,6 +22,7 @@ actix-web = "4"
 axum = { version = "0.8", features = ["json"] }
 env_logger = "0.11"
 poem = "3"
+rocket = { version = "0.5", features = ["json"] }
 tokio = { version = "1", features = ["full"] }
 tower-http = { version = "0.6", features = ["cors", "trace"] }
 tracing-subscriber = "0.3"
