@@ -27,3 +27,4 @@ tokio = { version = "1", features = ["full"] }
 tower-http = { version = "0.6", features = ["cors", "trace"] }
 tracing-subscriber = "0.3"
 uuid = { version = "1", features = ["v4"] }
+warp = { version = "0.4", features = ["server"] }
