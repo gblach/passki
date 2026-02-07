@@ -120,20 +120,11 @@ This design keeps state management simple and allows you to store session data h
 
 ## Examples
 
-Check out the `examples/` directory for complete working examples:
-
-- `actix-web.rs` - Full integration with Actix-web framework showing registration and authentication flows
-- `axum.rs` - Full integration with Axum web framework showing registration and authentication flows
-- `poem.rs` - Full integration with Poem web framework showing registration and authentication flows
-
-Run an example:
+The `examples/` directory has complete registration and authentication flows for several web frameworks:
+[Actix-web](examples/actix-web.rs) | [Axum](examples/axum.rs) | [Poem](examples/poem.rs) | [Rocket](examples/rocket.rs) | [Warp](examples/warp.rs)
 
 ```bash
-cargo run --example actix-web
-# or
-cargo run --example axum
-# or
-cargo run --example poem
+cargo run --example axum  # or actix-web, poem, rocket, warp
 ```
 
 Then visit `http://localhost:3000` in your browser.
