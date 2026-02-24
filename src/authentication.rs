@@ -195,7 +195,10 @@ impl Passki {
             authenticator_data[36],
         ]);
 
-        if counter <= stored_passkey.counter {
+        // Per the WebAuthn spec, the counter check only applies when at least one
+        // of the values is nonzero. Both being zero means the authenticator does
+        // not use counters (e.g. Google Password Manager), which is valid.
+        if (counter != 0 || stored_passkey.counter != 0) && counter <= stored_passkey.counter {
             return Err(Box::new(PasskiError::new(
                 "Invalid counter (possible replay attack)",
             )));
