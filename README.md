@@ -9,7 +9,7 @@ A simple, secure, and easy-to-use WebAuthn/Passkey implementation for Rust.
 ## Features
 
 - ✨ **Simple API** - Easy-to-use interface for passkey registration and authentication
-- 🔐 **Multiple Algorithms** - Support for EdDSA (Ed25519), ES256 (P-256), and RS256 (RSA)
+- 🔐 **Multiple Algorithms** - Support for EdDSA (Ed25519), ES256/ES384 (P-256/P-384), and RS256/RS384 (RSA)
 - 🛡️ **Security First** - Built-in replay attack protection via signature counters
 - 📦 **Zero Runtime Dependencies** - Only cryptography libraries, no web framework lock-in
 - ✅ **WebAuthn Level 2 Compliant** - Follows the latest W3C specification
@@ -92,7 +92,9 @@ Passki supports the following COSE algorithms:
 
 - **EdDSA** (Ed25519) - Algorithm ID: -8
 - **ES256** (ECDSA with P-256 and SHA-256) - Algorithm ID: -7
+- **ES384** (ECDSA with P-384 and SHA-384) - Algorithm ID: -35
 - **RS256** (RSASSA-PKCS1-v1_5 with SHA-256) - Algorithm ID: -257
+- **RS384** (RSASSA-PKCS1-v1_5 with SHA-384) - Algorithm ID: -258
 
 ## Security Considerations
 
