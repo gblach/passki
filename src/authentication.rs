@@ -16,8 +16,8 @@
 
 use aws_lc_rs::digest::{self, SHA256};
 use aws_lc_rs::signature::{
-    RsaPublicKeyComponents, UnparsedPublicKey, ECDSA_P256_SHA256_ASN1, ED25519,
-    RSA_PKCS1_2048_8192_SHA256,
+    RsaPublicKeyComponents, UnparsedPublicKey, ECDSA_P256_SHA256_ASN1, ECDSA_P384_SHA384_ASN1,
+    ED25519, RSA_PKCS1_2048_8192_SHA256, RSA_PKCS1_2048_8192_SHA384,
 };
 use serde::{Deserialize, Serialize};
 
@@ -235,7 +235,9 @@ impl Passki {
         match algorithm {
             -8 => Self::verify_eddsa(cose_key_bytes, signed_data, signature),
             -7 => Self::verify_es256(cose_key_bytes, signed_data, signature),
+            -35 => Self::verify_es384(cose_key_bytes, signed_data, signature),
             -257 => Self::verify_rs256(cose_key_bytes, signed_data, signature),
+            -258 => Self::verify_rs384(cose_key_bytes, signed_data, signature),
             _ => Err(Box::new(PasskiError::new(format!(
                 "Unsupported algorithm: {}",
                 algorithm
@@ -317,6 +319,45 @@ impl Passki {
         Ok(())
     }
 
+    /// Verifies an ES384 (ECDSA with P-384 and SHA-384) signature.
+    pub(crate) fn verify_es384(
+        cose_key_bytes: &[u8],
+        signed_data: &[u8],
+        signature: &[u8],
+    ) -> Result<()> {
+        let cose_key_value: ciborium::Value = ciborium::from_reader(cose_key_bytes)
+            .map_err(|e| PasskiError::new(format!("Failed to parse COSE key: {}", e)))?;
+
+        let cose_map = cose_key_value
+            .as_map()
+            .ok_or_else(|| PasskiError::new("COSE key is not a map"))?;
+
+        let x = cose_map
+            .iter()
+            .find(|(k, _)| k.as_integer() == Some((-2).into()))
+            .and_then(|(_, v)| v.as_bytes())
+            .ok_or_else(|| PasskiError::new("Missing x coordinate in COSE key"))?;
+
+        let y = cose_map
+            .iter()
+            .find(|(k, _)| k.as_integer() == Some((-3).into()))
+            .and_then(|(_, v)| v.as_bytes())
+            .ok_or_else(|| PasskiError::new("Missing y coordinate in COSE key"))?;
+
+        // Construct uncompressed public key (0x04 || x || y)
+        let mut public_key_bytes = vec![0x04];
+        public_key_bytes.extend_from_slice(x);
+        public_key_bytes.extend_from_slice(y);
+
+        // ECDSA_P384_SHA384_ASN1 handles SHA-384 hashing internally
+        let public_key = UnparsedPublicKey::new(&ECDSA_P384_SHA384_ASN1, &public_key_bytes);
+        public_key
+            .verify(signed_data, signature)
+            .map_err(|_| PasskiError::new("ES384 signature verification failed"))?;
+
+        Ok(())
+    }
+
     /// Verifies an RS256 (RSA with SHA-256) signature.
     pub(crate) fn verify_rs256(
         cose_key_bytes: &[u8],
@@ -348,6 +389,40 @@ impl Passki {
         public_key
             .verify(&RSA_PKCS1_2048_8192_SHA256, signed_data, signature)
             .map_err(|_| PasskiError::new("RS256 signature verification failed"))?;
+
+        Ok(())
+    }
+
+    /// Verifies an RS384 (RSA with SHA-384) signature.
+    pub(crate) fn verify_rs384(
+        cose_key_bytes: &[u8],
+        signed_data: &[u8],
+        signature: &[u8],
+    ) -> Result<()> {
+        let cose_key_value: ciborium::Value = ciborium::from_reader(cose_key_bytes)
+            .map_err(|e| PasskiError::new(format!("Failed to parse COSE key: {}", e)))?;
+
+        let cose_map = cose_key_value
+            .as_map()
+            .ok_or_else(|| PasskiError::new("COSE key is not a map"))?;
+
+        let n = cose_map
+            .iter()
+            .find(|(k, _)| k.as_integer() == Some((-1).into()))
+            .and_then(|(_, v)| v.as_bytes())
+            .ok_or_else(|| PasskiError::new("Missing n (modulus) in COSE key"))?;
+
+        let e = cose_map
+            .iter()
+            .find(|(k, _)| k.as_integer() == Some((-2).into()))
+            .and_then(|(_, v)| v.as_bytes())
+            .ok_or_else(|| PasskiError::new("Missing e (exponent) in COSE key"))?;
+
+        // RSA_PKCS1_2048_8192_SHA384 handles SHA-384 hashing internally
+        let public_key = RsaPublicKeyComponents { n, e };
+        public_key
+            .verify(&RSA_PKCS1_2048_8192_SHA384, signed_data, signature)
+            .map_err(|_| PasskiError::new("RS384 signature verification failed"))?;
 
         Ok(())
     }

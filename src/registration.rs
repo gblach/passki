@@ -164,7 +164,15 @@ impl Passki {
                     type_: "public-key".to_string(),
                 },
                 PubKeyCredParam {
+                    alg: -35,
+                    type_: "public-key".to_string(),
+                },
+                PubKeyCredParam {
                     alg: -257,
+                    type_: "public-key".to_string(),
+                },
+                PubKeyCredParam {
+                    alg: -258,
                     type_: "public-key".to_string(),
                 },
             ],

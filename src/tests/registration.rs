@@ -49,10 +49,12 @@ fn test_start_passkey_registration_returns_challenge() {
     assert!(!challenge.challenge.is_empty());
 
     // Verify algorithm support
-    assert_eq!(challenge.pub_key_cred_params.len(), 3);
+    assert_eq!(challenge.pub_key_cred_params.len(), 5);
     assert_eq!(challenge.pub_key_cred_params[0].alg, -8); // EdDSA
     assert_eq!(challenge.pub_key_cred_params[1].alg, -7); // ES256
-    assert_eq!(challenge.pub_key_cred_params[2].alg, -257); // RS256
+    assert_eq!(challenge.pub_key_cred_params[2].alg, -35); // ES384
+    assert_eq!(challenge.pub_key_cred_params[3].alg, -257); // RS256
+    assert_eq!(challenge.pub_key_cred_params[4].alg, -258); // RS384
 
     // Verify state
     assert_eq!(state.challenge.len(), 32);

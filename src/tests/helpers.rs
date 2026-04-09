@@ -128,6 +128,22 @@ pub fn create_es256_cose_key(x: &[u8], y: &[u8]) -> Vec<u8> {
     result
 }
 
+/// Helper function to create a valid ES384 COSE key
+pub fn create_es384_cose_key(x: &[u8], y: &[u8]) -> Vec<u8> {
+    use ciborium::Value;
+
+    let mut cose_key = Vec::new();
+    cose_key.push((Value::Integer(1.into()), Value::Integer(2.into()))); // kty: EC2
+    cose_key.push((Value::Integer(3.into()), Value::Integer((-35).into()))); // alg: ES384
+    cose_key.push((Value::Integer((-1).into()), Value::Integer(2.into()))); // crv: P-384
+    cose_key.push((Value::Integer((-2).into()), Value::Bytes(x.to_vec()))); // x coordinate
+    cose_key.push((Value::Integer((-3).into()), Value::Bytes(y.to_vec()))); // y coordinate
+
+    let mut result = Vec::new();
+    ciborium::into_writer(&Value::Map(cose_key), &mut result).unwrap();
+    result
+}
+
 /// Helper function to create a valid RS256 COSE key
 pub fn create_rs256_cose_key(n: &[u8], e: &[u8]) -> Vec<u8> {
     use ciborium::Value;
@@ -135,6 +151,21 @@ pub fn create_rs256_cose_key(n: &[u8], e: &[u8]) -> Vec<u8> {
     let mut cose_key = Vec::new();
     cose_key.push((Value::Integer(1.into()), Value::Integer(3.into()))); // kty: RSA
     cose_key.push((Value::Integer(3.into()), Value::Integer((-257).into()))); // alg: RS256
+    cose_key.push((Value::Integer((-1).into()), Value::Bytes(n.to_vec()))); // n (modulus)
+    cose_key.push((Value::Integer((-2).into()), Value::Bytes(e.to_vec()))); // e (exponent)
+
+    let mut result = Vec::new();
+    ciborium::into_writer(&Value::Map(cose_key), &mut result).unwrap();
+    result
+}
+
+/// Helper function to create a valid RS384 COSE key
+pub fn create_rs384_cose_key(n: &[u8], e: &[u8]) -> Vec<u8> {
+    use ciborium::Value;
+
+    let mut cose_key = Vec::new();
+    cose_key.push((Value::Integer(1.into()), Value::Integer(3.into()))); // kty: RSA
+    cose_key.push((Value::Integer(3.into()), Value::Integer((-258).into()))); // alg: RS384
     cose_key.push((Value::Integer((-1).into()), Value::Bytes(n.to_vec()))); // n (modulus)
     cose_key.push((Value::Integer((-2).into()), Value::Bytes(e.to_vec()))); // e (exponent)
 

@@ -13,11 +13,11 @@
 // limitations under the License.
 
 use crate::Passki;
-use super::helpers::{create_eddsa_cose_key, create_es256_cose_key, create_rs256_cose_key, create_test_rsa_keypair};
+use super::helpers::{create_eddsa_cose_key, create_es256_cose_key, create_es384_cose_key, create_rs256_cose_key, create_rs384_cose_key, create_test_rsa_keypair};
 use aws_lc_rs::rand::SystemRandom;
 use aws_lc_rs::signature::{
     EcdsaKeyPair, Ed25519KeyPair, KeyPair, ECDSA_P256_SHA256_ASN1_SIGNING,
-    RSA_PKCS1_SHA256,
+    ECDSA_P384_SHA384_ASN1_SIGNING, RSA_PKCS1_SHA256, RSA_PKCS1_SHA384,
 };
 
 // ===== EdDSA signature tests =====
@@ -376,6 +376,85 @@ fn test_verify_es256_invalid_public_key() {
     assert!(result.is_err());
 }
 
+// ===== ES384 signature tests =====
+
+#[test]
+fn test_verify_es384_valid_signature() {
+    let rng = SystemRandom::new();
+    let pkcs8_bytes = EcdsaKeyPair::generate_pkcs8(&ECDSA_P384_SHA384_ASN1_SIGNING, &rng).unwrap();
+    let key_pair = EcdsaKeyPair::from_pkcs8(&ECDSA_P384_SHA384_ASN1_SIGNING, pkcs8_bytes.as_ref()).unwrap();
+
+    let message = b"test message for ES384";
+    let signature = key_pair.sign(&rng, message).unwrap();
+
+    // Extract x and y coordinates from public key (uncompressed SEC1 format: 0x04 || x || y)
+    let public_key_bytes = key_pair.public_key().as_ref();
+    let x = &public_key_bytes[1..49];
+    let y = &public_key_bytes[49..97];
+
+    let cose_key_bytes = create_es384_cose_key(x, y);
+
+    let result = Passki::verify_es384(&cose_key_bytes, message, signature.as_ref());
+
+    assert!(
+        result.is_ok(),
+        "Valid ES384 signature should verify successfully"
+    );
+}
+
+#[test]
+fn test_verify_es384_invalid_signature() {
+    let rng = SystemRandom::new();
+    let pkcs8_bytes = EcdsaKeyPair::generate_pkcs8(&ECDSA_P384_SHA384_ASN1_SIGNING, &rng).unwrap();
+    let key_pair = EcdsaKeyPair::from_pkcs8(&ECDSA_P384_SHA384_ASN1_SIGNING, pkcs8_bytes.as_ref()).unwrap();
+
+    let message = b"test message";
+    let signature = key_pair.sign(&rng, message).unwrap();
+
+    let public_key_bytes = key_pair.public_key().as_ref();
+    let x = &public_key_bytes[1..49];
+    let y = &public_key_bytes[49..97];
+
+    let cose_key_bytes = create_es384_cose_key(x, y);
+
+    let wrong_message = b"different message";
+    let result = Passki::verify_es384(&cose_key_bytes, wrong_message, signature.as_ref());
+
+    assert!(
+        result.is_err(),
+        "Invalid ES384 signature should fail verification"
+    );
+    assert!(
+        result
+            .unwrap_err()
+            .to_string()
+            .contains("ES384 signature verification failed")
+    );
+}
+
+#[test]
+fn test_verify_es384_dispatch() {
+    let rng = SystemRandom::new();
+    let pkcs8_bytes = EcdsaKeyPair::generate_pkcs8(&ECDSA_P384_SHA384_ASN1_SIGNING, &rng).unwrap();
+    let key_pair = EcdsaKeyPair::from_pkcs8(&ECDSA_P384_SHA384_ASN1_SIGNING, pkcs8_bytes.as_ref()).unwrap();
+
+    let message = b"test message";
+    let signature = key_pair.sign(&rng, message).unwrap();
+
+    let public_key_bytes = key_pair.public_key().as_ref();
+    let x = &public_key_bytes[1..49];
+    let y = &public_key_bytes[49..97];
+
+    let cose_key_bytes = create_es384_cose_key(x, y);
+
+    let result = Passki::verify_signature(&cose_key_bytes, -35, message, signature.as_ref());
+
+    assert!(
+        result.is_ok(),
+        "verify_signature should dispatch to ES384 correctly"
+    );
+}
+
 // ===== RS256 signature tests =====
 
 #[test]
@@ -528,6 +607,77 @@ fn test_verify_rs256_invalid_public_key() {
     );
 }
 
+// ===== RS384 signature tests =====
+
+#[test]
+fn test_verify_rs384_valid_signature() {
+    let rng = SystemRandom::new();
+    let (key_pair, n, e) = create_test_rsa_keypair();
+
+    let message = b"test message for RS384";
+
+    let mut signature = vec![0u8; key_pair.public_modulus_len()];
+    key_pair.sign(&RSA_PKCS1_SHA384, &rng, message, &mut signature).unwrap();
+
+    let cose_key_bytes = create_rs384_cose_key(&n, &e);
+
+    let result = Passki::verify_rs384(&cose_key_bytes, message, &signature);
+
+    assert!(
+        result.is_ok(),
+        "Valid RS384 signature should verify successfully: {:?}",
+        result.err()
+    );
+}
+
+#[test]
+fn test_verify_rs384_invalid_signature() {
+    let rng = SystemRandom::new();
+    let (key_pair, n, e) = create_test_rsa_keypair();
+
+    let message = b"test message";
+
+    let mut signature = vec![0u8; key_pair.public_modulus_len()];
+    key_pair.sign(&RSA_PKCS1_SHA384, &rng, message, &mut signature).unwrap();
+
+    let cose_key_bytes = create_rs384_cose_key(&n, &e);
+
+    let wrong_message = b"different message";
+    let result = Passki::verify_rs384(&cose_key_bytes, wrong_message, &signature);
+
+    assert!(
+        result.is_err(),
+        "Invalid RS384 signature should fail verification"
+    );
+    assert!(
+        result
+            .unwrap_err()
+            .to_string()
+            .contains("RS384 signature verification failed")
+    );
+}
+
+#[test]
+fn test_verify_rs384_dispatch() {
+    let rng = SystemRandom::new();
+    let (key_pair, n, e) = create_test_rsa_keypair();
+
+    let message = b"test message";
+
+    let mut signature = vec![0u8; key_pair.public_modulus_len()];
+    key_pair.sign(&RSA_PKCS1_SHA384, &rng, message, &mut signature).unwrap();
+
+    let cose_key_bytes = create_rs384_cose_key(&n, &e);
+
+    let result = Passki::verify_signature(&cose_key_bytes, -258, message, &signature);
+
+    assert!(
+        result.is_ok(),
+        "verify_signature should dispatch to RS384 correctly: {:?}",
+        result.err()
+    );
+}
+
 // ===== verify_signature dispatch tests =====
 
 #[test]
@@ -633,7 +783,7 @@ fn test_verify_signature_unsupported_algorithm() {
 
 #[test]
 fn test_verify_signature_all_supported_algorithms() {
-    let algorithms = vec![-8, -7, -257];
+    let algorithms = vec![-8, -7, -35, -257, -258];
 
     for alg in algorithms {
         let message = b"test";
