@@ -53,7 +53,7 @@ pub struct AuthenticationChallenge {
 /// Server-side state for a passkey authentication in progress.
 ///
 /// This state must be stored temporarily and provided when completing the authentication.
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct AuthenticationState {
     /// The challenge that was sent to the client.
     pub challenge: Vec<u8>,

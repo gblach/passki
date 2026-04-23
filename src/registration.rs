@@ -60,7 +60,7 @@ pub struct RegistrationChallenge {
 /// Server-side state for a passkey registration in progress.
 ///
 /// This state must be stored temporarily and provided when completing the registration.
-#[derive(Clone, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct RegistrationState {
     /// The challenge that was sent to the client.
     pub challenge: Vec<u8>,

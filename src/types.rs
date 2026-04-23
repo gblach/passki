@@ -123,7 +123,7 @@ pub struct RelyingParty {
 }
 
 /// Information about the user account.
-#[derive(Clone, Serialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct UserInfo {
     /// Unique identifier for the user account (base64url-encoded).
     pub id: String,
