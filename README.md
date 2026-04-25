@@ -11,7 +11,7 @@ A simple, secure, and easy-to-use WebAuthn/Passkey implementation for Rust.
 - ✨ **Simple API** - Easy-to-use interface for passkey registration and authentication
 - 🔐 **Multiple Algorithms** - Support for EdDSA (Ed25519), ES256/ES384 (P-256/P-384), and RS256/RS384 (RSA)
 - 🛡️ **Security First** - Built-in replay attack protection via signature counters
-- 📦 **Zero Runtime Dependencies** - Only cryptography libraries, no web framework lock-in
+- 📦 **Framework Agnostic** - No web framework lock-in, works with any HTTP server
 - ✅ **WebAuthn Level 2 Compliant** - Follows the latest W3C specification
 - 🦀 **Pure Rust** - Memory-safe implementation with no unsafe code
 
@@ -57,7 +57,7 @@ let (registration_challenge, registration_state) = passki.start_passkey_registra
 // Client uses WebAuthn API to create credential
 
 // Step 2: Receive credential from client and complete registration
-let stored_passkey = passki.finish_passkey_registration(
+let mut stored_passkey: StoredPasskey = passki.finish_passkey_registration(
     &registration_credential,  // Credential from client
     &registration_state,       // State from step 1
 )?;
@@ -137,17 +137,11 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## License
 
-This project is licensed under the Apache License, Version 2.0 ([LICENSE](LICENSE)
-or http://www.apache.org/licenses/LICENSE-2.0).
+This project is licensed under the [Apache License, Version 2.0](http://www.apache.org/licenses/LICENSE-2.0) ([LICENSE](LICENSE)).
 
 ## Acknowledgments
 
-Passki is built on top of excellent Rust cryptography libraries:
-
-- [aws-lc-rs](https://github.com/aws/aws-lc-rs) - Cryptographic operations
-- [ed25519-dalek](https://github.com/dalek-cryptography/curve25519-dalek) - EdDSA signatures
-- [p256](https://github.com/RustCrypto/elliptic-curves) - ECDSA with P-256
-- [rsa](https://github.com/RustCrypto/RSA) - RSA signatures
+Passki is built on top of [aws-lc-rs](https://github.com/aws/aws-lc-rs) for cryptographic operations.
 
 ## Resources
 
