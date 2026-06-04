@@ -55,6 +55,7 @@
 //!     ResidentKeyRequirement::Preferred,              // Resident key
 //!     UserVerificationRequirement::Preferred,         // User verification
 //!     None,                                           // Exclude existing credentials
+//!     None,                                           // Extensions (None, or Some(RegistrationExtensions { ... }))
 //! ).expect("user_id must be at least 16 bytes");
 //!
 //! // Send registration_challenge to client (as JSON)
@@ -77,6 +78,7 @@
 //!     &user_passkeys,                            // User's stored passkeys
 //!     60000,                                     // Timeout (ms)
 //!     UserVerificationRequirement::Preferred,    // User verification
+//!     None,                                      // Extensions (None, or Some(AuthenticationExtensions { ... }))
 //! );
 //!
 //! // Send authentication_challenge to client (as JSON)

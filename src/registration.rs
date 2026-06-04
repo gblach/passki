@@ -55,6 +55,10 @@ pub struct RegistrationChallenge {
     /// preventing duplicate registrations.
     #[serde(rename = "excludeCredentials")]
     pub exclude_credentials: Vec<ExcludeCredential>,
+
+    /// WebAuthn extensions to request from the authenticator.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub extensions: Option<RegistrationExtensions>,
 }
 
 /// Server-side state for a passkey registration in progress.
@@ -82,6 +86,9 @@ pub struct RegistrationCredential {
 
     /// The client data JSON (base64url-encoded).
     pub client_data_json: String,
+
+    /// Extension results from the client (e.g., PRF support flag).
+    pub client_extension_results: Option<ClientExtensionResults>,
 }
 
 impl Passki {
@@ -100,6 +107,9 @@ impl Passki {
     /// * `resident_key` - Resident key requirement
     /// * `user_verification` - User verification requirement
     /// * `existing_credentials` - Optional list of existing credentials to exclude from registration
+    /// * `extensions` - Optional WebAuthn extensions. Use `Some(RegistrationExtensions { prf:
+    ///   PrfInput { eval: None } })` to probe PRF support, or include an `eval` to probe and
+    ///   evaluate in a single round trip.
     ///
     /// # Returns
     ///
@@ -121,6 +131,7 @@ impl Passki {
         resident_key: ResidentKeyRequirement,
         user_verification: UserVerificationRequirement,
         existing_credentials: Option<&[StoredPasskey]>,
+        extensions: Option<RegistrationExtensions>,
     ) -> Result<(RegistrationChallenge, RegistrationState)> {
         // Validate user_id length
         if user_id.len() < 16 {
@@ -183,6 +194,7 @@ impl Passki {
                 user_verification,
             },
             exclude_credentials,
+            extensions,
         };
 
         let state = RegistrationState {

@@ -182,3 +182,63 @@ pub struct AllowCredential {
     #[serde(rename = "type")]
     pub type_: String,
 }
+
+/// Extensions included in a registration challenge.
+#[derive(Serialize, Debug)]
+pub struct RegistrationExtensions {
+    pub prf: PrfInput,
+}
+
+/// Extensions included in an authentication challenge.
+#[derive(Serialize, Debug)]
+pub struct AuthenticationExtensions {
+    pub prf: PrfInput,
+}
+
+/// PRF extension input included in challenges.
+#[derive(Serialize, Debug)]
+pub struct PrfInput {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub eval: Option<PrfEval>,
+}
+
+/// PRF evaluation inputs sent to the authenticator.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct PrfEval {
+    /// Base64url-encoded first PRF input.
+    pub first: String,
+    /// Optional base64url-encoded second PRF input.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub second: Option<String>,
+}
+
+/// The full `clientExtensionResults` object returned by the browser.
+///
+/// Each field corresponds to one WebAuthn extension. This struct is used in
+/// both [`RegistrationCredential`] and [`AuthenticationCredential`] and maps
+/// directly to what `credential.getClientExtensionResults()` returns in JS.
+/// Adding support for a new extension means adding a field here.
+#[derive(Deserialize, Debug, Default)]
+pub struct ClientExtensionResults {
+    /// Results for the PRF extension.
+    #[serde(default)]
+    pub prf: Option<PrfExtensionResult>,
+}
+
+/// PRF extension result returned by the client.
+#[derive(Deserialize, Debug)]
+pub struct PrfExtensionResult {
+    /// Set during registration to indicate whether PRF is supported.
+    pub enabled: Option<bool>,
+    /// PRF outputs from the authenticator.
+    pub results: Option<PrfResults>,
+}
+
+/// PRF outputs returned by the authenticator.
+#[derive(Deserialize, Debug)]
+pub struct PrfResults {
+    /// Base64url-encoded first PRF output.
+    pub first: Option<String>,
+    /// Base64url-encoded second PRF output.
+    pub second: Option<String>,
+}

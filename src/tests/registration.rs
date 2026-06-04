@@ -38,6 +38,7 @@ fn test_start_passkey_registration_returns_challenge() {
         ResidentKeyRequirement::Preferred,
         UserVerificationRequirement::Preferred,
         None,
+        None,
     ).unwrap();
 
     // Verify challenge structure
@@ -75,6 +76,7 @@ fn test_start_passkey_registration_with_different_settings() {
         ResidentKeyRequirement::Required,
         UserVerificationRequirement::Required,
         None,
+        None,
     ).unwrap();
 
     assert_eq!(challenge.timeout, 30000);
@@ -96,6 +98,7 @@ fn test_start_passkey_registration_generates_unique_challenges() {
         ResidentKeyRequirement::Preferred,
         UserVerificationRequirement::Preferred,
         None,
+        None,
     ).unwrap();
 
     let user_id2 = b"user2_identifier";
@@ -107,6 +110,7 @@ fn test_start_passkey_registration_generates_unique_challenges() {
         AttestationConveyancePreference::None,
         ResidentKeyRequirement::Preferred,
         UserVerificationRequirement::Preferred,
+        None,
         None,
     ).unwrap();
 
@@ -128,6 +132,7 @@ fn test_start_passkey_registration_user_id_stored_as_bytes() {
         AttestationConveyancePreference::None,
         ResidentKeyRequirement::Preferred,
         UserVerificationRequirement::Preferred,
+        None,
         None,
     ).unwrap();
 
@@ -161,6 +166,7 @@ fn test_start_passkey_registration_with_single_existing_credential() {
         ResidentKeyRequirement::Preferred,
         UserVerificationRequirement::Preferred,
         Some(&[existing_passkey.clone()]),
+        None,
     ).unwrap();
 
     // Verify exclude_credentials contains the existing credential
@@ -211,6 +217,7 @@ fn test_start_passkey_registration_with_multiple_existing_credentials() {
         ResidentKeyRequirement::Preferred,
         UserVerificationRequirement::Preferred,
         Some(&existing_passkeys),
+        None,
     ).unwrap();
 
     // Verify all credentials are excluded
@@ -244,6 +251,7 @@ fn test_start_passkey_registration_none_vs_empty_slice() {
         ResidentKeyRequirement::Preferred,
         UserVerificationRequirement::Preferred,
         None,
+        None,
     ).unwrap();
 
     // Test with empty slice
@@ -257,6 +265,7 @@ fn test_start_passkey_registration_none_vs_empty_slice() {
         ResidentKeyRequirement::Preferred,
         UserVerificationRequirement::Preferred,
         Some(&empty_slice),
+        None,
     ).unwrap();
 
     // Both should result in no excluded credentials
@@ -279,6 +288,7 @@ fn test_start_passkey_registration_user_id_validation_success() {
         ResidentKeyRequirement::Preferred,
         UserVerificationRequirement::Preferred,
         None,
+        None,
     );
 
     assert!(result.is_ok(), "16-byte user_id should be valid");
@@ -297,6 +307,7 @@ fn test_start_passkey_registration_user_id_validation_fails_empty() {
         AttestationConveyancePreference::None,
         ResidentKeyRequirement::Preferred,
         UserVerificationRequirement::Preferred,
+        None,
         None,
     );
 
@@ -324,6 +335,7 @@ fn test_start_passkey_registration_user_id_validation_fails_15_bytes() {
         ResidentKeyRequirement::Preferred,
         UserVerificationRequirement::Preferred,
         None,
+        None,
     );
 
     assert!(result.is_err(), "15-byte user_id should fail");
@@ -349,6 +361,7 @@ fn test_finish_passkey_registration_success() {
         ResidentKeyRequirement::Preferred,
         UserVerificationRequirement::Preferred,
         None,
+        None,
     ).unwrap();
 
     let attestation_obj = create_test_attestation_object(-7);
@@ -358,6 +371,7 @@ fn test_finish_passkey_registration_success() {
         credential_id: Passki::base64_encode(&[1u8; 16]),
         public_key: Passki::base64_encode(&attestation_obj),
         client_data_json: Passki::base64_encode(&client_data_json),
+        client_extension_results: None,
     };
 
     let result = passki.finish_passkey_registration(&credential, &state);
@@ -384,6 +398,7 @@ fn test_finish_passkey_registration_wrong_challenge() {
         ResidentKeyRequirement::Preferred,
         UserVerificationRequirement::Preferred,
         None,
+        None,
     ).unwrap();
 
     let attestation_obj = create_test_attestation_object(-7);
@@ -394,6 +409,7 @@ fn test_finish_passkey_registration_wrong_challenge() {
         credential_id: Passki::base64_encode(&[1u8; 16]),
         public_key: Passki::base64_encode(&attestation_obj),
         client_data_json: Passki::base64_encode(&client_data_json),
+        client_extension_results: None,
     };
 
     let result = passki.finish_passkey_registration(&credential, &state);
@@ -420,6 +436,7 @@ fn test_finish_passkey_registration_wrong_origin() {
         ResidentKeyRequirement::Preferred,
         UserVerificationRequirement::Preferred,
         None,
+        None,
     ).unwrap();
 
     let attestation_obj = create_test_attestation_object(-7);
@@ -429,6 +446,7 @@ fn test_finish_passkey_registration_wrong_origin() {
         credential_id: Passki::base64_encode(&[1u8; 16]),
         public_key: Passki::base64_encode(&attestation_obj),
         client_data_json: Passki::base64_encode(&client_data_json),
+        client_extension_results: None,
     };
 
     let result = passki.finish_passkey_registration(&credential, &state);
@@ -450,6 +468,7 @@ fn test_finish_passkey_registration_eddsa_algorithm() {
         ResidentKeyRequirement::Preferred,
         UserVerificationRequirement::Preferred,
         None,
+        None,
     ).unwrap();
 
     let attestation_obj = create_test_attestation_object(-8);
@@ -459,6 +478,7 @@ fn test_finish_passkey_registration_eddsa_algorithm() {
         credential_id: Passki::base64_encode(&[2u8; 16]),
         public_key: Passki::base64_encode(&attestation_obj),
         client_data_json: Passki::base64_encode(&client_data_json),
+        client_extension_results: None,
     };
 
     let result = passki.finish_passkey_registration(&credential, &state);

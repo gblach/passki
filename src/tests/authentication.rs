@@ -30,6 +30,7 @@ fn test_start_passkey_authentication_returns_challenge() {
         &passkeys,
         60000,
         UserVerificationRequirement::Preferred,
+        None,
     );
 
     // Verify challenge structure
@@ -74,6 +75,7 @@ fn test_start_passkey_authentication_multiple_credentials() {
         &passkeys,
         30000,
         UserVerificationRequirement::Required,
+        None,
     );
 
     // Verify all credentials are included
@@ -105,6 +107,7 @@ fn test_start_passkey_authentication_empty_credentials() {
         &passkeys,
         60000,
         UserVerificationRequirement::Preferred,
+        None,
     );
 
     // Should work with empty credentials
@@ -128,12 +131,14 @@ fn test_start_passkey_authentication_generates_unique_challenges() {
         &passkeys,
         60000,
         UserVerificationRequirement::Preferred,
+        None,
     );
 
     let (challenge2, state2) = passki.start_passkey_authentication(
         &passkeys,
         60000,
         UserVerificationRequirement::Preferred,
+        None,
     );
 
     // Challenges should be unique
@@ -156,6 +161,7 @@ fn test_start_passkey_authentication_with_different_settings() {
         &passkeys,
         120000,
         UserVerificationRequirement::Discouraged,
+        None,
     );
 
     assert_eq!(challenge.timeout, 120000);
@@ -178,6 +184,7 @@ fn test_finish_passkey_authentication_success() {
         &passkeys,
         60000,
         UserVerificationRequirement::Preferred,
+        None,
     );
 
     let authenticator_data = create_test_authenticator_data(6);
@@ -189,6 +196,7 @@ fn test_finish_passkey_authentication_success() {
         authenticator_data: Passki::base64_encode(&authenticator_data),
         client_data_json: Passki::base64_encode(&client_data_json),
         signature: Passki::base64_encode(&vec![9u8; 64]),
+        client_extension_results: None,
     };
 
     let result = passki.finish_passkey_authentication(&credential, &state, &stored_passkey);
@@ -215,6 +223,7 @@ fn test_finish_passkey_authentication_wrong_credential_id() {
         &passkeys,
         60000,
         UserVerificationRequirement::Preferred,
+        None,
     );
 
     let authenticator_data = create_test_authenticator_data(6);
@@ -226,6 +235,7 @@ fn test_finish_passkey_authentication_wrong_credential_id() {
         authenticator_data: Passki::base64_encode(&authenticator_data),
         client_data_json: Passki::base64_encode(&client_data_json),
         signature: Passki::base64_encode(&vec![9u8; 64]),
+        client_extension_results: None,
     };
 
     let result = passki.finish_passkey_authentication(&credential, &state, &stored_passkey);
@@ -254,6 +264,7 @@ fn test_finish_passkey_authentication_wrong_challenge() {
         &passkeys,
         60000,
         UserVerificationRequirement::Preferred,
+        None,
     );
 
     let authenticator_data = create_test_authenticator_data(6);
@@ -266,6 +277,7 @@ fn test_finish_passkey_authentication_wrong_challenge() {
         authenticator_data: Passki::base64_encode(&authenticator_data),
         client_data_json: Passki::base64_encode(&client_data_json),
         signature: Passki::base64_encode(&vec![9u8; 64]),
+        client_extension_results: None,
     };
 
     let result = passki.finish_passkey_authentication(&credential, &state, &stored_passkey);
@@ -294,6 +306,7 @@ fn test_finish_passkey_authentication_wrong_origin() {
         &passkeys,
         60000,
         UserVerificationRequirement::Preferred,
+        None,
     );
 
     let authenticator_data = create_test_authenticator_data(6);
@@ -304,6 +317,7 @@ fn test_finish_passkey_authentication_wrong_origin() {
         authenticator_data: Passki::base64_encode(&authenticator_data),
         client_data_json: Passki::base64_encode(&client_data_json),
         signature: Passki::base64_encode(&vec![9u8; 64]),
+        client_extension_results: None,
     };
 
     let result = passki.finish_passkey_authentication(&credential, &state, &stored_passkey);
@@ -327,6 +341,7 @@ fn test_finish_passkey_authentication_invalid_counter() {
         &passkeys,
         60000,
         UserVerificationRequirement::Preferred,
+        None,
     );
 
     let authenticator_data = create_test_authenticator_data(5); // Counter 5 <= stored counter 10
@@ -338,6 +353,7 @@ fn test_finish_passkey_authentication_invalid_counter() {
         authenticator_data: Passki::base64_encode(&authenticator_data),
         client_data_json: Passki::base64_encode(&client_data_json),
         signature: Passki::base64_encode(&vec![9u8; 64]),
+        client_extension_results: None,
     };
 
     let result = passki.finish_passkey_authentication(&credential, &state, &stored_passkey);
@@ -361,6 +377,7 @@ fn test_finish_passkey_authentication_too_short_authenticator_data() {
         &passkeys,
         60000,
         UserVerificationRequirement::Preferred,
+        None,
     );
 
     let authenticator_data = vec![0u8; 36]; // Too short (< 37 bytes)
@@ -372,6 +389,7 @@ fn test_finish_passkey_authentication_too_short_authenticator_data() {
         authenticator_data: Passki::base64_encode(&authenticator_data),
         client_data_json: Passki::base64_encode(&client_data_json),
         signature: Passki::base64_encode(&vec![9u8; 64]),
+        client_extension_results: None,
     };
 
     let result = passki.finish_passkey_authentication(&credential, &state, &stored_passkey);
@@ -402,6 +420,7 @@ fn test_finish_passkey_authentication_usernameless() {
         &passkeys,
         60000,
         UserVerificationRequirement::Preferred,
+        None,
     );
 
     // Verify state has empty allowed_credentials
@@ -417,6 +436,7 @@ fn test_finish_passkey_authentication_usernameless() {
         authenticator_data: Passki::base64_encode(&authenticator_data),
         client_data_json: Passki::base64_encode(&client_data_json),
         signature: Passki::base64_encode(&vec![9u8; 64]),
+        client_extension_results: None,
     };
 
     let result = passki.finish_passkey_authentication(&credential, &state, &stored_passkey);

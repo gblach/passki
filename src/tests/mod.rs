@@ -18,6 +18,7 @@ mod attestation;
 mod authentication;
 mod base64;
 mod client_data;
+mod prf;
 mod registration;
 mod serde;
 mod signature;

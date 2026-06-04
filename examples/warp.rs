@@ -15,17 +15,17 @@
 //! # Passkeys Demo Server (Warp)
 //!
 //! This example demonstrates WebAuthn/Passkey authentication using the Passki library
-//! with the Warp web framework.
+//! with the Warp web framework, including optional PRF extension support for key derivation.
 //!
 //! ## Authentication Flows
 //!
 //! ### Registration (creating a new passkey)
 //! 1. Client sends username to `/register/start`
-//! 2. Server generates a challenge and returns WebAuthn options
+//! 2. Server generates a challenge and returns WebAuthn options (with PRF probe)
 //! 3. Client calls `navigator.credentials.create()` with these options
 //! 4. User authenticates with their device (fingerprint, face, PIN, etc.)
 //! 5. Client sends the credential to `/register/finish`
-//! 6. Server verifies and stores the passkey
+//! 6. Server verifies, stores the passkey, and reports PRF support
 //!
 //! ### Authentication (using an existing passkey)
 //! Two modes are supported:
@@ -39,6 +39,11 @@
 //! - Browser shows all available passkeys (discoverable credentials)
 //! - Server identifies the user by the credential used
 //!
+//! ### PRF key derivation (optional)
+//! If the client sends a `prf_salt` with the authentication request, the server
+//! includes it as `extensions.prf.eval.first` in the challenge. The authenticator
+//! derives a deterministic 32-byte key returned hex-encoded in `prf_output`.
+//!
 //! ## Running
 //! ```sh
 //! cargo run --example warp
@@ -46,14 +51,14 @@
 //! Then open http://localhost:3000 in your browser.
 
 use passki::{
-    AttestationConveyancePreference, AuthenticationCredential, AuthenticationState, ClientData,
-    Passki, RegistrationCredential, RegistrationState, ResidentKeyRequirement, StoredPasskey,
-    UserVerificationRequirement,
+    AttestationConveyancePreference, AuthenticationCredential, AuthenticationExtensions,
+    AuthenticationState, ClientData, ClientExtensionResults, Passki, PrfEval, PrfInput,
+    RegistrationCredential, RegistrationExtensions, RegistrationState, ResidentKeyRequirement,
+    StoredPasskey, UserVerificationRequirement,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::convert::Infallible;
-use std::fs;
 use std::sync::{Arc, Mutex};
 use uuid::Uuid;
 use warp::{Filter, Reply, http::StatusCode, reject::Reject, reply};
@@ -113,6 +118,8 @@ struct User {
     /// All passkeys registered by this user. A user can have multiple passkeys
     /// (e.g., one on their phone, one on their laptop, one security key).
     passkeys: Vec<StoredPasskey>,
+    /// Whether any of this user's passkeys reported PRF support during registration.
+    prf_supported: bool,
 }
 
 // =============================================================================
@@ -133,15 +140,21 @@ struct RegisterFinishRequest {
     public_key: String,
     /// Base64url-encoded client data JSON
     client_data_json: String,
+    /// Extension results from the browser (e.g., PRF support flag)
+    client_extension_results: Option<ClientExtensionResults>,
 }
 
-/// Request to start authentication. Username is optional:
-/// - If provided: passwordless flow (server specifies allowed credentials)
-/// - If omitted: usernameless flow (browser shows all available passkeys)
+/// Request to start authentication. Username and PRF salt are both optional.
 #[derive(Deserialize, Default)]
 struct AuthStartRequest {
+    /// If provided: passwordless flow (server specifies allowed credentials)
+    /// If omitted: usernameless flow (browser shows all available passkeys)
     #[serde(default)]
     username: Option<String>,
+    /// Base64url-encoded PRF context string. When present, the server requests
+    /// a PRF derivation for this salt.
+    #[serde(default)]
+    prf_salt: Option<String>,
 }
 
 /// Data sent by the client after WebAuthn authentication.
@@ -155,6 +168,8 @@ struct AuthFinishRequest {
     client_data_json: String,
     /// Base64url-encoded signature over authenticator_data + hash(client_data_json)
     signature: String,
+    /// Extension results from the browser (e.g., PRF outputs)
+    client_extension_results: Option<ClientExtensionResults>,
 }
 
 #[derive(Serialize)]
@@ -164,6 +179,12 @@ struct ApiResponse {
     /// In usernameless flow, returns the identified username
     #[serde(skip_serializing_if = "Option::is_none")]
     username: Option<String>,
+    /// Registration only: whether this passkey supports PRF
+    #[serde(skip_serializing_if = "Option::is_none")]
+    prf_supported: Option<bool>,
+    /// Authentication only: hex-encoded 32-byte derived key, when prf_salt was provided
+    #[serde(skip_serializing_if = "Option::is_none")]
+    prf_output: Option<String>,
 }
 
 // =============================================================================
@@ -192,9 +213,7 @@ fn with_state(
 // =============================================================================
 
 async fn index() -> Result<impl Reply, warp::Rejection> {
-    let html = fs::read_to_string("examples/index.html")
-        .map_err(|e| warp::reject::custom(AppError(e.to_string())))?;
-    Ok(reply::html(html))
+    Ok(reply::html(include_str!("index.html")))
 }
 
 /// POST /register/start - Begin passkey registration
@@ -222,6 +241,7 @@ async fn register_start(
         ResidentKeyRequirement::Preferred,      // Request discoverable credential if possible
         UserVerificationRequirement::Preferred, // Request user verification if available
         existing.as_deref(),                    // Exclude existing credentials
+        Some(RegistrationExtensions { prf: PrfInput { eval: None } }), // Probe PRF support
     ).map_err(|e| warp::reject::custom(AppError(e.to_string())))?;
 
     // Store state for verification in finish step, keyed by the challenge
@@ -233,7 +253,8 @@ async fn register_start(
 
 /// POST /register/finish - Complete passkey registration
 ///
-/// Verifies the credential created by the authenticator and stores it.
+/// Verifies the credential created by the authenticator, stores it, and reports
+/// whether this passkey supports the PRF extension.
 async fn register_finish(
     state: AppState,
     req: RegisterFinishRequest,
@@ -247,11 +268,18 @@ async fn register_finish(
         .remove(&client_data.challenge)
         .ok_or_else(|| warp::reject::custom(AppError("No pending registration".into())))?;
 
+    let prf_supported = req.client_extension_results
+        .as_ref()
+        .and_then(|ext| ext.prf.as_ref())
+        .and_then(|prf| prf.enabled)
+        .unwrap_or(false);
+
     // Package the credential data from the client
     let credential = RegistrationCredential {
         credential_id: req.credential_id,
         public_key: req.public_key,
         client_data_json: req.client_data_json,
+        client_extension_results: req.client_extension_results,
     };
 
     // Verify the credential (checks origin, challenge, parses public key)
@@ -269,16 +297,26 @@ async fn register_finish(
     users
         .entry(reg_state.user.name.clone())
         // If user exists, add passkey to their list.
-        .and_modify(|user| user.passkeys.push(passkey.clone()))
+        .and_modify(|user| {
+            user.passkeys.push(passkey.clone());
+            user.prf_supported |= prf_supported;
+        })
         // If new user, create user record with their info.
         .or_insert(User {
             id: user_id,
             username: reg_state.user.name,
             display_name: reg_state.user.display_name,
             passkeys: vec![passkey],
+            prf_supported,
         });
 
-    Ok(reply::json(&ApiResponse { success: true, message: "Registration successful".into(), username: None }))
+    Ok(reply::json(&ApiResponse {
+        success: true,
+        message: "Registration successful".into(),
+        username: None,
+        prf_supported: Some(prf_supported),
+        prf_output: None,
+    }))
 }
 
 /// POST /auth/start - Begin passkey authentication
@@ -287,7 +325,8 @@ async fn register_finish(
 /// - Passwordless: returns challenge with user's credential IDs (browser filters to these)
 /// - Usernameless: returns challenge with empty credential list (browser shows all passkeys)
 ///
-/// The challenge is used to correlate start and finish requests.
+/// If prf_salt is provided, the challenge includes a PRF eval so the authenticator
+/// will derive a key for that salt.
 async fn auth_start(
     state: AppState,
     req: AuthStartRequest,
@@ -303,10 +342,15 @@ async fn auth_start(
         vec![]
     };
 
+    let extensions = req.prf_salt.map(|salt| AuthenticationExtensions {
+        prf: PrfInput { eval: Some(PrfEval { first: salt, second: None }) },
+    });
+
     let (challenge, auth_state) = state.passki.start_passkey_authentication(
         &passkeys,
         60000,                                  // Timeout in milliseconds
         UserVerificationRequirement::Preferred, // Request user verification if available
+        extensions,
     );
 
     // Store state for verification in finish step, keyed by the challenge
@@ -318,10 +362,8 @@ async fn auth_start(
 
 /// POST /auth/finish - Complete passkey authentication
 ///
-/// Verifies the signature from the authenticator. The signature proves:
-/// 1. The user possesses the private key for this credential
-/// 2. The user approved this specific authentication (via the signed challenge)
-/// 3. User verification was performed (if required)
+/// Verifies the signature from the authenticator and, if a PRF salt was provided,
+/// returns the derived key hex-encoded in prf_output.
 async fn auth_finish(
     state: AppState,
     req: AuthFinishRequest,
@@ -355,6 +397,7 @@ async fn auth_finish(
         authenticator_data: req.authenticator_data,
         client_data_json: req.client_data_json,
         signature: req.signature,
+        client_extension_results: req.client_extension_results,
     };
 
     // Verify the signature (checks origin, challenge, signature, counter)
@@ -365,10 +408,15 @@ async fn auth_finish(
     // If counter goes backwards, it may indicate the credential was cloned.
     passkey.counter = result.counter;
 
+    let prf_output = result.prf_first
+        .map(|bytes| bytes.iter().map(|b| format!("{b:02x}")).collect());
+
     Ok(reply::json(&ApiResponse {
         success: true,
         message: format!("Welcome back, {}!", username),
         username: Some(username),
+        prf_supported: None,
+        prf_output,
     }))
 }
 

@@ -73,6 +73,7 @@
                 font-weight: 500;
             }
 
+
             input[type="text"] {
                 width: 100%;
                 padding: 12px;
@@ -122,6 +123,8 @@
                 padding: 12px;
                 border-radius: 8px;
                 font-size: 14px;
+                line-height: 1.7;
+                white-space: pre-line;
                 display: none;
             }
 
@@ -139,6 +142,32 @@
 
             .message.show {
                 display: block;
+            }
+
+
+            .prf-output {
+                margin-top: 10px;
+                padding: 10px 12px;
+                background: #f0f4ff;
+                border: 1px solid #c7d2fe;
+                border-radius: 8px;
+                display: none;
+            }
+
+            .prf-output .prf-label {
+                font-size: 11px;
+                font-weight: 600;
+                color: #4338ca;
+                text-transform: uppercase;
+                letter-spacing: 0.05em;
+                margin-bottom: 4px;
+            }
+
+            .prf-output .prf-key {
+                font-family: "Courier New", Courier, monospace;
+                font-size: 11px;
+                color: #1e1b4b;
+                word-break: break-all;
             }
 
             .divider {
@@ -188,8 +217,20 @@
                         placeholder="Leave empty for usernameless login"
                     />
                 </div>
+                <div class="input-group">
+                    <label for="prf-context">Derive a key for (optional)</label>
+                    <input
+                        type="text"
+                        id="prf-context"
+                        placeholder="e.g. notes, backup"
+                    />
+                </div>
                 <button id="login-btn">Login with Passkey</button>
                 <div id="login-message" class="message"></div>
+                <div id="login-prf-output" class="prf-output">
+                    <div class="prf-label">Derived key &mdash; 32 bytes, deterministic</div>
+                    <div id="prf-key-value" class="prf-key"></div>
+                </div>
             </div>
         </div>
 
@@ -213,6 +254,30 @@
                     .replace(/\+/g, "-")
                     .replace(/\//g, "_")
                     .replace(/=/g, "");
+            }
+
+            function textToBase64url(text) {
+                return bufferToBase64url(new TextEncoder().encode(text).buffer);
+            }
+
+            // Serialize clientExtensionResults to a plain JSON-safe object.
+            // ArrayBuffer values (PRF outputs) are base64url-encoded.
+            function serializeExtensionResults(extResults) {
+                if (!extResults.prf) return null;
+                const prf = {};
+                if (extResults.prf.enabled !== undefined) {
+                    prf.enabled = extResults.prf.enabled;
+                }
+                if (extResults.prf.results) {
+                    prf.results = {};
+                    if (extResults.prf.results.first) {
+                        prf.results.first = bufferToBase64url(extResults.prf.results.first);
+                    }
+                    if (extResults.prf.results.second) {
+                        prf.results.second = bufferToBase64url(extResults.prf.results.second);
+                    }
+                }
+                return { prf };
             }
 
             async function register() {
@@ -256,6 +321,10 @@
                             ),
                     });
 
+                    const clientExtensionResults = serializeExtensionResults(
+                        credential.getClientExtensionResults()
+                    );
+
                     // Finish registration
                     const finishRes = await fetch("/register/finish", {
                         method: "POST",
@@ -269,17 +338,19 @@
                             client_data_json: bufferToBase64url(
                                 credential.response.clientDataJSON,
                             ),
+                            client_extension_results: clientExtensionResults,
                         }),
                     });
 
                     if (!finishRes.ok)
                         throw new Error("Registration finish failed");
 
-                    showMessage(
-                        "register-message",
-                        "\u2713 Registration successful!",
-                        true,
-                    );
+                    const result = await finishRes.json();
+
+                    const prf = result.prf_supported === true ? "\n✓ PRF supported"
+                              : result.prf_supported === false ? "\n⚠ PRF not supported"
+                              : "";
+                    showMessage("register-message", `✓ Registration successful!${prf}`, true);
                     document.getElementById("register-username").value = "";
                 } catch (err) {
                     console.error(err);
@@ -301,18 +372,33 @@
                 const username = document
                     .getElementById("login-username")
                     .value.trim();
+                const context = document
+                    .getElementById("prf-context")
+                    .value.trim();
                 const loginBtn = document.getElementById("login-btn");
+                const outputEl = document.getElementById("login-prf-output");
                 loginBtn.disabled = true;
+                outputEl.style.display = "none";
 
                 try {
-                    const body = username ? { username } : {};
-                    const result = await authenticate(body);
+                    const startBody = username ? { username } : {};
+                    if (context) startBody.prf_salt = textToBase64url(context);
+
+                    const result = await authenticate(startBody);
+
                     showMessage(
                         "login-message",
-                        `\u2713 ${result.message}`,
+                        `✓ ${result.message}`,
                         true,
                     );
                     document.getElementById("login-username").value = "";
+                    document.getElementById("prf-context").value = "";
+
+                    if (result.prf_output) {
+                        document.getElementById("prf-key-value").textContent =
+                            result.prf_output;
+                        outputEl.style.display = "block";
+                    }
                 } catch (err) {
                     console.error(err);
                     showMessage(
@@ -341,6 +427,10 @@
                         PublicKeyCredential.parseRequestOptionsFromJSON(options),
                 });
 
+                const clientExtensionResults = serializeExtensionResults(
+                    credential.getClientExtensionResults()
+                );
+
                 const finishRes = await fetch("/auth/finish", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -356,6 +446,7 @@
                         signature: bufferToBase64url(
                             credential.response.signature,
                         ),
+                        client_extension_results: clientExtensionResults,
                     }),
                 });
 
@@ -390,6 +481,10 @@
                         publicKey: PublicKeyCredential.parseRequestOptionsFromJSON(options),
                     });
 
+                    const clientExtensionResults = serializeExtensionResults(
+                        credential.getClientExtensionResults()
+                    );
+
                     const finishRes = await fetch("/auth/finish", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
@@ -398,6 +493,7 @@
                             authenticator_data: bufferToBase64url(credential.response.authenticatorData),
                             client_data_json: bufferToBase64url(credential.response.clientDataJSON),
                             signature: bufferToBase64url(credential.response.signature),
+                            client_extension_results: clientExtensionResults,
                         }),
                     });
 
@@ -406,8 +502,9 @@
                         throw new Error(`Authentication finish failed: ${text}`);
                     }
                     const result = await finishRes.json();
-                    showMessage("login-message", `\u2713 ${result.message}`, true);
+                    showMessage("login-message", `✓ ${result.message}`, true);
                     document.getElementById("login-username").value = "";
+                    document.getElementById("prf-context").value = "";
 
                     initConditionalUI();
                 } catch (err) {
@@ -432,6 +529,11 @@
                 });
             document
                 .getElementById("login-username")
+                .addEventListener("keypress", (e) => {
+                    if (e.key === "Enter") login();
+                });
+            document
+                .getElementById("prf-context")
                 .addEventListener("keypress", (e) => {
                     if (e.key === "Enter") login();
                 });

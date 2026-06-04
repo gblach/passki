@@ -48,6 +48,10 @@ pub struct AuthenticationChallenge {
     /// User verification requirement.
     #[serde(rename = "userVerification")]
     pub user_verification: UserVerificationRequirement,
+
+    /// WebAuthn extensions to request from the authenticator.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub extensions: Option<AuthenticationExtensions>,
 }
 
 /// Server-side state for a passkey authentication in progress.
@@ -79,11 +83,14 @@ pub struct AuthenticationCredential {
 
     /// The signature over the authenticator data and client data hash (base64url-encoded).
     pub signature: String,
+
+    /// Extension results from the client (e.g., PRF outputs).
+    pub client_extension_results: Option<ClientExtensionResults>,
 }
 
 /// Result of a successful authentication.
 ///
-/// Contains the credential ID and updated counter value.
+/// Contains the credential ID, updated counter, and any PRF outputs.
 #[derive(Debug)]
 pub struct AuthenticationResult {
     /// The credential ID that was used for authentication.
@@ -91,6 +98,12 @@ pub struct AuthenticationResult {
 
     /// The updated signature counter from the authenticator.
     pub counter: u32,
+
+    /// Decoded first PRF output, if the PRF extension was requested and supported.
+    pub prf_first: Option<Vec<u8>>,
+
+    /// Decoded second PRF output, if a second input was requested and supported.
+    pub prf_second: Option<Vec<u8>>,
 }
 
 impl Passki {
@@ -104,6 +117,9 @@ impl Passki {
     /// * `passkeys` - List of stored passkeys that are allowed for this authentication
     /// * `timeout` - Timeout for the operation in milliseconds
     /// * `user_verification` - User verification requirement
+    /// * `extensions` - Optional WebAuthn extensions, e.g. `Some(AuthenticationExtensions { prf:
+    ///   PrfInput { eval: Some(PrfEval { first: ..., second: None }) } })` to request a PRF
+    ///   derivation.
     ///
     /// # Returns
     ///
@@ -115,6 +131,7 @@ impl Passki {
         passkeys: &[StoredPasskey],
         timeout: u64,
         user_verification: UserVerificationRequirement,
+        extensions: Option<AuthenticationExtensions>,
     ) -> (AuthenticationChallenge, AuthenticationState) {
         let challenge = Self::generate_challenge();
 
@@ -130,6 +147,7 @@ impl Passki {
                 })
                 .collect(),
             user_verification,
+            extensions,
         };
 
         let state = AuthenticationState {
@@ -219,9 +237,25 @@ impl Passki {
             &signature,
         )?;
 
+        let prf_results = credential.client_extension_results
+            .as_ref()
+            .and_then(|ext| ext.prf.as_ref())
+            .and_then(|prf| prf.results.as_ref());
+
+        let prf_first = prf_results
+            .and_then(|r| r.first.as_deref())
+            .map(Self::base64_decode)
+            .transpose()?;
+        let prf_second = prf_results
+            .and_then(|r| r.second.as_deref())
+            .map(Self::base64_decode)
+            .transpose()?;
+
         Ok(AuthenticationResult {
             credential_id,
             counter,
+            prf_first,
+            prf_second,
         })
     }
 

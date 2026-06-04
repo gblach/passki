@@ -13,6 +13,7 @@ A simple, secure, and easy-to-use WebAuthn/Passkey implementation for Rust.
 - 🛡️ **Security First** - Built-in replay attack protection via signature counters
 - 📦 **Framework Agnostic** - No web framework lock-in, works with any HTTP server
 - ✅ **WebAuthn Level 2 Compliant** - Follows the latest W3C specification
+- 🔑 **PRF Extension** - Support for the WebAuthn PRF extension for key derivation and E2E encryption
 - 🦀 **Pure Rust** - Memory-safe implementation with no unsafe code
 
 ## Installation
@@ -51,6 +52,7 @@ let (registration_challenge, registration_state) = passki.start_passkey_registra
     ResidentKeyRequirement::Preferred,              // Resident key
     UserVerificationRequirement::Preferred,         // User verification
     None,                                           // Exclude existing credentials
+    None,                                           // Extensions (None, or Some(RegistrationExtensions { ... }))
 ).expect("user_id must be at least 16 bytes");
 
 // Send registration_challenge to client (as JSON)
@@ -70,6 +72,7 @@ let (authentication_challenge, authentication_state) = passki.start_passkey_auth
     &user_passkeys,                            // User's stored passkeys
     60000,                                     // Timeout (ms)
     UserVerificationRequirement::Preferred,    // User verification
+    None,                                      // Extensions (None, or Some(AuthenticationExtensions { ... }))
 );
 
 // Send authentication_challenge to client (as JSON)
@@ -95,6 +98,55 @@ Passki supports the following COSE algorithms:
 - **ES384** (ECDSA with P-384 and SHA-384) - Algorithm ID: -35
 - **RS256** (RSASSA-PKCS1-v1_5 with SHA-256) - Algorithm ID: -257
 - **RS384** (RSASSA-PKCS1-v1_5 with SHA-384) - Algorithm ID: -258
+
+## PRF Extension
+
+The [WebAuthn PRF extension](https://www.w3.org/TR/webauthn-2/#prf-extension) lets a passkey derive deterministic secret bytes from the authenticator's internal HMAC-secret. This is useful for end-to-end encryption, per-user key derivation, and other scenarios where you need a stable secret tied to a specific passkey.
+
+The server passes input salts; the browser computes `HMAC-SHA256("WebAuthn PRF" || 0x00 || input)` and feeds the result into the authenticator. Passki passes the outputs through without processing them.
+
+```rust
+use passki::{ClientExtensionResults, PrfEval, PrfInput, RegistrationExtensions, AuthenticationExtensions};
+
+// During registration, probe for PRF support (no eval - works on all authenticators)
+let (challenge, state) = passki.start_passkey_registration(
+    user_id, username, display_name, 60000,
+    AttestationConveyancePreference::None,
+    ResidentKeyRequirement::Preferred,
+    UserVerificationRequirement::Preferred,
+    None,
+    Some(RegistrationExtensions { prf: PrfInput { eval: None } }),  // probe: ask "do you support PRF?"
+)?;
+
+// Pass clientExtensionResults from the browser directly - no unwrapping needed
+    let credential = RegistrationCredential {
+    credential_id, public_key, client_data_json,
+    client_extension_results: Some(ClientExtensionResults { prf: Some(ext) }),
+};
+// ext.enabled == Some(true) if the authenticator supports PRF
+
+// During authentication, request a PRF derivation for a given context
+let (challenge, state) = passki.start_passkey_authentication(
+    &user_passkeys,
+    60000,
+    UserVerificationRequirement::Preferred,
+    Some(AuthenticationExtensions {
+        prf: PrfInput { eval: Some(PrfEval {
+            first: Passki::base64_encode(b"my-app-encryption-key-context"),
+            second: None,
+        }) },
+    }),
+);
+
+// Pass clientExtensionResults from the browser directly
+let credential = AuthenticationCredential {
+    credential_id, authenticator_data, client_data_json, signature,
+    client_extension_results: Some(ClientExtensionResults { prf: Some(ext) }),
+};
+
+// result.prf_first contains the derived key bytes (32 bytes)
+// The same passkey + same context always yields the same bytes
+```
 
 ## Security Considerations
 
@@ -124,6 +176,8 @@ This design keeps state management simple and allows you to store session data h
 
 The `examples/` directory has complete registration and authentication flows for several web frameworks:
 [Actix-web](examples/actix-web.rs) | [Axum](examples/axum.rs) | [Poem](examples/poem.rs) | [Rocket](examples/rocket.rs) | [Warp](examples/warp.rs)
+
+All examples include full PRF support: registration probes for PRF and reports whether the authenticator supports it, and authentication accepts an optional key context string (`prf_salt`) to derive a 32-byte key.
 
 ```bash
 cargo run --example axum  # or actix-web, poem, rocket, warp
