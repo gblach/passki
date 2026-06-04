@@ -368,7 +368,7 @@ fn test_finish_passkey_registration_success() {
         None,
     ).unwrap();
 
-    let attestation_obj = create_test_attestation_object(-7);
+    let attestation_obj = create_test_attestation_object(-7, 0x45);
     let client_data_json = create_test_client_data_json(&state.challenge, "http://localhost:3000");
 
     let credential = RegistrationCredential {
@@ -405,7 +405,7 @@ fn test_finish_passkey_registration_wrong_challenge() {
         None,
     ).unwrap();
 
-    let attestation_obj = create_test_attestation_object(-7);
+    let attestation_obj = create_test_attestation_object(-7, 0x45);
     let wrong_challenge = vec![99u8; 32];
     let client_data_json = create_test_client_data_json(&wrong_challenge, "http://localhost:3000");
 
@@ -443,7 +443,7 @@ fn test_finish_passkey_registration_wrong_origin() {
         None,
     ).unwrap();
 
-    let attestation_obj = create_test_attestation_object(-7);
+    let attestation_obj = create_test_attestation_object(-7, 0x45);
     let client_data_json = create_test_client_data_json(&state.challenge, "https://evil.com");
 
     let credential = RegistrationCredential {
@@ -456,6 +456,39 @@ fn test_finish_passkey_registration_wrong_origin() {
     let result = passki.finish_passkey_registration(&credential, &state);
     assert!(result.is_err());
     assert!(result.unwrap_err().to_string().contains("Invalid origin"));
+}
+
+#[test]
+fn test_finish_passkey_registration_up_flag_not_set() {
+    let passki = Passki::new("localhost", "http://localhost:3000", "Test App");
+
+    let user_id = b"user123_16bytes_";
+    let (_challenge, state) = passki.start_passkey_registration(
+        user_id,
+        "testuser",
+        "Test User",
+        60000,
+        AttestationConveyancePreference::None,
+        ResidentKeyRequirement::Preferred,
+        UserVerificationRequirement::Preferred,
+        None,
+        None,
+    ).unwrap();
+
+    // flags: AT=1 but UP=0 (0x40)
+    let attestation_obj = create_test_attestation_object(-7, 0x44);
+    let client_data_json = create_test_client_data_json(&state.challenge, "http://localhost:3000");
+
+    let credential = RegistrationCredential {
+        credential_id: Passki::base64_encode(&[1u8; 16]),
+        public_key: Passki::base64_encode(&attestation_obj),
+        client_data_json: Passki::base64_encode(&client_data_json),
+        client_extension_results: None,
+    };
+
+    let result = passki.finish_passkey_registration(&credential, &state);
+    assert!(result.is_err());
+    assert!(result.unwrap_err().to_string().contains("UP flag not set"));
 }
 
 #[test]
@@ -475,7 +508,7 @@ fn test_finish_passkey_registration_eddsa_algorithm() {
         None,
     ).unwrap();
 
-    let attestation_obj = create_test_attestation_object(-8);
+    let attestation_obj = create_test_attestation_object(-8, 0x45);
     let client_data_json = create_test_client_data_json(&state.challenge, "http://localhost:3000");
 
     let credential = RegistrationCredential {

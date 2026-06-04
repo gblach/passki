@@ -194,7 +194,7 @@ fn test_finish_passkey_authentication_success() {
         None,
     );
 
-    let authenticator_data = create_test_authenticator_data(6);
+    let authenticator_data = create_test_authenticator_data(6, 0x01);
     let client_data_json =
         create_test_auth_client_data_json(&state.challenge, "http://localhost:3000");
 
@@ -234,7 +234,7 @@ fn test_finish_passkey_authentication_wrong_credential_id() {
         None,
     );
 
-    let authenticator_data = create_test_authenticator_data(6);
+    let authenticator_data = create_test_authenticator_data(6, 0x01);
     let client_data_json =
         create_test_auth_client_data_json(&state.challenge, "http://localhost:3000");
 
@@ -276,7 +276,7 @@ fn test_finish_passkey_authentication_wrong_challenge() {
         None,
     );
 
-    let authenticator_data = create_test_authenticator_data(6);
+    let authenticator_data = create_test_authenticator_data(6, 0x01);
     let wrong_challenge = vec![88u8; 32];
     let client_data_json =
         create_test_auth_client_data_json(&wrong_challenge, "http://localhost:3000");
@@ -319,7 +319,7 @@ fn test_finish_passkey_authentication_wrong_origin() {
         None,
     );
 
-    let authenticator_data = create_test_authenticator_data(6);
+    let authenticator_data = create_test_authenticator_data(6, 0x01);
     let client_data_json = create_test_auth_client_data_json(&state.challenge, "https://evil.com");
 
     let credential = AuthenticationCredential {
@@ -355,7 +355,7 @@ fn test_finish_passkey_authentication_invalid_counter() {
         None,
     );
 
-    let authenticator_data = create_test_authenticator_data(5); // Counter 5 <= stored counter 10
+    let authenticator_data = create_test_authenticator_data(5, 0x01); // Counter 5 <= stored counter 10
     let client_data_json =
         create_test_auth_client_data_json(&state.challenge, "http://localhost:3000");
 
@@ -415,6 +415,44 @@ fn test_finish_passkey_authentication_too_short_authenticator_data() {
 }
 
 #[test]
+fn test_finish_passkey_authentication_up_flag_not_set() {
+    let passki = Passki::new("localhost", "http://localhost:3000", "Test App");
+
+    let stored_passkey = StoredPasskey {
+        credential_id: vec![1u8; 16],
+        public_key: vec![2u8; 64],
+        counter: 5,
+        algorithm: -7,
+        rk: None,
+    };
+
+    let passkeys = vec![stored_passkey.clone()];
+    let (_challenge, state) = passki.start_passkey_authentication(
+        &passkeys,
+        60000,
+        UserVerificationRequirement::Preferred,
+        None,
+    );
+
+    // flags: UP=0 (0x00)
+    let authenticator_data = create_test_authenticator_data(6, 0x00);
+    let client_data_json =
+        create_test_auth_client_data_json(&state.challenge, "http://localhost:3000");
+
+    let credential = AuthenticationCredential {
+        credential_id: Passki::base64_encode(&vec![1u8; 16]),
+        authenticator_data: Passki::base64_encode(&authenticator_data),
+        client_data_json: Passki::base64_encode(&client_data_json),
+        signature: Passki::base64_encode(&vec![9u8; 64]),
+        client_extension_results: None,
+    };
+
+    let result = passki.finish_passkey_authentication(&credential, &state, &stored_passkey);
+    assert!(result.is_err());
+    assert!(result.unwrap_err().to_string().contains("UP flag not set"));
+}
+
+#[test]
 fn test_finish_passkey_authentication_usernameless() {
     let passki = Passki::new("localhost", "http://localhost:3000", "Test App");
 
@@ -439,7 +477,7 @@ fn test_finish_passkey_authentication_usernameless() {
     // Verify state has empty allowed_credentials
     assert!(state.allowed_credentials.is_empty());
 
-    let authenticator_data = create_test_authenticator_data(6);
+    let authenticator_data = create_test_authenticator_data(6, 0x01);
     let client_data_json =
         create_test_auth_client_data_json(&state.challenge, "http://localhost:3000");
 

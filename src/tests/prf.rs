@@ -30,7 +30,7 @@ fn signed_auth_credential(
     prf: Option<PrfExtensionResult>,
 ) -> AuthenticationCredential {
     let client_extension_results = prf.map(|p| ClientExtensionResults { prf: Some(p), cred_props: None });
-    let auth_data = create_test_authenticator_data(counter);
+    let auth_data = create_test_authenticator_data(counter, 0x01);
     let client_data_json = create_test_auth_client_data_json(challenge, origin);
 
     let client_data_hash = digest::digest(&SHA256, &client_data_json);

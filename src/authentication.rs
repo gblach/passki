@@ -212,6 +212,12 @@ impl Passki {
             return Err(Box::new(PasskiError::new("rpId hash mismatch")));
         }
 
+        // Check UP flag (bit 0) - user must be present
+        let flags = authenticator_data[32];
+        if (flags & 0x01) == 0 {
+            return Err(Box::new(PasskiError::new("User not present (UP flag not set)")));
+        }
+
         let counter = u32::from_be_bytes([
             authenticator_data[33],
             authenticator_data[34],

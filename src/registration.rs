@@ -280,8 +280,14 @@ impl Passki {
             return Err(Box::new(PasskiError::new("rpId hash mismatch")));
         }
 
-        // Check if attested credential data is present (bit 6 of flags)
         let flags = auth_data_bytes[32];
+
+        // Check UP flag (bit 0) - user must be present
+        if (flags & 0x01) == 0 {
+            return Err(Box::new(PasskiError::new("User not present (UP flag not set)")));
+        }
+
+        // Check if attested credential data is present (bit 6 of flags)
         if (flags & 0x40) == 0 {
             return Err(Box::new(PasskiError::new(
                 "No attested credential data present",

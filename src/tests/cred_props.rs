@@ -75,7 +75,7 @@ fn test_cred_props_and_prf_can_be_requested_together() {
 // ===== RegistrationResult cred_props_rk extraction =====
 
 fn make_credential(state: &RegistrationState, cred_props: Option<CredPropsResult>) -> RegistrationCredential {
-    let attestation_obj = create_test_attestation_object(-7);
+    let attestation_obj = create_test_attestation_object(-7, 0x45);
     let client_data_json = create_test_client_data_json(&state.challenge, "http://localhost:3000");
     RegistrationCredential {
         credential_id: Passki::base64_encode(&[1u8; 16]),
@@ -137,7 +137,7 @@ fn test_cred_props_rk_none_when_no_extension_results() {
         None,
     ).unwrap();
 
-    let attestation_obj = create_test_attestation_object(-7);
+    let attestation_obj = create_test_attestation_object(-7, 0x45);
     let client_data_json = create_test_client_data_json(&state.challenge, "http://localhost:3000");
     let credential = RegistrationCredential {
         credential_id: Passki::base64_encode(&[1u8; 16]),

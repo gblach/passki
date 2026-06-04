@@ -219,7 +219,7 @@ The initial recommendation. Defined the core protocol:
 - [x] Attestation object CBOR parsing
 - [ ] Attestation statement verification (`packed`, `tpm`, `android-key`, `fido-u2f`) - `attStmt` is ignored; only `authData` is extracted
 - [x] rpId hash verification in authenticator data - the hash in bytes 0-31 is compared against `sha256(rp_id)`
-- [ ] UP (user present) flag enforcement
+- [x] UP (user present) flag enforcement
 - [ ] UV (user verified) flag enforcement
 
 ### Level 2 (2021)
