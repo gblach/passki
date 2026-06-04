@@ -64,6 +64,9 @@ pub struct AuthenticationState {
 
     /// List of credential IDs that are allowed for this authentication.
     pub allowed_credentials: Vec<Vec<u8>>,
+
+    /// The user verification requirement requested when the ceremony was started.
+    pub user_verification: UserVerificationRequirement,
 }
 
 /// Credential data returned by the client after authentication.
@@ -153,6 +156,7 @@ impl Passki {
         let state = AuthenticationState {
             challenge: challenge.clone(),
             allowed_credentials: passkeys.iter().map(|pk| pk.credential_id.clone()).collect(),
+            user_verification,
         };
 
         (challenge_response, state)
@@ -216,6 +220,11 @@ impl Passki {
         let flags = authenticator_data[32];
         if (flags & 0x01) == 0 {
             return Err(Box::new(PasskiError::new("User not present (UP flag not set)")));
+        }
+
+        // Check UV flag (bit 2) - required only when user_verification is Required
+        if state.user_verification == UserVerificationRequirement::Required && (flags & 0x04) == 0 {
+            return Err(Box::new(PasskiError::new("User verification required but UV flag not set")));
         }
 
         let counter = u32::from_be_bytes([

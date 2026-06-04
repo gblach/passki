@@ -23,6 +23,7 @@ fn test_registration_state_roundtrip() {
             name: "alice@example.com".to_string(),
             display_name: "Alice Smith".to_string(),
         },
+        user_verification: UserVerificationRequirement::Preferred,
     };
 
     let json = serde_json::to_string(&state).unwrap();
@@ -43,6 +44,7 @@ fn test_registration_state_json_shape() {
             name: "bob".to_string(),
             display_name: "Bob".to_string(),
         },
+        user_verification: UserVerificationRequirement::Required,
     };
 
     let value: serde_json::Value = serde_json::to_value(&state).unwrap();
@@ -61,6 +63,7 @@ fn test_authentication_state_roundtrip() {
             vec![1u8; 16],
             vec![2u8; 16],
         ],
+        user_verification: UserVerificationRequirement::Required,
     };
 
     let json = serde_json::to_string(&state).unwrap();
@@ -75,6 +78,7 @@ fn test_authentication_state_empty_credentials_roundtrip() {
     let state = AuthenticationState {
         challenge: vec![0u8; 32],
         allowed_credentials: vec![],
+        user_verification: UserVerificationRequirement::Preferred,
     };
 
     let json = serde_json::to_string(&state).unwrap();
@@ -89,6 +93,7 @@ fn test_authentication_state_json_shape() {
     let state = AuthenticationState {
         challenge: vec![0xff, 0x00],
         allowed_credentials: vec![vec![0xaa, 0xbb]],
+        user_verification: UserVerificationRequirement::Discouraged,
     };
 
     let value: serde_json::Value = serde_json::to_value(&state).unwrap();

@@ -72,6 +72,9 @@ pub struct RegistrationState {
 
     /// The user information.
     pub user: UserInfo,
+
+    /// The user verification requirement requested when the ceremony was started.
+    pub user_verification: UserVerificationRequirement,
 }
 
 /// Credential data returned by the client after registration.
@@ -201,6 +204,7 @@ impl Passki {
         let state = RegistrationState {
             challenge: challenge.clone(),
             user,
+            user_verification,
         };
 
         Ok((challenge_response, state))
@@ -238,7 +242,14 @@ impl Passki {
 
         // Parse attestation object to extract public key and algorithm
         let attestation_bytes = Self::base64_decode(&credential.public_key)?;
-        let (public_key_bytes, algorithm) = self.parse_attestation_object(&attestation_bytes)?;
+        let (public_key_bytes, algorithm, flags) = self.parse_attestation_object(&attestation_bytes)?;
+
+        if (flags & 0x01) == 0 {
+            return Err(Box::new(PasskiError::new("User not present (UP flag not set)")));
+        }
+        if state.user_verification == UserVerificationRequirement::Required && (flags & 0x04) == 0 {
+            return Err(Box::new(PasskiError::new("User verification required but UV flag not set")));
+        }
 
         let rk = credential.client_extension_results
             .as_ref()
@@ -254,8 +265,8 @@ impl Passki {
         })
     }
 
-    /// Parses a CBOR attestation object to extract the public key and algorithm.
-    pub(crate) fn parse_attestation_object(&self, attestation_bytes: &[u8]) -> Result<(Vec<u8>, i32)> {
+    /// Parses a CBOR attestation object to extract the public key, algorithm, and flags byte.
+    pub(crate) fn parse_attestation_object(&self, attestation_bytes: &[u8]) -> Result<(Vec<u8>, i32, u8)> {
         // Parse CBOR attestation object
         let attestation: ciborium::Value = ciborium::from_reader(attestation_bytes)
             .map_err(|e| PasskiError::new(format!("Failed to parse attestation object: {}", e)))?;
@@ -281,11 +292,6 @@ impl Passki {
         }
 
         let flags = auth_data_bytes[32];
-
-        // Check UP flag (bit 0) - user must be present
-        if (flags & 0x01) == 0 {
-            return Err(Box::new(PasskiError::new("User not present (UP flag not set)")));
-        }
 
         // Check if attested credential data is present (bit 6 of flags)
         if (flags & 0x40) == 0 {
@@ -324,6 +330,6 @@ impl Passki {
         // Store the raw COSE key bytes
         let public_key_bytes = cose_key_bytes.to_vec();
 
-        Ok((public_key_bytes, algorithm))
+        Ok((public_key_bytes, algorithm, flags))
     }
 }

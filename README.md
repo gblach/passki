@@ -220,7 +220,7 @@ The initial recommendation. Defined the core protocol:
 - [ ] Attestation statement verification (`packed`, `tpm`, `android-key`, `fido-u2f`) - `attStmt` is ignored; only `authData` is extracted
 - [x] rpId hash verification in authenticator data - the hash in bytes 0-31 is compared against `sha256(rp_id)`
 - [x] UP (user present) flag enforcement
-- [ ] UV (user verified) flag enforcement
+- [x] UV (user verified) flag enforcement
 
 ### Level 2 (2021)
 

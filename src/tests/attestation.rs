@@ -25,7 +25,7 @@ fn test_parse_attestation_object_es256() {
     let result = passki().parse_attestation_object(&attestation_obj);
 
     assert!(result.is_ok());
-    let (public_key, algorithm) = result.unwrap();
+    let (public_key, algorithm, _) = result.unwrap();
     assert_eq!(algorithm, -7);
     assert!(!public_key.is_empty());
 }
@@ -36,7 +36,7 @@ fn test_parse_attestation_object_eddsa() {
     let result = passki().parse_attestation_object(&attestation_obj);
 
     assert!(result.is_ok());
-    let (public_key, algorithm) = result.unwrap();
+    let (public_key, algorithm, _) = result.unwrap();
     assert_eq!(algorithm, -8);
     assert!(!public_key.is_empty());
 }
@@ -144,7 +144,7 @@ fn test_parse_attestation_object_invalid_cose_key() {
 #[test]
 fn test_parse_attestation_object_extracts_correct_cose_key() {
     let attestation_obj = create_test_attestation_object(-7, 0x45);
-    let (public_key_bytes, algorithm) = passki().parse_attestation_object(&attestation_obj).unwrap();
+    let (public_key_bytes, algorithm, _) = passki().parse_attestation_object(&attestation_obj).unwrap();
 
     assert_eq!(algorithm, -7);
 

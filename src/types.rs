@@ -80,7 +80,7 @@ pub enum ResidentKeyRequirement {
 ///
 /// Specifies whether user verification (e.g., PIN, biometric) is required
 /// during the authentication ceremony.
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Debug)]
 #[serde(rename_all = "lowercase")]
 pub enum UserVerificationRequirement {
     /// User verification is required.

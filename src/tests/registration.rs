@@ -459,6 +459,86 @@ fn test_finish_passkey_registration_wrong_origin() {
 }
 
 #[test]
+fn test_finish_passkey_registration_uv_required_flag_set() {
+    let passki = Passki::new("localhost", "http://localhost:3000", "Test App");
+
+    let user_id = b"user123_16bytes_";
+    let (_challenge, state) = passki.start_passkey_registration(
+        user_id, "testuser", "Test User", 60000,
+        AttestationConveyancePreference::None,
+        ResidentKeyRequirement::Preferred,
+        UserVerificationRequirement::Required,
+        None, None,
+    ).unwrap();
+
+    // flags: UP=1, UV=1, AT=1 (0x45)
+    let attestation_obj = create_test_attestation_object(-7, 0x45);
+    let client_data_json = create_test_client_data_json(&state.challenge, "http://localhost:3000");
+    let credential = RegistrationCredential {
+        credential_id: Passki::base64_encode(&[1u8; 16]),
+        public_key: Passki::base64_encode(&attestation_obj),
+        client_data_json: Passki::base64_encode(&client_data_json),
+        client_extension_results: None,
+    };
+
+    assert!(passki.finish_passkey_registration(&credential, &state).is_ok());
+}
+
+#[test]
+fn test_finish_passkey_registration_uv_required_flag_not_set() {
+    let passki = Passki::new("localhost", "http://localhost:3000", "Test App");
+
+    let user_id = b"user123_16bytes_";
+    let (_challenge, state) = passki.start_passkey_registration(
+        user_id, "testuser", "Test User", 60000,
+        AttestationConveyancePreference::None,
+        ResidentKeyRequirement::Preferred,
+        UserVerificationRequirement::Required,
+        None, None,
+    ).unwrap();
+
+    // flags: UP=1, UV=0, AT=1 (0x41)
+    let attestation_obj = create_test_attestation_object(-7, 0x41);
+    let client_data_json = create_test_client_data_json(&state.challenge, "http://localhost:3000");
+    let credential = RegistrationCredential {
+        credential_id: Passki::base64_encode(&[1u8; 16]),
+        public_key: Passki::base64_encode(&attestation_obj),
+        client_data_json: Passki::base64_encode(&client_data_json),
+        client_extension_results: None,
+    };
+
+    let result = passki.finish_passkey_registration(&credential, &state);
+    assert!(result.is_err());
+    assert!(result.unwrap_err().to_string().contains("UV flag not set"));
+}
+
+#[test]
+fn test_finish_passkey_registration_uv_preferred_flag_not_set() {
+    let passki = Passki::new("localhost", "http://localhost:3000", "Test App");
+
+    let user_id = b"user123_16bytes_";
+    let (_challenge, state) = passki.start_passkey_registration(
+        user_id, "testuser", "Test User", 60000,
+        AttestationConveyancePreference::None,
+        ResidentKeyRequirement::Preferred,
+        UserVerificationRequirement::Preferred,
+        None, None,
+    ).unwrap();
+
+    // flags: UP=1, UV=0, AT=1 (0x41) - UV not set is fine when not Required
+    let attestation_obj = create_test_attestation_object(-7, 0x41);
+    let client_data_json = create_test_client_data_json(&state.challenge, "http://localhost:3000");
+    let credential = RegistrationCredential {
+        credential_id: Passki::base64_encode(&[1u8; 16]),
+        public_key: Passki::base64_encode(&attestation_obj),
+        client_data_json: Passki::base64_encode(&client_data_json),
+        client_extension_results: None,
+    };
+
+    assert!(passki.finish_passkey_registration(&credential, &state).is_ok());
+}
+
+#[test]
 fn test_finish_passkey_registration_up_flag_not_set() {
     let passki = Passki::new("localhost", "http://localhost:3000", "Test App");
 
