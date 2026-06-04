@@ -14,6 +14,7 @@
 
 //! Passkey registration functionality.
 
+use aws_lc_rs::digest::{self, SHA256};
 use serde::{Deserialize, Serialize};
 
 use crate::client_data::{ClientData, ClientDataType};
@@ -237,7 +238,7 @@ impl Passki {
 
         // Parse attestation object to extract public key and algorithm
         let attestation_bytes = Self::base64_decode(&credential.public_key)?;
-        let (public_key_bytes, algorithm) = Self::parse_attestation_object(&attestation_bytes)?;
+        let (public_key_bytes, algorithm) = self.parse_attestation_object(&attestation_bytes)?;
 
         let rk = credential.client_extension_results
             .as_ref()
@@ -254,7 +255,7 @@ impl Passki {
     }
 
     /// Parses a CBOR attestation object to extract the public key and algorithm.
-    pub(crate) fn parse_attestation_object(attestation_bytes: &[u8]) -> Result<(Vec<u8>, i32)> {
+    pub(crate) fn parse_attestation_object(&self, attestation_bytes: &[u8]) -> Result<(Vec<u8>, i32)> {
         // Parse CBOR attestation object
         let attestation: ciborium::Value = ciborium::from_reader(attestation_bytes)
             .map_err(|e| PasskiError::new(format!("Failed to parse attestation object: {}", e)))?;
@@ -271,6 +272,12 @@ impl Passki {
             return Err(Box::new(PasskiError::new(
                 "Invalid authenticator data length",
             )));
+        }
+
+        // Verify rpId hash (bytes 0-31)
+        let rp_id_hash = digest::digest(&SHA256, self.rp_id.as_bytes());
+        if &auth_data_bytes[..32] != rp_id_hash.as_ref() {
+            return Err(Box::new(PasskiError::new("rpId hash mismatch")));
         }
 
         // Check if attested credential data is present (bit 6 of flags)

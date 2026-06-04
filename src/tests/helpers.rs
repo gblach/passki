@@ -13,16 +13,20 @@
 // limitations under the License.
 
 use crate::Passki;
+use aws_lc_rs::digest::{self, SHA256};
 use aws_lc_rs::rsa::KeySize;
 use aws_lc_rs::signature::{KeyPair, RsaKeyPair};
+
+pub fn rp_id_hash(rp_id: &str) -> Vec<u8> {
+    digest::digest(&SHA256, rp_id.as_bytes()).as_ref().to_vec()
+}
 
 /// Helper function to create a minimal valid attestation object
 pub fn create_test_attestation_object(algorithm: i32) -> Vec<u8> {
     use ciborium::Value;
 
-    // Create a minimal authenticator data
     let mut auth_data = Vec::new();
-    auth_data.extend_from_slice(&[0u8; 32]); // rpIdHash
+    auth_data.extend_from_slice(&rp_id_hash("localhost")); // rpIdHash
     auth_data.push(0x45); // flags: UP=1, UV=0, AT=1
     auth_data.extend_from_slice(&[0, 0, 0, 0]); // counter
     auth_data.extend_from_slice(&[0u8; 16]); // aaguid
@@ -77,7 +81,7 @@ pub fn create_test_client_data_json(challenge: &[u8], origin: &str) -> Vec<u8> {
 /// Helper function to create valid authenticator data for authentication
 pub fn create_test_authenticator_data(counter: u32) -> Vec<u8> {
     let mut auth_data = Vec::new();
-    auth_data.extend_from_slice(&[0u8; 32]); // rpIdHash
+    auth_data.extend_from_slice(&rp_id_hash("localhost")); // rpIdHash
     auth_data.push(0x01); // flags: UP=1
     auth_data.extend_from_slice(&counter.to_be_bytes()); // counter
     auth_data

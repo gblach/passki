@@ -200,10 +200,16 @@ impl Passki {
         let client_data = ClientData::from_bytes(&client_data_bytes)?;
         client_data.verify(ClientDataType::Get, &state.challenge, &self.rp_origin)?;
 
-        // Verify counter
+        // Verify authenticator data
         let authenticator_data = Self::base64_decode(&credential.authenticator_data)?;
         if authenticator_data.len() < 37 {
             return Err(Box::new(PasskiError::new("Invalid authenticator data")));
+        }
+
+        // Verify rpId hash (bytes 0-31)
+        let rp_id_hash = digest::digest(&SHA256, self.rp_id.as_bytes());
+        if &authenticator_data[..32] != rp_id_hash.as_ref() {
+            return Err(Box::new(PasskiError::new("rpId hash mismatch")));
         }
 
         let counter = u32::from_be_bytes([

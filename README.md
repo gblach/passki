@@ -218,7 +218,7 @@ The initial recommendation. Defined the core protocol:
 - [x] `AttestationConveyancePreference` (`none` / `indirect` / `direct`)
 - [x] Attestation object CBOR parsing
 - [ ] Attestation statement verification (`packed`, `tpm`, `android-key`, `fido-u2f`) - `attStmt` is ignored; only `authData` is extracted
-- [ ] rpId hash verification in authenticator data - the hash in bytes 0-31 is not compared against `sha256(rp_id)`
+- [x] rpId hash verification in authenticator data - the hash in bytes 0-31 is compared against `sha256(rp_id)`
 - [ ] UP (user present) flag enforcement
 - [ ] UV (user verified) flag enforcement
 
