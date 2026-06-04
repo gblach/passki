@@ -12,7 +12,6 @@ A simple, secure, and easy-to-use WebAuthn/Passkey implementation for Rust.
 - 🔐 **Multiple Algorithms** - Support for EdDSA (Ed25519), ES256/ES384 (P-256/P-384), and RS256/RS384 (RSA)
 - 🛡️ **Security First** - Built-in replay attack protection via signature counters
 - 📦 **Framework Agnostic** - No web framework lock-in, works with any HTTP server
-- ✅ **WebAuthn Level 2 Compliant** - Follows the latest W3C specification
 - 🔑 **PRF Extension** - Support for the WebAuthn PRF extension for key derivation and E2E encryption
 - 🦀 **Pure Rust** - Memory-safe implementation with no unsafe code
 
@@ -184,6 +183,56 @@ cargo run --example axum  # or actix-web, poem, rocket, warp
 ```
 
 Then visit `http://localhost:3000` in your browser.
+
+## WebAuthn Specification Levels
+
+WebAuthn has three specification levels published by the W3C. Checkboxes mark features
+currently implemented in passki.
+
+### Level 1 (2019)
+
+The initial recommendation. Defined the core protocol:
+
+- [x] Registration ceremony (`create`) and authentication ceremony (`get`)
+- [x] Challenge generation and binding
+- [x] Client data JSON origin verification
+- [x] Authenticator data parsing
+- [x] COSE public key extraction
+- [x] Signature verification (EdDSA/Ed25519, ES256/P-256, ES384/P-384, RS256, RS384)
+- [x] Signature counter tracking and replay detection
+- [x] Credential exclusion (`excludeCredentials`)
+- [x] `AttestationConveyancePreference` (`none` / `indirect` / `direct`)
+- [x] Attestation object CBOR parsing
+- [ ] Attestation statement verification (`packed`, `tpm`, `android-key`, `fido-u2f`) - `attStmt` is ignored; only `authData` is extracted
+- [ ] rpId hash verification in authenticator data - the hash in bytes 0-31 is not compared against `sha256(rp_id)`
+- [ ] UP (user present) flag enforcement
+- [ ] UV (user verified) flag enforcement
+
+### Level 2 (2021)
+
+A substantial expansion, still the most widely implemented level today:
+
+- [x] Discoverable credentials / usernameless flows (empty `allowCredentials`)
+- [x] `ResidentKeyRequirement` (`discouraged` / `preferred` / `required`)
+- [x] `enterprise` attestation conveyance preference
+- [x] Zero-counter authenticator support (explicitly allowed per spec)
+- [ ] `credProps` extension - reports whether a discoverable credential was created
+- [ ] `largeBlob` extension - store small blobs on the authenticator (e.g. SSH keys)
+- [ ] `minPinLength` extension - query or enforce minimum PIN length
+- [ ] `credProtect` extension - control UV requirement for credential access
+- [ ] `uvm` extension - user verification method details
+- [ ] `userHandle` in authentication response - needed to identify the user in usernameless flows
+
+### Level 3 (Candidate Recommendation, not yet a W3C Recommendation)
+
+Still under active development:
+
+- [x] PRF extension (`prf`) - deterministic key derivation via HMAC-Secret
+- [ ] `payment` extension - Secure Payment Confirmation (SPC) integration
+- [ ] Related origin requests - use credentials across subdomains / related origins
+- [ ] JSON serialization helpers (`parseCreationOptionsFromJSON`, `toJSON`, etc.)
+- [ ] Signal API - lets RPs notify the browser that a credential was deleted or changed
+- [ ] Hybrid transport / cross-device auth (caBLE) - QR/BLE cross-device flows
 
 ## Contributing
 
