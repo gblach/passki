@@ -547,7 +547,12 @@ fn test_from_base64_invalid_json() {
     let result = ClientData::from_base64(&encoded);
 
     assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("Invalid client data JSON"));
+    assert!(
+        result
+            .unwrap_err()
+            .to_string()
+            .contains("Invalid client data JSON")
+    );
 }
 
 #[test]

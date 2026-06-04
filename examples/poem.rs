@@ -207,26 +207,39 @@ async fn register_start(
     let user_id = Uuid::new_v4().as_bytes().to_vec();
 
     // If user exists, get their existing passkeys to exclude them from re-registration
-    let existing = store.users.lock().unwrap()
-        .get(&req.username).map(|u| u.passkeys.clone());
+    let existing = store
+        .users
+        .lock()
+        .unwrap()
+        .get(&req.username)
+        .map(|u| u.passkeys.clone());
 
     // Probe without eval: asks "do you support PRF?" without requesting a derivation.
     // This avoids false negatives on authenticators that support PRF during authentication
     // but not during registration (e.g. YubiKey 5 series).
-    let (challenge, state) = passki.start_passkey_registration(
-        &user_id,
-        &req.username,                          // User handle (displayed by authenticator)
-        &req.username,                          // Display name
-        60000,                                  // Timeout in milliseconds
-        AttestationConveyancePreference::None,  // Don't request attestation
-        ResidentKeyRequirement::Preferred,      // Request discoverable credential if possible
-        UserVerificationRequirement::Preferred, // Request user verification if available
-        existing.as_deref(),                    // Exclude existing credentials
-        Some(RegistrationExtensions { cred_props: Some(true), prf: Some(PrfInput { eval: None }) }), // Probe PRF support
-    ).map_err(err)?;
+    let (challenge, state) = passki
+        .start_passkey_registration(
+            &user_id,
+            &req.username, // User handle (displayed by authenticator)
+            &req.username, // Display name
+            60000,         // Timeout in milliseconds
+            AttestationConveyancePreference::None, // Don't request attestation
+            ResidentKeyRequirement::Preferred, // Request discoverable credential if possible
+            UserVerificationRequirement::Preferred, // Request user verification if available
+            existing.as_deref(), // Exclude existing credentials
+            Some(RegistrationExtensions {
+                cred_props: Some(true),
+                prf: Some(PrfInput { eval: None }),
+            }), // Probe PRF support
+        )
+        .map_err(err)?;
 
     // Store state for verification in finish step, keyed by the challenge
-    store.pending_registrations.lock().unwrap().insert(challenge.challenge.clone(), state);
+    store
+        .pending_registrations
+        .lock()
+        .unwrap()
+        .insert(challenge.challenge.clone(), state);
 
     // Return challenge to client (will be passed to navigator.credentials.create())
     Ok(Json(challenge))
@@ -246,11 +259,15 @@ async fn register_finish(
     let client_data = ClientData::from_base64(&req.client_data_json).map_err(err)?;
 
     // Retrieve and remove the pending registration state
-    let state = store.pending_registrations.lock().unwrap()
+    let state = store
+        .pending_registrations
+        .lock()
+        .unwrap()
         .remove(&client_data.challenge)
         .ok_or_else(|| err("No pending registration"))?;
 
-    let prf_supported = req.client_extension_results
+    let prf_supported = req
+        .client_extension_results
         .as_ref()
         .and_then(|ext| ext.prf.as_ref())
         .and_then(|prf| prf.enabled)
@@ -265,7 +282,9 @@ async fn register_finish(
     };
 
     // Verify the credential (checks origin, challenge, parses public key)
-    let passkey = passki.finish_passkey_registration(&credential, &state).map_err(err)?;
+    let passkey = passki
+        .finish_passkey_registration(&credential, &state)
+        .map_err(err)?;
     let residental_key = passkey.rk;
 
     // Decode user ID from base64url to UUID
@@ -325,7 +344,12 @@ async fn auth_start(
     };
 
     let extensions = req.prf_salt.map(|salt| AuthenticationExtensions {
-        prf: PrfInput { eval: Some(PrfEval { first: salt, second: None }) },
+        prf: PrfInput {
+            eval: Some(PrfEval {
+                first: salt,
+                second: None,
+            }),
+        },
     });
 
     let (challenge, state) = passki.start_passkey_authentication(
@@ -336,7 +360,11 @@ async fn auth_start(
     );
 
     // Store state for verification in finish step, keyed by the challenge
-    store.pending_authentications.lock().unwrap().insert(challenge.challenge.clone(), state);
+    store
+        .pending_authentications
+        .lock()
+        .unwrap()
+        .insert(challenge.challenge.clone(), state);
 
     // Return challenge to client
     Ok(Json(challenge))
@@ -356,7 +384,10 @@ async fn auth_finish(
     let client_data = ClientData::from_base64(&req.client_data_json).map_err(err)?;
 
     // Retrieve pending state using challenge
-    let state = store.pending_authentications.lock().unwrap()
+    let state = store
+        .pending_authentications
+        .lock()
+        .unwrap()
         .remove(&client_data.challenge)
         .ok_or_else(|| err("No pending authentication"))?;
 
@@ -365,9 +396,11 @@ async fn auth_finish(
 
     // Find user by credential_id
     let mut users = store.users.lock().unwrap();
-    let (username, passkey) = users.iter_mut()
+    let (username, passkey) = users
+        .iter_mut()
         .find_map(|(name, user)| {
-            user.passkeys.iter_mut()
+            user.passkeys
+                .iter_mut()
                 .find(|pk| pk.credential_id == credential_id)
                 .map(|pk| (name.clone(), pk))
         })
@@ -383,13 +416,16 @@ async fn auth_finish(
     };
 
     // Verify the signature (checks origin, challenge, signature, counter)
-    let result = passki.finish_passkey_authentication(&credential, &state, passkey).map_err(err)?;
+    let result = passki
+        .finish_passkey_authentication(&credential, &state, passkey)
+        .map_err(err)?;
 
     // Update the counter to detect cloned authenticators.
     // If counter goes backwards, it may indicate the credential was cloned.
     passkey.counter = result.counter;
 
-    let prf_output = result.prf_first
+    let prf_output = result
+        .prf_first
         .map(|bytes| bytes.iter().map(|b| format!("{b:02x}")).collect());
 
     Ok(Json(ApiResponse {

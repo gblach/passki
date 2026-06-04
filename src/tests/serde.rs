@@ -59,10 +59,7 @@ fn test_registration_state_json_shape() {
 fn test_authentication_state_roundtrip() {
     let state = AuthenticationState {
         challenge: vec![9, 10, 11, 12, 13, 14, 15, 16],
-        allowed_credentials: vec![
-            vec![1u8; 16],
-            vec![2u8; 16],
-        ],
+        allowed_credentials: vec![vec![1u8; 16], vec![2u8; 16]],
         user_verification: UserVerificationRequirement::Required,
     };
 

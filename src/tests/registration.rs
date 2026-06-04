@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::*;
 use super::helpers::{create_test_attestation_object, create_test_client_data_json};
+use crate::*;
 
 #[test]
 fn test_passki_new() {
@@ -29,17 +29,19 @@ fn test_start_passkey_registration_returns_challenge() {
     let passki = Passki::new("localhost", "http://localhost:3000", "Test App");
 
     let user_id = b"user123_16_bytes";
-    let (challenge, state) = passki.start_passkey_registration(
-        user_id,
-        "testuser",
-        "Test User",
-        60000,
-        AttestationConveyancePreference::None,
-        ResidentKeyRequirement::Preferred,
-        UserVerificationRequirement::Preferred,
-        None,
-        None,
-    ).unwrap();
+    let (challenge, state) = passki
+        .start_passkey_registration(
+            user_id,
+            "testuser",
+            "Test User",
+            60000,
+            AttestationConveyancePreference::None,
+            ResidentKeyRequirement::Preferred,
+            UserVerificationRequirement::Preferred,
+            None,
+            None,
+        )
+        .unwrap();
 
     // Verify challenge structure
     assert_eq!(challenge.rp.id, "localhost");
@@ -67,17 +69,19 @@ fn test_start_passkey_registration_with_different_settings() {
     let passki = Passki::new("example.com", "https://example.com", "Example App");
 
     let user_id = b"admin_user_id_16";
-    let (challenge, _state) = passki.start_passkey_registration(
-        user_id,
-        "adminuser",
-        "Admin User",
-        30000,
-        AttestationConveyancePreference::Direct,
-        ResidentKeyRequirement::Required,
-        UserVerificationRequirement::Required,
-        None,
-        None,
-    ).unwrap();
+    let (challenge, _state) = passki
+        .start_passkey_registration(
+            user_id,
+            "adminuser",
+            "Admin User",
+            30000,
+            AttestationConveyancePreference::Direct,
+            ResidentKeyRequirement::Required,
+            UserVerificationRequirement::Required,
+            None,
+            None,
+        )
+        .unwrap();
 
     assert_eq!(challenge.timeout, 30000);
     assert_eq!(challenge.user.name, "adminuser");
@@ -89,30 +93,34 @@ fn test_start_passkey_registration_generates_unique_challenges() {
     let passki = Passki::new("localhost", "http://localhost:3000", "Test App");
 
     let user_id1 = b"user1_identifier";
-    let (challenge1, state1) = passki.start_passkey_registration(
-        user_id1,
-        "user1",
-        "User 1",
-        60000,
-        AttestationConveyancePreference::None,
-        ResidentKeyRequirement::Preferred,
-        UserVerificationRequirement::Preferred,
-        None,
-        None,
-    ).unwrap();
+    let (challenge1, state1) = passki
+        .start_passkey_registration(
+            user_id1,
+            "user1",
+            "User 1",
+            60000,
+            AttestationConveyancePreference::None,
+            ResidentKeyRequirement::Preferred,
+            UserVerificationRequirement::Preferred,
+            None,
+            None,
+        )
+        .unwrap();
 
     let user_id2 = b"user2_identifier";
-    let (challenge2, state2) = passki.start_passkey_registration(
-        user_id2,
-        "user2",
-        "User 2",
-        60000,
-        AttestationConveyancePreference::None,
-        ResidentKeyRequirement::Preferred,
-        UserVerificationRequirement::Preferred,
-        None,
-        None,
-    ).unwrap();
+    let (challenge2, state2) = passki
+        .start_passkey_registration(
+            user_id2,
+            "user2",
+            "User 2",
+            60000,
+            AttestationConveyancePreference::None,
+            ResidentKeyRequirement::Preferred,
+            UserVerificationRequirement::Preferred,
+            None,
+            None,
+        )
+        .unwrap();
 
     // Challenges should be unique
     assert_ne!(challenge1.challenge, challenge2.challenge);
@@ -124,17 +132,19 @@ fn test_start_passkey_registration_user_id_stored_as_bytes() {
     let passki = Passki::new("localhost", "http://localhost:3000", "Test App");
 
     let user_id = b"testuser_16bytes";
-    let (challenge, state) = passki.start_passkey_registration(
-        user_id,
-        "testuser",
-        "Test User",
-        60000,
-        AttestationConveyancePreference::None,
-        ResidentKeyRequirement::Preferred,
-        UserVerificationRequirement::Preferred,
-        None,
-        None,
-    ).unwrap();
+    let (challenge, state) = passki
+        .start_passkey_registration(
+            user_id,
+            "testuser",
+            "Test User",
+            60000,
+            AttestationConveyancePreference::None,
+            ResidentKeyRequirement::Preferred,
+            UserVerificationRequirement::Preferred,
+            None,
+            None,
+        )
+        .unwrap();
 
     // User info should be stored in state
     assert_eq!(state.user.id, challenge.user.id);
@@ -154,21 +164,23 @@ fn test_start_passkey_registration_with_single_existing_credential() {
         public_key: vec![2u8; 32],
         counter: 5,
         algorithm: -7,
-            rk: None,
+        rk: None,
     };
 
     let user_id = b"user123_16bytes_";
-    let (challenge, state) = passki.start_passkey_registration(
-        user_id,
-        "testuser",
-        "Test User",
-        60000,
-        AttestationConveyancePreference::None,
-        ResidentKeyRequirement::Preferred,
-        UserVerificationRequirement::Preferred,
-        Some(&[existing_passkey.clone()]),
-        None,
-    ).unwrap();
+    let (challenge, state) = passki
+        .start_passkey_registration(
+            user_id,
+            "testuser",
+            "Test User",
+            60000,
+            AttestationConveyancePreference::None,
+            ResidentKeyRequirement::Preferred,
+            UserVerificationRequirement::Preferred,
+            Some(&[existing_passkey.clone()]),
+            None,
+        )
+        .unwrap();
 
     // Verify exclude_credentials contains the existing credential
     assert_eq!(challenge.exclude_credentials.len(), 1);
@@ -212,17 +224,19 @@ fn test_start_passkey_registration_with_multiple_existing_credentials() {
     ];
 
     let user_id = b"user123_16bytes_";
-    let (challenge, state) = passki.start_passkey_registration(
-        user_id,
-        "testuser",
-        "Test User",
-        60000,
-        AttestationConveyancePreference::None,
-        ResidentKeyRequirement::Preferred,
-        UserVerificationRequirement::Preferred,
-        Some(&existing_passkeys),
-        None,
-    ).unwrap();
+    let (challenge, state) = passki
+        .start_passkey_registration(
+            user_id,
+            "testuser",
+            "Test User",
+            60000,
+            AttestationConveyancePreference::None,
+            ResidentKeyRequirement::Preferred,
+            UserVerificationRequirement::Preferred,
+            Some(&existing_passkeys),
+            None,
+        )
+        .unwrap();
 
     // Verify all credentials are excluded
     assert_eq!(challenge.exclude_credentials.len(), 3);
@@ -246,31 +260,35 @@ fn test_start_passkey_registration_none_vs_empty_slice() {
     let user_id = b"user123_16bytes_";
 
     // Test with None
-    let (challenge_none, _state_none) = passki.start_passkey_registration(
-        user_id,
-        "testuser",
-        "Test User",
-        60000,
-        AttestationConveyancePreference::None,
-        ResidentKeyRequirement::Preferred,
-        UserVerificationRequirement::Preferred,
-        None,
-        None,
-    ).unwrap();
+    let (challenge_none, _state_none) = passki
+        .start_passkey_registration(
+            user_id,
+            "testuser",
+            "Test User",
+            60000,
+            AttestationConveyancePreference::None,
+            ResidentKeyRequirement::Preferred,
+            UserVerificationRequirement::Preferred,
+            None,
+            None,
+        )
+        .unwrap();
 
     // Test with empty slice
     let empty_slice: Vec<StoredPasskey> = vec![];
-    let (challenge_empty, _state_empty) = passki.start_passkey_registration(
-        user_id,
-        "testuser",
-        "Test User",
-        60000,
-        AttestationConveyancePreference::None,
-        ResidentKeyRequirement::Preferred,
-        UserVerificationRequirement::Preferred,
-        Some(&empty_slice),
-        None,
-    ).unwrap();
+    let (challenge_empty, _state_empty) = passki
+        .start_passkey_registration(
+            user_id,
+            "testuser",
+            "Test User",
+            60000,
+            AttestationConveyancePreference::None,
+            ResidentKeyRequirement::Preferred,
+            UserVerificationRequirement::Preferred,
+            Some(&empty_slice),
+            None,
+        )
+        .unwrap();
 
     // Both should result in no excluded credentials
     assert_eq!(challenge_none.exclude_credentials.len(), 0);
@@ -356,17 +374,19 @@ fn test_finish_passkey_registration_success() {
     let passki = Passki::new("localhost", "http://localhost:3000", "Test App");
 
     let user_id = b"user123_16bytes_";
-    let (_challenge, state) = passki.start_passkey_registration(
-        user_id,
-        "testuser",
-        "Test User",
-        60000,
-        AttestationConveyancePreference::None,
-        ResidentKeyRequirement::Preferred,
-        UserVerificationRequirement::Preferred,
-        None,
-        None,
-    ).unwrap();
+    let (_challenge, state) = passki
+        .start_passkey_registration(
+            user_id,
+            "testuser",
+            "Test User",
+            60000,
+            AttestationConveyancePreference::None,
+            ResidentKeyRequirement::Preferred,
+            UserVerificationRequirement::Preferred,
+            None,
+            None,
+        )
+        .unwrap();
 
     let attestation_obj = create_test_attestation_object(-7, 0x45);
     let client_data_json = create_test_client_data_json(&state.challenge, "http://localhost:3000");
@@ -393,17 +413,19 @@ fn test_finish_passkey_registration_wrong_challenge() {
     let passki = Passki::new("localhost", "http://localhost:3000", "Test App");
 
     let user_id = b"user123_16bytes_";
-    let (_challenge, state) = passki.start_passkey_registration(
-        user_id,
-        "testuser",
-        "Test User",
-        60000,
-        AttestationConveyancePreference::None,
-        ResidentKeyRequirement::Preferred,
-        UserVerificationRequirement::Preferred,
-        None,
-        None,
-    ).unwrap();
+    let (_challenge, state) = passki
+        .start_passkey_registration(
+            user_id,
+            "testuser",
+            "Test User",
+            60000,
+            AttestationConveyancePreference::None,
+            ResidentKeyRequirement::Preferred,
+            UserVerificationRequirement::Preferred,
+            None,
+            None,
+        )
+        .unwrap();
 
     let attestation_obj = create_test_attestation_object(-7, 0x45);
     let wrong_challenge = vec![99u8; 32];
@@ -431,17 +453,19 @@ fn test_finish_passkey_registration_wrong_origin() {
     let passki = Passki::new("localhost", "http://localhost:3000", "Test App");
 
     let user_id = b"user123_16bytes_";
-    let (_challenge, state) = passki.start_passkey_registration(
-        user_id,
-        "testuser",
-        "Test User",
-        60000,
-        AttestationConveyancePreference::None,
-        ResidentKeyRequirement::Preferred,
-        UserVerificationRequirement::Preferred,
-        None,
-        None,
-    ).unwrap();
+    let (_challenge, state) = passki
+        .start_passkey_registration(
+            user_id,
+            "testuser",
+            "Test User",
+            60000,
+            AttestationConveyancePreference::None,
+            ResidentKeyRequirement::Preferred,
+            UserVerificationRequirement::Preferred,
+            None,
+            None,
+        )
+        .unwrap();
 
     let attestation_obj = create_test_attestation_object(-7, 0x45);
     let client_data_json = create_test_client_data_json(&state.challenge, "https://evil.com");
@@ -463,13 +487,19 @@ fn test_finish_passkey_registration_uv_required_flag_set() {
     let passki = Passki::new("localhost", "http://localhost:3000", "Test App");
 
     let user_id = b"user123_16bytes_";
-    let (_challenge, state) = passki.start_passkey_registration(
-        user_id, "testuser", "Test User", 60000,
-        AttestationConveyancePreference::None,
-        ResidentKeyRequirement::Preferred,
-        UserVerificationRequirement::Required,
-        None, None,
-    ).unwrap();
+    let (_challenge, state) = passki
+        .start_passkey_registration(
+            user_id,
+            "testuser",
+            "Test User",
+            60000,
+            AttestationConveyancePreference::None,
+            ResidentKeyRequirement::Preferred,
+            UserVerificationRequirement::Required,
+            None,
+            None,
+        )
+        .unwrap();
 
     // flags: UP=1, UV=1, AT=1 (0x45)
     let attestation_obj = create_test_attestation_object(-7, 0x45);
@@ -481,7 +511,11 @@ fn test_finish_passkey_registration_uv_required_flag_set() {
         client_extension_results: None,
     };
 
-    assert!(passki.finish_passkey_registration(&credential, &state).is_ok());
+    assert!(
+        passki
+            .finish_passkey_registration(&credential, &state)
+            .is_ok()
+    );
 }
 
 #[test]
@@ -489,13 +523,19 @@ fn test_finish_passkey_registration_uv_required_flag_not_set() {
     let passki = Passki::new("localhost", "http://localhost:3000", "Test App");
 
     let user_id = b"user123_16bytes_";
-    let (_challenge, state) = passki.start_passkey_registration(
-        user_id, "testuser", "Test User", 60000,
-        AttestationConveyancePreference::None,
-        ResidentKeyRequirement::Preferred,
-        UserVerificationRequirement::Required,
-        None, None,
-    ).unwrap();
+    let (_challenge, state) = passki
+        .start_passkey_registration(
+            user_id,
+            "testuser",
+            "Test User",
+            60000,
+            AttestationConveyancePreference::None,
+            ResidentKeyRequirement::Preferred,
+            UserVerificationRequirement::Required,
+            None,
+            None,
+        )
+        .unwrap();
 
     // flags: UP=1, UV=0, AT=1 (0x41)
     let attestation_obj = create_test_attestation_object(-7, 0x41);
@@ -517,13 +557,19 @@ fn test_finish_passkey_registration_uv_preferred_flag_not_set() {
     let passki = Passki::new("localhost", "http://localhost:3000", "Test App");
 
     let user_id = b"user123_16bytes_";
-    let (_challenge, state) = passki.start_passkey_registration(
-        user_id, "testuser", "Test User", 60000,
-        AttestationConveyancePreference::None,
-        ResidentKeyRequirement::Preferred,
-        UserVerificationRequirement::Preferred,
-        None, None,
-    ).unwrap();
+    let (_challenge, state) = passki
+        .start_passkey_registration(
+            user_id,
+            "testuser",
+            "Test User",
+            60000,
+            AttestationConveyancePreference::None,
+            ResidentKeyRequirement::Preferred,
+            UserVerificationRequirement::Preferred,
+            None,
+            None,
+        )
+        .unwrap();
 
     // flags: UP=1, UV=0, AT=1 (0x41) - UV not set is fine when not Required
     let attestation_obj = create_test_attestation_object(-7, 0x41);
@@ -535,7 +581,11 @@ fn test_finish_passkey_registration_uv_preferred_flag_not_set() {
         client_extension_results: None,
     };
 
-    assert!(passki.finish_passkey_registration(&credential, &state).is_ok());
+    assert!(
+        passki
+            .finish_passkey_registration(&credential, &state)
+            .is_ok()
+    );
 }
 
 #[test]
@@ -543,17 +593,19 @@ fn test_finish_passkey_registration_up_flag_not_set() {
     let passki = Passki::new("localhost", "http://localhost:3000", "Test App");
 
     let user_id = b"user123_16bytes_";
-    let (_challenge, state) = passki.start_passkey_registration(
-        user_id,
-        "testuser",
-        "Test User",
-        60000,
-        AttestationConveyancePreference::None,
-        ResidentKeyRequirement::Preferred,
-        UserVerificationRequirement::Preferred,
-        None,
-        None,
-    ).unwrap();
+    let (_challenge, state) = passki
+        .start_passkey_registration(
+            user_id,
+            "testuser",
+            "Test User",
+            60000,
+            AttestationConveyancePreference::None,
+            ResidentKeyRequirement::Preferred,
+            UserVerificationRequirement::Preferred,
+            None,
+            None,
+        )
+        .unwrap();
 
     // flags: AT=1 but UP=0 (0x40)
     let attestation_obj = create_test_attestation_object(-7, 0x44);
@@ -576,17 +628,19 @@ fn test_finish_passkey_registration_eddsa_algorithm() {
     let passki = Passki::new("localhost", "http://localhost:3000", "Test App");
 
     let user_id = b"user123_16bytes_";
-    let (_challenge, state) = passki.start_passkey_registration(
-        user_id,
-        "testuser",
-        "Test User",
-        60000,
-        AttestationConveyancePreference::None,
-        ResidentKeyRequirement::Preferred,
-        UserVerificationRequirement::Preferred,
-        None,
-        None,
-    ).unwrap();
+    let (_challenge, state) = passki
+        .start_passkey_registration(
+            user_id,
+            "testuser",
+            "Test User",
+            60000,
+            AttestationConveyancePreference::None,
+            ResidentKeyRequirement::Preferred,
+            UserVerificationRequirement::Preferred,
+            None,
+            None,
+        )
+        .unwrap();
 
     let attestation_obj = create_test_attestation_object(-8, 0x45);
     let client_data_json = create_test_client_data_json(&state.challenge, "http://localhost:3000");

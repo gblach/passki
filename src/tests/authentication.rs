@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use super::helpers::{create_test_auth_client_data_json, create_test_authenticator_data};
 use crate::*;
-use super::helpers::{create_test_authenticator_data, create_test_auth_client_data_json};
 
 #[test]
 fn test_start_passkey_authentication_returns_challenge() {
@@ -24,7 +24,7 @@ fn test_start_passkey_authentication_returns_challenge() {
         public_key: vec![2u8; 32],
         counter: 0,
         algorithm: -7,
-            rk: None,
+        rk: None,
     }];
 
     let (challenge, state) = passki.start_passkey_authentication(
@@ -129,7 +129,7 @@ fn test_start_passkey_authentication_generates_unique_challenges() {
         public_key: vec![2u8; 32],
         counter: 0,
         algorithm: -7,
-            rk: None,
+        rk: None,
     }];
 
     let (challenge1, state1) = passki.start_passkey_authentication(
@@ -160,7 +160,7 @@ fn test_start_passkey_authentication_with_different_settings() {
         public_key: vec![8u8; 40],
         counter: 100,
         algorithm: -8,
-            rk: None,
+        rk: None,
     }];
 
     let (challenge, _state) = passki.start_passkey_authentication(
@@ -183,7 +183,7 @@ fn test_finish_passkey_authentication_success() {
         public_key: vec![2u8; 64],
         counter: 5,
         algorithm: -7,
-            rk: None,
+        rk: None,
     };
 
     let passkeys = vec![stored_passkey.clone()];
@@ -223,7 +223,7 @@ fn test_finish_passkey_authentication_wrong_credential_id() {
         public_key: vec![2u8; 64],
         counter: 5,
         algorithm: -7,
-            rk: None,
+        rk: None,
     };
 
     let passkeys = vec![stored_passkey.clone()];
@@ -265,7 +265,7 @@ fn test_finish_passkey_authentication_wrong_challenge() {
         public_key: vec![2u8; 64],
         counter: 5,
         algorithm: -7,
-            rk: None,
+        rk: None,
     };
 
     let passkeys = vec![stored_passkey.clone()];
@@ -308,7 +308,7 @@ fn test_finish_passkey_authentication_wrong_origin() {
         public_key: vec![2u8; 64],
         counter: 5,
         algorithm: -7,
-            rk: None,
+        rk: None,
     };
 
     let passkeys = vec![stored_passkey.clone()];
@@ -344,7 +344,7 @@ fn test_finish_passkey_authentication_invalid_counter() {
         public_key: vec![2u8; 64],
         counter: 10,
         algorithm: -7,
-            rk: None,
+        rk: None,
     };
 
     let passkeys = vec![stored_passkey.clone()];
@@ -381,7 +381,7 @@ fn test_finish_passkey_authentication_too_short_authenticator_data() {
         public_key: vec![2u8; 64],
         counter: 5,
         algorithm: -7,
-            rk: None,
+        rk: None,
     };
 
     let passkeys = vec![stored_passkey.clone()];
@@ -428,12 +428,16 @@ fn test_finish_passkey_authentication_uv_required_flag_set() {
 
     let passkeys = vec![stored_passkey.clone()];
     let (_challenge, state) = passki.start_passkey_authentication(
-        &passkeys, 60000, UserVerificationRequirement::Required, None,
+        &passkeys,
+        60000,
+        UserVerificationRequirement::Required,
+        None,
     );
 
     // flags: UP=1, UV=1 (0x05)
     let authenticator_data = create_test_authenticator_data(6, 0x05);
-    let client_data_json = create_test_auth_client_data_json(&state.challenge, "http://localhost:3000");
+    let client_data_json =
+        create_test_auth_client_data_json(&state.challenge, "http://localhost:3000");
     let credential = AuthenticationCredential {
         credential_id: Passki::base64_encode(&vec![1u8; 16]),
         authenticator_data: Passki::base64_encode(&authenticator_data),
@@ -443,9 +447,14 @@ fn test_finish_passkey_authentication_uv_required_flag_set() {
     };
 
     // Fails at signature verification (dummy key), not at UV check
-    let err = passki.finish_passkey_authentication(&credential, &state, &stored_passkey)
-        .unwrap_err().to_string();
-    assert!(!err.contains("UV flag not set"), "unexpected UV error: {err}");
+    let err = passki
+        .finish_passkey_authentication(&credential, &state, &stored_passkey)
+        .unwrap_err()
+        .to_string();
+    assert!(
+        !err.contains("UV flag not set"),
+        "unexpected UV error: {err}"
+    );
 }
 
 #[test]
@@ -462,12 +471,16 @@ fn test_finish_passkey_authentication_uv_required_flag_not_set() {
 
     let passkeys = vec![stored_passkey.clone()];
     let (_challenge, state) = passki.start_passkey_authentication(
-        &passkeys, 60000, UserVerificationRequirement::Required, None,
+        &passkeys,
+        60000,
+        UserVerificationRequirement::Required,
+        None,
     );
 
     // flags: UP=1, UV=0 (0x01)
     let authenticator_data = create_test_authenticator_data(6, 0x01);
-    let client_data_json = create_test_auth_client_data_json(&state.challenge, "http://localhost:3000");
+    let client_data_json =
+        create_test_auth_client_data_json(&state.challenge, "http://localhost:3000");
     let credential = AuthenticationCredential {
         credential_id: Passki::base64_encode(&vec![1u8; 16]),
         authenticator_data: Passki::base64_encode(&authenticator_data),
@@ -495,12 +508,16 @@ fn test_finish_passkey_authentication_uv_preferred_flag_not_set() {
 
     let passkeys = vec![stored_passkey.clone()];
     let (_challenge, state) = passki.start_passkey_authentication(
-        &passkeys, 60000, UserVerificationRequirement::Preferred, None,
+        &passkeys,
+        60000,
+        UserVerificationRequirement::Preferred,
+        None,
     );
 
     // flags: UP=1, UV=0 (0x01) - UV not set is fine when not Required
     let authenticator_data = create_test_authenticator_data(6, 0x01);
-    let client_data_json = create_test_auth_client_data_json(&state.challenge, "http://localhost:3000");
+    let client_data_json =
+        create_test_auth_client_data_json(&state.challenge, "http://localhost:3000");
     let credential = AuthenticationCredential {
         credential_id: Passki::base64_encode(&vec![1u8; 16]),
         authenticator_data: Passki::base64_encode(&authenticator_data),
@@ -510,9 +527,14 @@ fn test_finish_passkey_authentication_uv_preferred_flag_not_set() {
     };
 
     // Fails at signature verification (dummy key), not at UV check
-    let err = passki.finish_passkey_authentication(&credential, &state, &stored_passkey)
-        .unwrap_err().to_string();
-    assert!(!err.contains("UV flag not set"), "unexpected UV error: {err}");
+    let err = passki
+        .finish_passkey_authentication(&credential, &state, &stored_passkey)
+        .unwrap_err()
+        .to_string();
+    assert!(
+        !err.contains("UV flag not set"),
+        "unexpected UV error: {err}"
+    );
 }
 
 #[test]
@@ -563,7 +585,7 @@ fn test_finish_passkey_authentication_usernameless() {
         public_key: vec![2u8; 64],
         counter: 5,
         algorithm: -7,
-            rk: None,
+        rk: None,
     };
 
     // Start authentication with EMPTY credentials list (usernameless flow)

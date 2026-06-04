@@ -17,9 +17,9 @@
 use aws_lc_rs::digest::{self, SHA256};
 use serde::{Deserialize, Serialize};
 
+use crate::Passki;
 use crate::client_data::{ClientData, ClientDataType};
 use crate::types::*;
-use crate::Passki;
 
 /// Challenge sent to the client to begin passkey registration.
 ///
@@ -242,16 +242,22 @@ impl Passki {
 
         // Parse attestation object to extract public key and algorithm
         let attestation_bytes = Self::base64_decode(&credential.public_key)?;
-        let (public_key_bytes, algorithm, flags) = self.parse_attestation_object(&attestation_bytes)?;
+        let (public_key_bytes, algorithm, flags) =
+            self.parse_attestation_object(&attestation_bytes)?;
 
         if (flags & 0x01) == 0 {
-            return Err(Box::new(PasskiError::new("User not present (UP flag not set)")));
+            return Err(Box::new(PasskiError::new(
+                "User not present (UP flag not set)",
+            )));
         }
         if state.user_verification == UserVerificationRequirement::Required && (flags & 0x04) == 0 {
-            return Err(Box::new(PasskiError::new("User verification required but UV flag not set")));
+            return Err(Box::new(PasskiError::new(
+                "User verification required but UV flag not set",
+            )));
         }
 
-        let rk = credential.client_extension_results
+        let rk = credential
+            .client_extension_results
             .as_ref()
             .and_then(|ext| ext.cred_props.as_ref())
             .and_then(|cp| cp.rk);
@@ -266,7 +272,10 @@ impl Passki {
     }
 
     /// Parses a CBOR attestation object to extract the public key, algorithm, and flags byte.
-    pub(crate) fn parse_attestation_object(&self, attestation_bytes: &[u8]) -> Result<(Vec<u8>, i32, u8)> {
+    pub(crate) fn parse_attestation_object(
+        &self,
+        attestation_bytes: &[u8],
+    ) -> Result<(Vec<u8>, i32, u8)> {
         // Parse CBOR attestation object
         let attestation: ciborium::Value = ciborium::from_reader(attestation_bytes)
             .map_err(|e| PasskiError::new(format!("Failed to parse attestation object: {}", e)))?;

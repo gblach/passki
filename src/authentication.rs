@@ -16,14 +16,14 @@
 
 use aws_lc_rs::digest::{self, SHA256};
 use aws_lc_rs::signature::{
-    RsaPublicKeyComponents, UnparsedPublicKey, ECDSA_P256_SHA256_ASN1, ECDSA_P384_SHA384_ASN1,
-    ED25519, RSA_PKCS1_2048_8192_SHA256, RSA_PKCS1_2048_8192_SHA384,
+    ECDSA_P256_SHA256_ASN1, ECDSA_P384_SHA384_ASN1, ED25519, RSA_PKCS1_2048_8192_SHA256,
+    RSA_PKCS1_2048_8192_SHA384, RsaPublicKeyComponents, UnparsedPublicKey,
 };
 use serde::{Deserialize, Serialize};
 
+use crate::Passki;
 use crate::client_data::{ClientData, ClientDataType};
 use crate::types::*;
-use crate::Passki;
 
 /// Challenge sent to the client to begin passkey authentication.
 ///
@@ -219,12 +219,16 @@ impl Passki {
         // Check UP flag (bit 0) - user must be present
         let flags = authenticator_data[32];
         if (flags & 0x01) == 0 {
-            return Err(Box::new(PasskiError::new("User not present (UP flag not set)")));
+            return Err(Box::new(PasskiError::new(
+                "User not present (UP flag not set)",
+            )));
         }
 
         // Check UV flag (bit 2) - required only when user_verification is Required
         if state.user_verification == UserVerificationRequirement::Required && (flags & 0x04) == 0 {
-            return Err(Box::new(PasskiError::new("User verification required but UV flag not set")));
+            return Err(Box::new(PasskiError::new(
+                "User verification required but UV flag not set",
+            )));
         }
 
         let counter = u32::from_be_bytes([
@@ -258,7 +262,8 @@ impl Passki {
             &signature,
         )?;
 
-        let prf_results = credential.client_extension_results
+        let prf_results = credential
+            .client_extension_results
             .as_ref()
             .and_then(|ext| ext.prf.as_ref())
             .and_then(|prf| prf.results.as_ref());
@@ -281,7 +286,8 @@ impl Passki {
     }
 
     /// Verifies a signature using the appropriate algorithm.
-    #[inline] pub(crate) fn verify_signature(
+    #[inline]
+    pub(crate) fn verify_signature(
         cose_key_bytes: &[u8],
         algorithm: i32,
         signed_data: &[u8],

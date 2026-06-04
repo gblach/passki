@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::Passki;
 use super::helpers::{create_test_attestation_object, rp_id_hash};
+use crate::Passki;
 
 fn passki() -> Passki {
     Passki::new("localhost", "http://localhost:3000", "Test")
@@ -60,7 +60,10 @@ fn test_parse_attestation_object_missing_auth_data() {
     use ciborium::Value;
 
     let mut att_obj = Vec::new();
-    att_obj.push((Value::Text("fmt".to_string()), Value::Text("none".to_string())));
+    att_obj.push((
+        Value::Text("fmt".to_string()),
+        Value::Text("none".to_string()),
+    ));
     att_obj.push((Value::Text("attStmt".to_string()), Value::Map(Vec::new())));
 
     let mut bytes = Vec::new();
@@ -76,8 +79,14 @@ fn test_parse_attestation_object_too_short_auth_data() {
     use ciborium::Value;
 
     let mut att_obj = Vec::new();
-    att_obj.push((Value::Text("fmt".to_string()), Value::Text("none".to_string())));
-    att_obj.push((Value::Text("authData".to_string()), Value::Bytes(vec![0u8; 36])));
+    att_obj.push((
+        Value::Text("fmt".to_string()),
+        Value::Text("none".to_string()),
+    ));
+    att_obj.push((
+        Value::Text("authData".to_string()),
+        Value::Bytes(vec![0u8; 36]),
+    ));
     att_obj.push((Value::Text("attStmt".to_string()), Value::Map(Vec::new())));
 
     let mut bytes = Vec::new();
@@ -85,7 +94,12 @@ fn test_parse_attestation_object_too_short_auth_data() {
 
     let result = passki().parse_attestation_object(&bytes);
     assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("Invalid authenticator data length"));
+    assert!(
+        result
+            .unwrap_err()
+            .to_string()
+            .contains("Invalid authenticator data length")
+    );
 }
 
 #[test]
@@ -98,7 +112,10 @@ fn test_parse_attestation_object_no_attested_credential_data() {
     auth_data.extend_from_slice(&[0, 0, 0, 0]); // counter
 
     let mut att_obj = Vec::new();
-    att_obj.push((Value::Text("fmt".to_string()), Value::Text("none".to_string())));
+    att_obj.push((
+        Value::Text("fmt".to_string()),
+        Value::Text("none".to_string()),
+    ));
     att_obj.push((Value::Text("authData".to_string()), Value::Bytes(auth_data)));
     att_obj.push((Value::Text("attStmt".to_string()), Value::Map(Vec::new())));
 
@@ -107,7 +124,12 @@ fn test_parse_attestation_object_no_attested_credential_data() {
 
     let result = passki().parse_attestation_object(&bytes);
     assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("No attested credential data present"));
+    assert!(
+        result
+            .unwrap_err()
+            .to_string()
+            .contains("No attested credential data present")
+    );
 }
 
 #[test]
@@ -129,7 +151,10 @@ fn test_parse_attestation_object_invalid_cose_key() {
     auth_data.extend_from_slice(&cose_key_bytes);
 
     let mut att_obj = Vec::new();
-    att_obj.push((Value::Text("fmt".to_string()), Value::Text("none".to_string())));
+    att_obj.push((
+        Value::Text("fmt".to_string()),
+        Value::Text("none".to_string()),
+    ));
     att_obj.push((Value::Text("authData".to_string()), Value::Bytes(auth_data)));
     att_obj.push((Value::Text("attStmt".to_string()), Value::Map(Vec::new())));
 
@@ -138,13 +163,19 @@ fn test_parse_attestation_object_invalid_cose_key() {
 
     let result = passki().parse_attestation_object(&bytes);
     assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("Missing or invalid algorithm"));
+    assert!(
+        result
+            .unwrap_err()
+            .to_string()
+            .contains("Missing or invalid algorithm")
+    );
 }
 
 #[test]
 fn test_parse_attestation_object_extracts_correct_cose_key() {
     let attestation_obj = create_test_attestation_object(-7, 0x45);
-    let (public_key_bytes, algorithm, _) = passki().parse_attestation_object(&attestation_obj).unwrap();
+    let (public_key_bytes, algorithm, _) =
+        passki().parse_attestation_object(&attestation_obj).unwrap();
 
     assert_eq!(algorithm, -7);
 

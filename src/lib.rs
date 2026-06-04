@@ -21,7 +21,6 @@
 //! # Features
 //!
 //! - Support for multiple cryptographic algorithms (EdDSA/Ed25519, ES256/P-256, RS256/RSA)
-//! - Full WebAuthn Level 2 compliance
 //! - Replay attack protection via signature counters
 //! - Flexible authenticator selection and user verification options
 //! - Credential exclusion to prevent duplicate registrations
@@ -182,8 +181,9 @@ impl Passki {
     /// # Returns
     ///
     /// A base64url-encoded string without padding.
-    #[inline] pub fn base64_encode(data: &[u8]) -> String {
-        use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
+    #[inline]
+    pub fn base64_encode(data: &[u8]) -> String {
+        use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
         URL_SAFE_NO_PAD.encode(data)
     }
 
@@ -200,11 +200,14 @@ impl Passki {
     /// # Errors
     ///
     /// Returns an error if the input is not valid base64url.
-    #[inline] pub fn base64_decode(s: &str) -> types::Result<Vec<u8>> {
-        use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
+    #[inline]
+    pub fn base64_decode(s: &str) -> types::Result<Vec<u8>> {
+        use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
         URL_SAFE_NO_PAD.decode(s).map_err(|e| {
-            Box::new(types::PasskiError::new(format!("Base64 decode error: {}", e)))
-                as Box<dyn StdError>
+            Box::new(types::PasskiError::new(format!(
+                "Base64 decode error: {}",
+                e
+            ))) as Box<dyn StdError>
         })
     }
 }

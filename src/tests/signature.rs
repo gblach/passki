@@ -12,12 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use super::helpers::{
+    create_eddsa_cose_key, create_es256_cose_key, create_es384_cose_key, create_rs256_cose_key,
+    create_rs384_cose_key, create_test_rsa_keypair,
+};
 use crate::Passki;
-use super::helpers::{create_eddsa_cose_key, create_es256_cose_key, create_es384_cose_key, create_rs256_cose_key, create_rs384_cose_key, create_test_rsa_keypair};
 use aws_lc_rs::rand::SystemRandom;
 use aws_lc_rs::signature::{
-    EcdsaKeyPair, Ed25519KeyPair, KeyPair, ECDSA_P256_SHA256_ASN1_SIGNING,
-    ECDSA_P384_SHA384_ASN1_SIGNING, RSA_PKCS1_SHA256, RSA_PKCS1_SHA384,
+    ECDSA_P256_SHA256_ASN1_SIGNING, ECDSA_P384_SHA384_ASN1_SIGNING, EcdsaKeyPair, Ed25519KeyPair,
+    KeyPair, RSA_PKCS1_SHA256, RSA_PKCS1_SHA384,
 };
 
 // ===== EdDSA signature tests =====
@@ -56,11 +59,7 @@ fn test_verify_eddsa_invalid_signature() {
 
     // Try to verify with different message
     let wrong_message = b"different message";
-    let result = Passki::verify_eddsa(
-        &cose_key_bytes,
-        wrong_message,
-        signature.as_ref(),
-    );
+    let result = Passki::verify_eddsa(&cose_key_bytes, wrong_message, signature.as_ref());
 
     assert!(
         result.is_err(),
@@ -221,7 +220,8 @@ fn test_verify_eddsa_cose_key_not_map() {
 fn test_verify_es256_valid_signature() {
     let rng = SystemRandom::new();
     let pkcs8_bytes = EcdsaKeyPair::generate_pkcs8(&ECDSA_P256_SHA256_ASN1_SIGNING, &rng).unwrap();
-    let key_pair = EcdsaKeyPair::from_pkcs8(&ECDSA_P256_SHA256_ASN1_SIGNING, pkcs8_bytes.as_ref()).unwrap();
+    let key_pair =
+        EcdsaKeyPair::from_pkcs8(&ECDSA_P256_SHA256_ASN1_SIGNING, pkcs8_bytes.as_ref()).unwrap();
 
     let message = b"test message for ES256";
     let signature = key_pair.sign(&rng, message).unwrap();
@@ -245,7 +245,8 @@ fn test_verify_es256_valid_signature() {
 fn test_verify_es256_invalid_signature() {
     let rng = SystemRandom::new();
     let pkcs8_bytes = EcdsaKeyPair::generate_pkcs8(&ECDSA_P256_SHA256_ASN1_SIGNING, &rng).unwrap();
-    let key_pair = EcdsaKeyPair::from_pkcs8(&ECDSA_P256_SHA256_ASN1_SIGNING, pkcs8_bytes.as_ref()).unwrap();
+    let key_pair =
+        EcdsaKeyPair::from_pkcs8(&ECDSA_P256_SHA256_ASN1_SIGNING, pkcs8_bytes.as_ref()).unwrap();
 
     let message = b"test message";
     let signature = key_pair.sign(&rng, message).unwrap();
@@ -258,11 +259,7 @@ fn test_verify_es256_invalid_signature() {
 
     // Try to verify with different message
     let wrong_message = b"different message";
-    let result = Passki::verify_es256(
-        &cose_key_bytes,
-        wrong_message,
-        signature.as_ref(),
-    );
+    let result = Passki::verify_es256(&cose_key_bytes, wrong_message, signature.as_ref());
 
     assert!(
         result.is_err(),
@@ -280,7 +277,8 @@ fn test_verify_es256_invalid_signature() {
 fn test_verify_es256_corrupted_signature() {
     let rng = SystemRandom::new();
     let pkcs8_bytes = EcdsaKeyPair::generate_pkcs8(&ECDSA_P256_SHA256_ASN1_SIGNING, &rng).unwrap();
-    let key_pair = EcdsaKeyPair::from_pkcs8(&ECDSA_P256_SHA256_ASN1_SIGNING, pkcs8_bytes.as_ref()).unwrap();
+    let key_pair =
+        EcdsaKeyPair::from_pkcs8(&ECDSA_P256_SHA256_ASN1_SIGNING, pkcs8_bytes.as_ref()).unwrap();
 
     let message = b"test message";
     let signature = key_pair.sign(&rng, message).unwrap();
@@ -382,7 +380,8 @@ fn test_verify_es256_invalid_public_key() {
 fn test_verify_es384_valid_signature() {
     let rng = SystemRandom::new();
     let pkcs8_bytes = EcdsaKeyPair::generate_pkcs8(&ECDSA_P384_SHA384_ASN1_SIGNING, &rng).unwrap();
-    let key_pair = EcdsaKeyPair::from_pkcs8(&ECDSA_P384_SHA384_ASN1_SIGNING, pkcs8_bytes.as_ref()).unwrap();
+    let key_pair =
+        EcdsaKeyPair::from_pkcs8(&ECDSA_P384_SHA384_ASN1_SIGNING, pkcs8_bytes.as_ref()).unwrap();
 
     let message = b"test message for ES384";
     let signature = key_pair.sign(&rng, message).unwrap();
@@ -406,7 +405,8 @@ fn test_verify_es384_valid_signature() {
 fn test_verify_es384_invalid_signature() {
     let rng = SystemRandom::new();
     let pkcs8_bytes = EcdsaKeyPair::generate_pkcs8(&ECDSA_P384_SHA384_ASN1_SIGNING, &rng).unwrap();
-    let key_pair = EcdsaKeyPair::from_pkcs8(&ECDSA_P384_SHA384_ASN1_SIGNING, pkcs8_bytes.as_ref()).unwrap();
+    let key_pair =
+        EcdsaKeyPair::from_pkcs8(&ECDSA_P384_SHA384_ASN1_SIGNING, pkcs8_bytes.as_ref()).unwrap();
 
     let message = b"test message";
     let signature = key_pair.sign(&rng, message).unwrap();
@@ -436,7 +436,8 @@ fn test_verify_es384_invalid_signature() {
 fn test_verify_es384_dispatch() {
     let rng = SystemRandom::new();
     let pkcs8_bytes = EcdsaKeyPair::generate_pkcs8(&ECDSA_P384_SHA384_ASN1_SIGNING, &rng).unwrap();
-    let key_pair = EcdsaKeyPair::from_pkcs8(&ECDSA_P384_SHA384_ASN1_SIGNING, pkcs8_bytes.as_ref()).unwrap();
+    let key_pair =
+        EcdsaKeyPair::from_pkcs8(&ECDSA_P384_SHA384_ASN1_SIGNING, pkcs8_bytes.as_ref()).unwrap();
 
     let message = b"test message";
     let signature = key_pair.sign(&rng, message).unwrap();
@@ -465,7 +466,9 @@ fn test_verify_rs256_valid_signature() {
     let message = b"test message for RS256";
 
     let mut signature = vec![0u8; key_pair.public_modulus_len()];
-    key_pair.sign(&RSA_PKCS1_SHA256, &rng, message, &mut signature).unwrap();
+    key_pair
+        .sign(&RSA_PKCS1_SHA256, &rng, message, &mut signature)
+        .unwrap();
 
     let cose_key_bytes = create_rs256_cose_key(&n, &e);
 
@@ -486,7 +489,9 @@ fn test_verify_rs256_invalid_signature() {
     let message = b"test message";
 
     let mut signature = vec![0u8; key_pair.public_modulus_len()];
-    key_pair.sign(&RSA_PKCS1_SHA256, &rng, message, &mut signature).unwrap();
+    key_pair
+        .sign(&RSA_PKCS1_SHA256, &rng, message, &mut signature)
+        .unwrap();
 
     let cose_key_bytes = create_rs256_cose_key(&n, &e);
 
@@ -514,7 +519,9 @@ fn test_verify_rs256_corrupted_signature() {
     let message = b"test message";
 
     let mut signature = vec![0u8; key_pair.public_modulus_len()];
-    key_pair.sign(&RSA_PKCS1_SHA256, &rng, message, &mut signature).unwrap();
+    key_pair
+        .sign(&RSA_PKCS1_SHA256, &rng, message, &mut signature)
+        .unwrap();
 
     // Corrupt the signature
     signature[0] ^= 0xFF;
@@ -617,7 +624,9 @@ fn test_verify_rs384_valid_signature() {
     let message = b"test message for RS384";
 
     let mut signature = vec![0u8; key_pair.public_modulus_len()];
-    key_pair.sign(&RSA_PKCS1_SHA384, &rng, message, &mut signature).unwrap();
+    key_pair
+        .sign(&RSA_PKCS1_SHA384, &rng, message, &mut signature)
+        .unwrap();
 
     let cose_key_bytes = create_rs384_cose_key(&n, &e);
 
@@ -638,7 +647,9 @@ fn test_verify_rs384_invalid_signature() {
     let message = b"test message";
 
     let mut signature = vec![0u8; key_pair.public_modulus_len()];
-    key_pair.sign(&RSA_PKCS1_SHA384, &rng, message, &mut signature).unwrap();
+    key_pair
+        .sign(&RSA_PKCS1_SHA384, &rng, message, &mut signature)
+        .unwrap();
 
     let cose_key_bytes = create_rs384_cose_key(&n, &e);
 
@@ -665,7 +676,9 @@ fn test_verify_rs384_dispatch() {
     let message = b"test message";
 
     let mut signature = vec![0u8; key_pair.public_modulus_len()];
-    key_pair.sign(&RSA_PKCS1_SHA384, &rng, message, &mut signature).unwrap();
+    key_pair
+        .sign(&RSA_PKCS1_SHA384, &rng, message, &mut signature)
+        .unwrap();
 
     let cose_key_bytes = create_rs384_cose_key(&n, &e);
 
@@ -709,7 +722,8 @@ fn test_verify_signature_eddsa_dispatch() {
 fn test_verify_signature_es256_dispatch() {
     let rng = SystemRandom::new();
     let pkcs8_bytes = EcdsaKeyPair::generate_pkcs8(&ECDSA_P256_SHA256_ASN1_SIGNING, &rng).unwrap();
-    let key_pair = EcdsaKeyPair::from_pkcs8(&ECDSA_P256_SHA256_ASN1_SIGNING, pkcs8_bytes.as_ref()).unwrap();
+    let key_pair =
+        EcdsaKeyPair::from_pkcs8(&ECDSA_P256_SHA256_ASN1_SIGNING, pkcs8_bytes.as_ref()).unwrap();
 
     let message = b"test message";
     let signature = key_pair.sign(&rng, message).unwrap();
@@ -741,7 +755,9 @@ fn test_verify_signature_rs256_dispatch() {
     let message = b"test message";
 
     let mut signature = vec![0u8; key_pair.public_modulus_len()];
-    key_pair.sign(&RSA_PKCS1_SHA256, &rng, message, &mut signature).unwrap();
+    key_pair
+        .sign(&RSA_PKCS1_SHA256, &rng, message, &mut signature)
+        .unwrap();
 
     let cose_key_bytes = create_rs256_cose_key(&n, &e);
 

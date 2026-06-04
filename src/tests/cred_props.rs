@@ -12,23 +12,30 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::*;
 use super::helpers::{create_test_attestation_object, create_test_client_data_json};
+use crate::*;
 
 // ===== Registration challenge serialization =====
 
 #[test]
 fn test_cred_props_in_challenge_when_requested() {
     let passki = Passki::new("localhost", "http://localhost:3000", "Test");
-    let (challenge, _) = passki.start_passkey_registration(
-        b"user123_16bytes_",
-        "alice", "Alice", 60000,
-        AttestationConveyancePreference::None,
-        ResidentKeyRequirement::Preferred,
-        UserVerificationRequirement::Preferred,
-        None,
-        Some(RegistrationExtensions { cred_props: Some(true), ..Default::default() }),
-    ).unwrap();
+    let (challenge, _) = passki
+        .start_passkey_registration(
+            b"user123_16bytes_",
+            "alice",
+            "Alice",
+            60000,
+            AttestationConveyancePreference::None,
+            ResidentKeyRequirement::Preferred,
+            UserVerificationRequirement::Preferred,
+            None,
+            Some(RegistrationExtensions {
+                cred_props: Some(true),
+                ..Default::default()
+            }),
+        )
+        .unwrap();
 
     let json = serde_json::to_value(&challenge).unwrap();
     assert_eq!(json["extensions"]["credProps"], true);
@@ -37,15 +44,19 @@ fn test_cred_props_in_challenge_when_requested() {
 #[test]
 fn test_cred_props_absent_from_challenge_when_not_requested() {
     let passki = Passki::new("localhost", "http://localhost:3000", "Test");
-    let (challenge, _) = passki.start_passkey_registration(
-        b"user123_16bytes_",
-        "alice", "Alice", 60000,
-        AttestationConveyancePreference::None,
-        ResidentKeyRequirement::Preferred,
-        UserVerificationRequirement::Preferred,
-        None,
-        None,
-    ).unwrap();
+    let (challenge, _) = passki
+        .start_passkey_registration(
+            b"user123_16bytes_",
+            "alice",
+            "Alice",
+            60000,
+            AttestationConveyancePreference::None,
+            ResidentKeyRequirement::Preferred,
+            UserVerificationRequirement::Preferred,
+            None,
+            None,
+        )
+        .unwrap();
 
     let json = serde_json::to_value(&challenge).unwrap();
     assert!(json.get("extensions").is_none());
@@ -54,18 +65,22 @@ fn test_cred_props_absent_from_challenge_when_not_requested() {
 #[test]
 fn test_cred_props_and_prf_can_be_requested_together() {
     let passki = Passki::new("localhost", "http://localhost:3000", "Test");
-    let (challenge, _) = passki.start_passkey_registration(
-        b"user123_16bytes_",
-        "alice", "Alice", 60000,
-        AttestationConveyancePreference::None,
-        ResidentKeyRequirement::Preferred,
-        UserVerificationRequirement::Preferred,
-        None,
-        Some(RegistrationExtensions {
-            cred_props: Some(true),
-            prf: Some(PrfInput { eval: None }),
-        }),
-    ).unwrap();
+    let (challenge, _) = passki
+        .start_passkey_registration(
+            b"user123_16bytes_",
+            "alice",
+            "Alice",
+            60000,
+            AttestationConveyancePreference::None,
+            ResidentKeyRequirement::Preferred,
+            UserVerificationRequirement::Preferred,
+            None,
+            Some(RegistrationExtensions {
+                cred_props: Some(true),
+                prf: Some(PrfInput { eval: None }),
+            }),
+        )
+        .unwrap();
 
     let json = serde_json::to_value(&challenge).unwrap();
     assert_eq!(json["extensions"]["credProps"], true);
@@ -74,7 +89,10 @@ fn test_cred_props_and_prf_can_be_requested_together() {
 
 // ===== RegistrationResult cred_props_rk extraction =====
 
-fn make_credential(state: &RegistrationState, cred_props: Option<CredPropsResult>) -> RegistrationCredential {
+fn make_credential(
+    state: &RegistrationState,
+    cred_props: Option<CredPropsResult>,
+) -> RegistrationCredential {
     let attestation_obj = create_test_attestation_object(-7, 0x45);
     let client_data_json = create_test_client_data_json(&state.challenge, "http://localhost:3000");
     RegistrationCredential {
@@ -91,51 +109,73 @@ fn make_credential(state: &RegistrationState, cred_props: Option<CredPropsResult
 #[test]
 fn test_cred_props_rk_true_surfaced_in_result() {
     let passki = Passki::new("localhost", "http://localhost:3000", "Test App");
-    let (_, state) = passki.start_passkey_registration(
-        b"user123_16bytes_",
-        "testuser", "Test User", 60000,
-        AttestationConveyancePreference::None,
-        ResidentKeyRequirement::Preferred,
-        UserVerificationRequirement::Preferred,
-        None,
-        Some(RegistrationExtensions { cred_props: Some(true), ..Default::default() }),
-    ).unwrap();
+    let (_, state) = passki
+        .start_passkey_registration(
+            b"user123_16bytes_",
+            "testuser",
+            "Test User",
+            60000,
+            AttestationConveyancePreference::None,
+            ResidentKeyRequirement::Preferred,
+            UserVerificationRequirement::Preferred,
+            None,
+            Some(RegistrationExtensions {
+                cred_props: Some(true),
+                ..Default::default()
+            }),
+        )
+        .unwrap();
 
     let credential = make_credential(&state, Some(CredPropsResult { rk: Some(true) }));
-    let result = passki.finish_passkey_registration(&credential, &state).unwrap();
+    let result = passki
+        .finish_passkey_registration(&credential, &state)
+        .unwrap();
     assert_eq!(result.rk, Some(true));
 }
 
 #[test]
 fn test_cred_props_rk_false_surfaced_in_result() {
     let passki = Passki::new("localhost", "http://localhost:3000", "Test App");
-    let (_, state) = passki.start_passkey_registration(
-        b"user123_16bytes_",
-        "testuser", "Test User", 60000,
-        AttestationConveyancePreference::None,
-        ResidentKeyRequirement::Preferred,
-        UserVerificationRequirement::Preferred,
-        None,
-        Some(RegistrationExtensions { cred_props: Some(true), ..Default::default() }),
-    ).unwrap();
+    let (_, state) = passki
+        .start_passkey_registration(
+            b"user123_16bytes_",
+            "testuser",
+            "Test User",
+            60000,
+            AttestationConveyancePreference::None,
+            ResidentKeyRequirement::Preferred,
+            UserVerificationRequirement::Preferred,
+            None,
+            Some(RegistrationExtensions {
+                cred_props: Some(true),
+                ..Default::default()
+            }),
+        )
+        .unwrap();
 
     let credential = make_credential(&state, Some(CredPropsResult { rk: Some(false) }));
-    let result = passki.finish_passkey_registration(&credential, &state).unwrap();
+    let result = passki
+        .finish_passkey_registration(&credential, &state)
+        .unwrap();
     assert_eq!(result.rk, Some(false));
 }
 
 #[test]
 fn test_cred_props_rk_none_when_no_extension_results() {
     let passki = Passki::new("localhost", "http://localhost:3000", "Test App");
-    let (_, state) = passki.start_passkey_registration(
-        b"user123_16bytes_",
-        "testuser", "Test User", 60000,
-        AttestationConveyancePreference::None,
-        ResidentKeyRequirement::Preferred,
-        UserVerificationRequirement::Preferred,
-        None,
-        None,
-    ).unwrap();
+    let (_, state) = passki
+        .start_passkey_registration(
+            b"user123_16bytes_",
+            "testuser",
+            "Test User",
+            60000,
+            AttestationConveyancePreference::None,
+            ResidentKeyRequirement::Preferred,
+            UserVerificationRequirement::Preferred,
+            None,
+            None,
+        )
+        .unwrap();
 
     let attestation_obj = create_test_attestation_object(-7, 0x45);
     let client_data_json = create_test_client_data_json(&state.challenge, "http://localhost:3000");
@@ -146,25 +186,36 @@ fn test_cred_props_rk_none_when_no_extension_results() {
         client_extension_results: None,
     };
 
-    let result = passki.finish_passkey_registration(&credential, &state).unwrap();
+    let result = passki
+        .finish_passkey_registration(&credential, &state)
+        .unwrap();
     assert_eq!(result.rk, None);
 }
 
 #[test]
 fn test_cred_props_rk_none_when_rk_not_reported() {
     let passki = Passki::new("localhost", "http://localhost:3000", "Test App");
-    let (_, state) = passki.start_passkey_registration(
-        b"user123_16bytes_",
-        "testuser", "Test User", 60000,
-        AttestationConveyancePreference::None,
-        ResidentKeyRequirement::Preferred,
-        UserVerificationRequirement::Preferred,
-        None,
-        Some(RegistrationExtensions { cred_props: Some(true), ..Default::default() }),
-    ).unwrap();
+    let (_, state) = passki
+        .start_passkey_registration(
+            b"user123_16bytes_",
+            "testuser",
+            "Test User",
+            60000,
+            AttestationConveyancePreference::None,
+            ResidentKeyRequirement::Preferred,
+            UserVerificationRequirement::Preferred,
+            None,
+            Some(RegistrationExtensions {
+                cred_props: Some(true),
+                ..Default::default()
+            }),
+        )
+        .unwrap();
 
     let credential = make_credential(&state, Some(CredPropsResult { rk: None }));
-    let result = passki.finish_passkey_registration(&credential, &state).unwrap();
+    let result = passki
+        .finish_passkey_registration(&credential, &state)
+        .unwrap();
     assert_eq!(result.rk, None);
 }
 

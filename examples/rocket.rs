@@ -228,23 +228,34 @@ fn register_start(
     let user_id = Uuid::new_v4().as_bytes().to_vec();
 
     // If user exists, get their existing passkeys to exclude them from re-registration
-    let existing = store.users.lock().unwrap()
-        .get(&req.username).map(|u| u.passkeys.clone());
+    let existing = store
+        .users
+        .lock()
+        .unwrap()
+        .get(&req.username)
+        .map(|u| u.passkeys.clone());
 
     let (challenge, reg_state) = passki.start_passkey_registration(
         &user_id,
-        &req.username,                          // User handle (displayed by authenticator)
-        &req.username,                          // Display name
-        60000,                                  // Timeout in milliseconds
-        AttestationConveyancePreference::None,  // Don't request attestation
-        ResidentKeyRequirement::Preferred,      // Request discoverable credential if possible
+        &req.username, // User handle (displayed by authenticator)
+        &req.username, // Display name
+        60000,         // Timeout in milliseconds
+        AttestationConveyancePreference::None, // Don't request attestation
+        ResidentKeyRequirement::Preferred, // Request discoverable credential if possible
         UserVerificationRequirement::Preferred, // Request user verification if available
-        existing.as_deref(),                    // Exclude existing credentials
-        Some(RegistrationExtensions { cred_props: Some(true), prf: Some(PrfInput { eval: None }) }), // Probe PRF support
+        existing.as_deref(), // Exclude existing credentials
+        Some(RegistrationExtensions {
+            cred_props: Some(true),
+            prf: Some(PrfInput { eval: None }),
+        }), // Probe PRF support
     )?;
 
     // Store state for verification in finish step, keyed by the challenge
-    store.pending_registrations.lock().unwrap().insert(challenge.challenge.clone(), reg_state);
+    store
+        .pending_registrations
+        .lock()
+        .unwrap()
+        .insert(challenge.challenge.clone(), reg_state);
 
     // Return challenge to client (will be passed to navigator.credentials.create())
     Ok(Json(challenge))
@@ -266,11 +277,15 @@ fn register_finish(
     let client_data = ClientData::from_base64(&req.client_data_json)?;
 
     // Retrieve and remove the pending registration state
-    let reg_state = store.pending_registrations.lock().unwrap()
+    let reg_state = store
+        .pending_registrations
+        .lock()
+        .unwrap()
         .remove(&client_data.challenge)
         .ok_or(AppError("No pending registration".into()))?;
 
-    let prf_supported = req.client_extension_results
+    let prf_supported = req
+        .client_extension_results
         .as_ref()
         .and_then(|ext| ext.prf.as_ref())
         .and_then(|prf| prf.enabled)
@@ -337,7 +352,9 @@ fn auth_start(
     let passkeys = if let Some(ref username) = req.username {
         // Passwordless flow: get user's passkeys to include in allowCredentials
         let users = store.users.lock().unwrap();
-        let user = users.get(username).ok_or(AppError("User not found".into()))?;
+        let user = users
+            .get(username)
+            .ok_or(AppError("User not found".into()))?;
         user.passkeys.clone()
     } else {
         // Usernameless flow: empty allowCredentials lets browser show all passkeys
@@ -345,7 +362,12 @@ fn auth_start(
     };
 
     let extensions = req.prf_salt.clone().map(|salt| AuthenticationExtensions {
-        prf: PrfInput { eval: Some(PrfEval { first: salt, second: None }) },
+        prf: PrfInput {
+            eval: Some(PrfEval {
+                first: salt,
+                second: None,
+            }),
+        },
     });
 
     let (challenge, auth_state) = passki.start_passkey_authentication(
@@ -356,7 +378,11 @@ fn auth_start(
     );
 
     // Store state for verification in finish step, keyed by the challenge
-    store.pending_authentications.lock().unwrap().insert(challenge.challenge.clone(), auth_state);
+    store
+        .pending_authentications
+        .lock()
+        .unwrap()
+        .insert(challenge.challenge.clone(), auth_state);
 
     // Return challenge to client
     Ok(Json(challenge))
@@ -378,7 +404,10 @@ fn auth_finish(
     let client_data = ClientData::from_base64(&req.client_data_json)?;
 
     // Retrieve pending state using challenge
-    let auth_state = store.pending_authentications.lock().unwrap()
+    let auth_state = store
+        .pending_authentications
+        .lock()
+        .unwrap()
         .remove(&client_data.challenge)
         .ok_or(AppError("No pending authentication".into()))?;
 
@@ -387,9 +416,11 @@ fn auth_finish(
 
     // Find user by credential_id
     let mut users = store.users.lock().unwrap();
-    let (username, passkey) = users.iter_mut()
+    let (username, passkey) = users
+        .iter_mut()
         .find_map(|(name, user)| {
-            user.passkeys.iter_mut()
+            user.passkeys
+                .iter_mut()
                 .find(|pk| pk.credential_id == credential_id)
                 .map(|pk| (name.clone(), pk))
         })
@@ -411,7 +442,8 @@ fn auth_finish(
     // If counter goes backwards, it may indicate the credential was cloned.
     passkey.counter = result.counter;
 
-    let prf_output = result.prf_first
+    let prf_output = result
+        .prf_first
         .map(|bytes| bytes.iter().map(|b| format!("{b:02x}")).collect());
 
     Ok(Json(ApiResponse {
@@ -434,23 +466,21 @@ fn rocket() -> Rocket<Build> {
     // - rp_id: The domain name (no protocol or port). Credentials are bound to this.
     // - origin: The full origin URL. Must match what the browser sends.
     // - rp_name: Human-readable name shown by authenticators.
-    let passki = Passki::new(
-        "localhost",
-        "http://localhost:3000",
-        "Passkeys Demo",
-    );
+    let passki = Passki::new("localhost", "http://localhost:3000", "Passkeys Demo");
 
-    let figment = rocket::Config::figment()
-        .merge(("port", 3000));
+    let figment = rocket::Config::figment().merge(("port", 3000));
 
     rocket::custom(figment)
         .manage(passki)
         .manage(Store::default())
-        .mount("/", routes![
-            index,
-            register_start,
-            register_finish,
-            auth_start,
-            auth_finish,
-        ])
+        .mount(
+            "/",
+            routes![
+                index,
+                register_start,
+                register_finish,
+                auth_start,
+                auth_finish,
+            ],
+        )
 }

@@ -45,7 +45,10 @@ impl FromStr for ClientDataType {
         match s {
             "webauthn.create" => Ok(ClientDataType::Create),
             "webauthn.get" => Ok(ClientDataType::Get),
-            _ => Err(PasskiError::new(format!("Invalid type in client data: {}", s))),
+            _ => Err(PasskiError::new(format!(
+                "Invalid type in client data: {}",
+                s
+            ))),
         }
     }
 }
@@ -152,7 +155,8 @@ impl ClientData {
     ///     .ok_or("No pending state")?;
     /// # */
     /// ```
-    #[inline] pub fn from_base64(client_data_json: &str) -> Result<ClientData> {
+    #[inline]
+    pub fn from_base64(client_data_json: &str) -> Result<ClientData> {
         let bytes = crate::Passki::base64_decode(client_data_json)?;
         Self::from_bytes(&bytes)
     }
