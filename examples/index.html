@@ -263,21 +263,27 @@
             // Serialize clientExtensionResults to a plain JSON-safe object.
             // ArrayBuffer values (PRF outputs) are base64url-encoded.
             function serializeExtensionResults(extResults) {
-                if (!extResults.prf) return null;
-                const prf = {};
-                if (extResults.prf.enabled !== undefined) {
-                    prf.enabled = extResults.prf.enabled;
+                const out = {};
+                if (extResults.credProps !== undefined) {
+                    out.credProps = extResults.credProps;
                 }
-                if (extResults.prf.results) {
-                    prf.results = {};
-                    if (extResults.prf.results.first) {
-                        prf.results.first = bufferToBase64url(extResults.prf.results.first);
+                if (extResults.prf) {
+                    const prf = {};
+                    if (extResults.prf.enabled !== undefined) {
+                        prf.enabled = extResults.prf.enabled;
                     }
-                    if (extResults.prf.results.second) {
-                        prf.results.second = bufferToBase64url(extResults.prf.results.second);
+                    if (extResults.prf.results) {
+                        prf.results = {};
+                        if (extResults.prf.results.first) {
+                            prf.results.first = bufferToBase64url(extResults.prf.results.first);
+                        }
+                        if (extResults.prf.results.second) {
+                            prf.results.second = bufferToBase64url(extResults.prf.results.second);
+                        }
                     }
+                    out.prf = prf;
                 }
-                return { prf };
+                return Object.keys(out).length ? out : null;
             }
 
             async function register() {
@@ -350,7 +356,10 @@
                     const prf = result.prf_supported === true ? "\n✓ PRF supported"
                               : result.prf_supported === false ? "\n⚠ PRF not supported"
                               : "";
-                    showMessage("register-message", `✓ Registration successful!${prf}`, true);
+                    const rk = result.residental_key === true ? "\n✓ Residental key"
+                               : result.residental_key === false ? "\n⚠ Non-residental key"
+                               : "";
+                    showMessage("register-message", `✓ Registration successful!${rk}${prf}`, true);
                     document.getElementById("register-username").value = "";
                 } catch (err) {
                     console.error(err);

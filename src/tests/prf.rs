@@ -29,7 +29,7 @@ fn signed_auth_credential(
     key_pair: &Ed25519KeyPair,
     prf: Option<PrfExtensionResult>,
 ) -> AuthenticationCredential {
-    let client_extension_results = prf.map(|p| ClientExtensionResults { prf: Some(p) });
+    let client_extension_results = prf.map(|p| ClientExtensionResults { prf: Some(p), cred_props: None });
     let auth_data = create_test_authenticator_data(counter);
     let client_data_json = create_test_auth_client_data_json(challenge, origin);
 
@@ -53,6 +53,7 @@ fn make_stored_passkey(credential_id: &[u8], public_key_bytes: &[u8; 32], counte
         public_key: create_eddsa_cose_key(public_key_bytes),
         counter,
         algorithm: -8,
+            rk: None,
     }
 }
 
@@ -78,10 +79,10 @@ fn test_registration_challenge_omits_extensions_when_prf_none() {
 #[test]
 fn test_registration_challenge_includes_extensions_when_prf_some() {
     let passki = Passki::new("localhost", "http://localhost:3000", "Test");
-    let extensions = Some(RegistrationExtensions { prf: PrfInput { eval: Some(PrfEval {
+    let extensions = Some(RegistrationExtensions { prf: Some(PrfInput { eval: Some(PrfEval {
         first: Passki::base64_encode(b"salt-one"),
         second: None,
-    }) } });
+    }) }), ..Default::default() });
     let (challenge, _) = passki.start_passkey_registration(
         b"user123_16bytes_",
         "alice", "Alice", 60000,
@@ -100,10 +101,10 @@ fn test_registration_challenge_includes_extensions_when_prf_some() {
 fn test_registration_challenge_extensions_json_shape() {
     let passki = Passki::new("localhost", "http://localhost:3000", "Test");
     let salt = b"my-salt-bytes";
-    let extensions = Some(RegistrationExtensions { prf: PrfInput { eval: Some(PrfEval {
+    let extensions = Some(RegistrationExtensions { prf: Some(PrfInput { eval: Some(PrfEval {
         first: Passki::base64_encode(salt),
         second: None,
-    }) } });
+    }) }), ..Default::default() });
     let (challenge, _) = passki.start_passkey_registration(
         b"user123_16bytes_",
         "alice", "Alice", 60000,
@@ -123,10 +124,10 @@ fn test_registration_challenge_extensions_json_shape() {
 #[test]
 fn test_registration_challenge_extensions_includes_second_input() {
     let passki = Passki::new("localhost", "http://localhost:3000", "Test");
-    let extensions = Some(RegistrationExtensions { prf: PrfInput { eval: Some(PrfEval {
+    let extensions = Some(RegistrationExtensions { prf: Some(PrfInput { eval: Some(PrfEval {
         first: Passki::base64_encode(b"first-salt"),
         second: Some(Passki::base64_encode(b"second-salt")),
-    }) } });
+    }) }), ..Default::default() });
     let (challenge, _) = passki.start_passkey_registration(
         b"user123_16bytes_",
         "alice", "Alice", 60000,
@@ -146,8 +147,8 @@ fn test_registration_challenge_extensions_includes_second_input() {
 #[test]
 fn test_registration_challenge_probe_only_has_no_eval() {
     let passki = Passki::new("localhost", "http://localhost:3000", "Test");
-    // RegistrationExtensions { prf: PrfInput { eval: None } } → { "prf": {} } — asks for support flag without evaluating
-    let extensions = Some(RegistrationExtensions { prf: PrfInput { eval: None } });
+    // RegistrationExtensions { prf: Some(PrfInput { eval: None }), .. } → { "prf": {} } — asks for support flag without evaluating
+    let extensions = Some(RegistrationExtensions { prf: Some(PrfInput { eval: None }), ..Default::default() });
     let (challenge, _) = passki.start_passkey_registration(
         b"user123_16bytes_",
         "alice", "Alice", 60000,

@@ -239,12 +239,17 @@ impl Passki {
         let attestation_bytes = Self::base64_decode(&credential.public_key)?;
         let (public_key_bytes, algorithm) = Self::parse_attestation_object(&attestation_bytes)?;
 
-        // Store passkey
+        let rk = credential.client_extension_results
+            .as_ref()
+            .and_then(|ext| ext.cred_props.as_ref())
+            .and_then(|cp| cp.rk);
+
         Ok(StoredPasskey {
             credential_id: Self::base64_decode(&credential.credential_id)?,
             public_key: public_key_bytes,
             counter: 0,
             algorithm,
+            rk,
         })
     }
 

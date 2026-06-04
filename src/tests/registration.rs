@@ -154,6 +154,7 @@ fn test_start_passkey_registration_with_single_existing_credential() {
         public_key: vec![2u8; 32],
         counter: 5,
         algorithm: -7,
+            rk: None,
     };
 
     let user_id = b"user123_16bytes_";
@@ -192,18 +193,21 @@ fn test_start_passkey_registration_with_multiple_existing_credentials() {
             public_key: vec![2u8; 32],
             counter: 5,
             algorithm: -7,
+            rk: None,
         },
         StoredPasskey {
             credential_id: vec![3u8; 16],
             public_key: vec![4u8; 32],
             counter: 10,
             algorithm: -8,
+            rk: None,
         },
         StoredPasskey {
             credential_id: vec![5u8; 16],
             public_key: vec![6u8; 64],
             counter: 15,
             algorithm: -257,
+            rk: None,
         },
     ];
 

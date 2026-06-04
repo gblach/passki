@@ -12,7 +12,7 @@ A simple, secure, and easy-to-use WebAuthn/Passkey implementation for Rust.
 - 🔐 **Multiple Algorithms** - Support for EdDSA (Ed25519), ES256/ES384 (P-256/P-384), and RS256/RS384 (RSA)
 - 🛡️ **Security First** - Built-in replay attack protection via signature counters
 - 📦 **Framework Agnostic** - No web framework lock-in, works with any HTTP server
-- 🔑 **PRF Extension** - Support for the WebAuthn PRF extension for key derivation and E2E encryption
+- 🔑 **Extensions** - Support for `credProps` (discoverable credential reporting) and PRF (key derivation / E2E encryption)
 - 🦀 **Pure Rust** - Memory-safe implementation with no unsafe code
 
 ## Installation
@@ -58,7 +58,7 @@ let (registration_challenge, registration_state) = passki.start_passkey_registra
 // Client uses WebAuthn API to create credential
 
 // Step 2: Receive credential from client and complete registration
-let mut stored_passkey: StoredPasskey = passki.finish_passkey_registration(
+let mut stored_passkey = passki.finish_passkey_registration(
     &registration_credential,  // Credential from client
     &registration_state,       // State from step 1
 )?;
@@ -98,31 +98,51 @@ Passki supports the following COSE algorithms:
 - **RS256** (RSASSA-PKCS1-v1_5 with SHA-256) - Algorithm ID: -257
 - **RS384** (RSASSA-PKCS1-v1_5 with SHA-384) - Algorithm ID: -258
 
-## PRF Extension
+## Extensions
 
-The [WebAuthn PRF extension](https://www.w3.org/TR/webauthn-2/#prf-extension) lets a passkey derive deterministic secret bytes from the authenticator's internal HMAC-secret. This is useful for end-to-end encryption, per-user key derivation, and other scenarios where you need a stable secret tied to a specific passkey.
+### credProps
 
-The server passes input salts; the browser computes `HMAC-SHA256("WebAuthn PRF" || 0x00 || input)` and feeds the result into the authenticator. Passki passes the outputs through without processing them.
+The `credProps` extension reports whether the authenticator created a discoverable (resident) credential - one stored on the device and usable in passwordless flows. Request it during registration; the result is stored in `StoredPasskey::rk`.
 
 ```rust
-use passki::{ClientExtensionResults, PrfEval, PrfInput, RegistrationExtensions, AuthenticationExtensions};
+use passki::RegistrationExtensions;
 
-// During registration, probe for PRF support (no eval - works on all authenticators)
+// Request credProps during registration
 let (challenge, state) = passki.start_passkey_registration(
     user_id, username, display_name, 60000,
     AttestationConveyancePreference::None,
     ResidentKeyRequirement::Preferred,
     UserVerificationRequirement::Preferred,
     None,
-    Some(RegistrationExtensions { prf: PrfInput { eval: None } }),  // probe: ask "do you support PRF?"
+    Some(RegistrationExtensions { cred_props: Some(true), ..Default::default() }),
 )?;
 
-// Pass clientExtensionResults from the browser directly - no unwrapping needed
-    let credential = RegistrationCredential {
-    credential_id, public_key, client_data_json,
-    client_extension_results: Some(ClientExtensionResults { prf: Some(ext) }),
-};
-// ext.enabled == Some(true) if the authenticator supports PRF
+let passkey = passki.finish_passkey_registration(&credential, &state)?;
+// passkey.rk == Some(true)  → discoverable credential created
+// passkey.rk == Some(false) → non-discoverable credential created
+// passkey.rk == None        → authenticator did not report
+```
+
+### PRF
+
+The [WebAuthn PRF extension](https://www.w3.org/TR/webauthn-3/#prf-extension) lets a passkey derive deterministic secret bytes from the authenticator's internal HMAC-secret. This is useful for end-to-end encryption, per-user key derivation, and other scenarios where you need a stable secret tied to a specific passkey.
+
+The server passes input salts; the browser computes `HMAC-SHA256("WebAuthn PRF" || 0x00 || input)` and feeds the result into the authenticator. Passki passes the outputs through without processing them.
+
+```rust
+use passki::{AuthenticationExtensions, PrfEval, PrfInput, RegistrationExtensions};
+
+// During registration, probe for PRF support
+let (challenge, state) = passki.start_passkey_registration(
+    user_id, username, display_name, 60000,
+    AttestationConveyancePreference::None,
+    ResidentKeyRequirement::Preferred,
+    UserVerificationRequirement::Preferred,
+    None,
+    Some(RegistrationExtensions { prf: Some(PrfInput { eval: None }), ..Default::default() }),
+)?;
+// Check client_extension_results.prf.enabled in the credential before calling finish
+// to know whether the authenticator supports PRF
 
 // During authentication, request a PRF derivation for a given context
 let (challenge, state) = passki.start_passkey_authentication(
@@ -136,12 +156,6 @@ let (challenge, state) = passki.start_passkey_authentication(
         }) },
     }),
 );
-
-// Pass clientExtensionResults from the browser directly
-let credential = AuthenticationCredential {
-    credential_id, authenticator_data, client_data_json, signature,
-    client_extension_results: Some(ClientExtensionResults { prf: Some(ext) }),
-};
 
 // result.prf_first contains the derived key bytes (32 bytes)
 // The same passkey + same context always yields the same bytes
@@ -176,7 +190,7 @@ This design keeps state management simple and allows you to store session data h
 The `examples/` directory has complete registration and authentication flows for several web frameworks:
 [Actix-web](examples/actix-web.rs) | [Axum](examples/axum.rs) | [Poem](examples/poem.rs) | [Rocket](examples/rocket.rs) | [Warp](examples/warp.rs)
 
-All examples include full PRF support: registration probes for PRF and reports whether the authenticator supports it, and authentication accepts an optional key context string (`prf_salt`) to derive a 32-byte key.
+All examples request both `credProps` and PRF during registration. Registration reports whether a resident key was created; authentication accepts an optional key context string (`prf_salt`) to derive a 32-byte key.
 
 ```bash
 cargo run --example axum  # or actix-web, poem, rocket, warp
@@ -216,7 +230,7 @@ A substantial expansion, still the most widely implemented level today:
 - [x] `ResidentKeyRequirement` (`discouraged` / `preferred` / `required`)
 - [x] `enterprise` attestation conveyance preference
 - [x] Zero-counter authenticator support (explicitly allowed per spec)
-- [ ] `credProps` extension - reports whether a discoverable credential was created
+- [x] `credProps` extension - reports whether a discoverable credential was created
 - [ ] `largeBlob` extension - store small blobs on the authenticator (e.g. SSH keys)
 - [ ] `minPinLength` extension - query or enforce minimum PIN length
 - [ ] `credProtect` extension - control UV requirement for credential access
@@ -248,6 +262,6 @@ Passki is built on top of [aws-lc-rs](https://github.com/aws/aws-lc-rs) for cryp
 
 ## Resources
 
-- [WebAuthn Specification](https://www.w3.org/TR/webauthn-2/)
+- [WebAuthn Specification](https://www.w3.org/TR/webauthn-3/)
 - [FIDO Alliance](https://fidoalliance.org/)
 - [WebAuthn Guide](https://webauthn.guide/)

@@ -108,6 +108,11 @@ pub struct StoredPasskey {
 
     /// The COSE algorithm identifier (e.g., -7 for ES256, -8 for EdDSA, -257 for RS256).
     pub algorithm: i32,
+
+    /// Whether this is a discoverable (resident) credential, as reported by the `credProps`
+    /// extension during registration. `None` if `credProps` was not requested or not reported.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rk: Option<bool>,
 }
 
 /// Information about the relying party (RP).
@@ -184,9 +189,12 @@ pub struct AllowCredential {
 }
 
 /// Extensions included in a registration challenge.
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Debug, Default)]
 pub struct RegistrationExtensions {
-    pub prf: PrfInput,
+    #[serde(rename = "credProps", skip_serializing_if = "Option::is_none")]
+    pub cred_props: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub prf: Option<PrfInput>,
 }
 
 /// Extensions included in an authentication challenge.
@@ -196,7 +204,7 @@ pub struct AuthenticationExtensions {
 }
 
 /// PRF extension input included in challenges.
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Debug, Default)]
 pub struct PrfInput {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub eval: Option<PrfEval>,
@@ -220,9 +228,19 @@ pub struct PrfEval {
 /// Adding support for a new extension means adding a field here.
 #[derive(Deserialize, Debug, Default)]
 pub struct ClientExtensionResults {
+    /// Results for the credProps extension.
+    #[serde(default, rename = "credProps")]
+    pub cred_props: Option<CredPropsResult>,
     /// Results for the PRF extension.
     #[serde(default)]
     pub prf: Option<PrfExtensionResult>,
+}
+
+/// Credential properties returned by the browser after registration.
+#[derive(Deserialize, Debug)]
+pub struct CredPropsResult {
+    /// Whether a discoverable (resident) credential was created.
+    pub rk: Option<bool>,
 }
 
 /// PRF extension result returned by the client.

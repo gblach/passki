@@ -24,6 +24,7 @@ fn test_start_passkey_authentication_returns_challenge() {
         public_key: vec![2u8; 32],
         counter: 0,
         algorithm: -7,
+            rk: None,
     }];
 
     let (challenge, state) = passki.start_passkey_authentication(
@@ -56,18 +57,21 @@ fn test_start_passkey_authentication_multiple_credentials() {
             public_key: vec![2u8; 32],
             counter: 0,
             algorithm: -7,
+            rk: None,
         },
         StoredPasskey {
             credential_id: vec![3u8; 16],
             public_key: vec![4u8; 32],
             counter: 5,
             algorithm: -8,
+            rk: None,
         },
         StoredPasskey {
             credential_id: vec![5u8; 16],
             public_key: vec![6u8; 64],
             counter: 10,
             algorithm: -257,
+            rk: None,
         },
     ];
 
@@ -125,6 +129,7 @@ fn test_start_passkey_authentication_generates_unique_challenges() {
         public_key: vec![2u8; 32],
         counter: 0,
         algorithm: -7,
+            rk: None,
     }];
 
     let (challenge1, state1) = passki.start_passkey_authentication(
@@ -155,6 +160,7 @@ fn test_start_passkey_authentication_with_different_settings() {
         public_key: vec![8u8; 40],
         counter: 100,
         algorithm: -8,
+            rk: None,
     }];
 
     let (challenge, _state) = passki.start_passkey_authentication(
@@ -177,6 +183,7 @@ fn test_finish_passkey_authentication_success() {
         public_key: vec![2u8; 64],
         counter: 5,
         algorithm: -7,
+            rk: None,
     };
 
     let passkeys = vec![stored_passkey.clone()];
@@ -216,6 +223,7 @@ fn test_finish_passkey_authentication_wrong_credential_id() {
         public_key: vec![2u8; 64],
         counter: 5,
         algorithm: -7,
+            rk: None,
     };
 
     let passkeys = vec![stored_passkey.clone()];
@@ -257,6 +265,7 @@ fn test_finish_passkey_authentication_wrong_challenge() {
         public_key: vec![2u8; 64],
         counter: 5,
         algorithm: -7,
+            rk: None,
     };
 
     let passkeys = vec![stored_passkey.clone()];
@@ -299,6 +308,7 @@ fn test_finish_passkey_authentication_wrong_origin() {
         public_key: vec![2u8; 64],
         counter: 5,
         algorithm: -7,
+            rk: None,
     };
 
     let passkeys = vec![stored_passkey.clone()];
@@ -334,6 +344,7 @@ fn test_finish_passkey_authentication_invalid_counter() {
         public_key: vec![2u8; 64],
         counter: 10,
         algorithm: -7,
+            rk: None,
     };
 
     let passkeys = vec![stored_passkey.clone()];
@@ -370,6 +381,7 @@ fn test_finish_passkey_authentication_too_short_authenticator_data() {
         public_key: vec![2u8; 64],
         counter: 5,
         algorithm: -7,
+            rk: None,
     };
 
     let passkeys = vec![stored_passkey.clone()];
@@ -412,6 +424,7 @@ fn test_finish_passkey_authentication_usernameless() {
         public_key: vec![2u8; 64],
         counter: 5,
         algorithm: -7,
+            rk: None,
     };
 
     // Start authentication with EMPTY credentials list (usernameless flow)
