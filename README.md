@@ -21,7 +21,7 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-passki = "0.1"
+passki = "0.2"
 ```
 
 ## Quick Start
