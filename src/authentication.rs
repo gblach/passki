@@ -300,6 +300,7 @@ impl Passki {
             ALG_EDDSA => Self::verify_eddsa(cose_key_bytes, signed_data, signature),
             ALG_ES256 => Self::verify_ecdsa(
                 &ECDSA_P256_SHA256_ASN1,
+                CRV_P256,
                 "ES256",
                 cose_key_bytes,
                 signed_data,
@@ -307,6 +308,7 @@ impl Passki {
             ),
             ALG_ES384 => Self::verify_ecdsa(
                 &ECDSA_P384_SHA384_ASN1,
+                CRV_P384,
                 "ES384",
                 cose_key_bytes,
                 signed_data,
@@ -358,6 +360,30 @@ impl Passki {
             .ok_or_else(|| PasskiError::new(format!("Missing {} in COSE key", name)).into())
     }
 
+    /// Verifies that an integer field in a COSE key map has the expected value.
+    fn cose_expect(
+        cose_map: &[(ciborium::Value, ciborium::Value)],
+        label: i64,
+        name: &str,
+        expected: i64,
+    ) -> Result<()> {
+        let value: i64 = cose_map
+            .iter()
+            .find(|(k, _)| k.as_integer() == Some(label.into()))
+            .and_then(|(_, v)| v.as_integer())
+            .and_then(|i| i.try_into().ok())
+            .ok_or_else(|| PasskiError::new(format!("Missing {} in COSE key", name)))?;
+
+        if value != expected {
+            return Err(Box::new(PasskiError::new(format!(
+                "Invalid {} in COSE key: expected {}, got {}",
+                name, expected, value
+            ))));
+        }
+
+        Ok(())
+    }
+
     /// Verifies an EdDSA (Ed25519) signature.
     pub(crate) fn verify_eddsa(
         cose_key_bytes: &[u8],
@@ -365,6 +391,8 @@ impl Passki {
         signature: &[u8],
     ) -> Result<()> {
         let cose_map = Self::cose_parse(cose_key_bytes)?;
+        Self::cose_expect(&cose_map, 1, "kty", KTY_OKP)?;
+        Self::cose_expect(&cose_map, -1, "crv", CRV_ED25519)?;
         let x = Self::cose_field(&cose_map, -2, "x coordinate")?;
 
         if x.len() != 32 {
@@ -384,12 +412,15 @@ impl Passki {
     /// Verifies an ECDSA signature (ES256 or ES384).
     pub(crate) fn verify_ecdsa(
         algorithm: &'static EcdsaVerificationAlgorithm,
+        crv: i64,
         name: &str,
         cose_key_bytes: &[u8],
         signed_data: &[u8],
         signature: &[u8],
     ) -> Result<()> {
         let cose_map = Self::cose_parse(cose_key_bytes)?;
+        Self::cose_expect(&cose_map, 1, "kty", KTY_EC2)?;
+        Self::cose_expect(&cose_map, -1, "crv", crv)?;
         let x = Self::cose_field(&cose_map, -2, "x coordinate")?;
         let y = Self::cose_field(&cose_map, -3, "y coordinate")?;
 
@@ -416,6 +447,7 @@ impl Passki {
         signature: &[u8],
     ) -> Result<()> {
         let cose_map = Self::cose_parse(cose_key_bytes)?;
+        Self::cose_expect(&cose_map, 1, "kty", KTY_RSA)?;
         let n = Self::cose_field(&cose_map, -1, "n (modulus)")?;
         let e = Self::cose_field(&cose_map, -2, "e (exponent)")?;
 

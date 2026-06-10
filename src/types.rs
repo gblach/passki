@@ -66,6 +66,24 @@ pub(crate) const ALG_RS256: i32 = -257;
 /// RS384 (RSASSA-PKCS1-v1_5 with SHA-384).
 pub(crate) const ALG_RS384: i32 = -258;
 
+// COSE key types
+
+/// OKP (Octet Key Pair, used by Ed25519).
+pub(crate) const KTY_OKP: i64 = 1;
+/// EC2 (elliptic curve with x/y coordinates).
+pub(crate) const KTY_EC2: i64 = 2;
+/// RSA.
+pub(crate) const KTY_RSA: i64 = 3;
+
+// COSE elliptic curves
+
+/// P-256 curve.
+pub(crate) const CRV_P256: i64 = 1;
+/// P-384 curve.
+pub(crate) const CRV_P384: i64 = 2;
+/// Ed25519 curve.
+pub(crate) const CRV_ED25519: i64 = 6;
+
 /// Attestation conveyance preference for passkey registration.
 ///
 /// Specifies whether and how the relying party wants to receive attestation

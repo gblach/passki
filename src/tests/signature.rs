@@ -707,6 +707,159 @@ fn test_verify_rs384_dispatch() {
     );
 }
 
+// ===== COSE key type and curve validation tests =====
+
+#[test]
+fn test_verify_eddsa_wrong_kty() {
+    use ciborium::Value;
+
+    // COSE key with kty EC2 instead of OKP
+    let cose_key = vec![
+        (Value::Integer(1.into()), Value::Integer(2.into())), // kty: EC2 (wrong)
+        (Value::Integer(3.into()), Value::Integer((-8).into())), // alg: EdDSA
+        (Value::Integer((-1).into()), Value::Integer(6.into())), // crv: Ed25519
+        (Value::Integer((-2).into()), Value::Bytes(vec![0u8; 32])), // x
+    ];
+    let mut cose_key_bytes = Vec::new();
+    ciborium::into_writer(&Value::Map(cose_key), &mut cose_key_bytes).unwrap();
+
+    let result = Passki::verify_eddsa(&cose_key_bytes, b"test", &[0u8; 64]);
+
+    assert!(result.is_err());
+    assert!(
+        result
+            .unwrap_err()
+            .to_string()
+            .contains("Invalid kty in COSE key")
+    );
+}
+
+#[test]
+fn test_verify_eddsa_wrong_crv() {
+    use ciborium::Value;
+
+    // COSE key with crv P-256 instead of Ed25519
+    let cose_key = vec![
+        (Value::Integer(1.into()), Value::Integer(1.into())), // kty: OKP
+        (Value::Integer(3.into()), Value::Integer((-8).into())), // alg: EdDSA
+        (Value::Integer((-1).into()), Value::Integer(1.into())), // crv: P-256 (wrong)
+        (Value::Integer((-2).into()), Value::Bytes(vec![0u8; 32])), // x
+    ];
+    let mut cose_key_bytes = Vec::new();
+    ciborium::into_writer(&Value::Map(cose_key), &mut cose_key_bytes).unwrap();
+
+    let result = Passki::verify_eddsa(&cose_key_bytes, b"test", &[0u8; 64]);
+
+    assert!(result.is_err());
+    assert!(
+        result
+            .unwrap_err()
+            .to_string()
+            .contains("Invalid crv in COSE key")
+    );
+}
+
+#[test]
+fn test_verify_eddsa_missing_kty() {
+    use ciborium::Value;
+
+    // COSE key without kty (label 1)
+    let cose_key = vec![
+        (Value::Integer(3.into()), Value::Integer((-8).into())), // alg: EdDSA
+        (Value::Integer((-1).into()), Value::Integer(6.into())), // crv: Ed25519
+        (Value::Integer((-2).into()), Value::Bytes(vec![0u8; 32])), // x
+    ];
+    let mut cose_key_bytes = Vec::new();
+    ciborium::into_writer(&Value::Map(cose_key), &mut cose_key_bytes).unwrap();
+
+    let result = Passki::verify_eddsa(&cose_key_bytes, b"test", &[0u8; 64]);
+
+    assert!(result.is_err());
+    assert!(
+        result
+            .unwrap_err()
+            .to_string()
+            .contains("Missing kty in COSE key")
+    );
+}
+
+#[test]
+fn test_verify_es256_wrong_crv() {
+    use ciborium::Value;
+
+    // COSE key with crv P-384 but verified as ES256 (P-256)
+    let cose_key = vec![
+        (Value::Integer(1.into()), Value::Integer(2.into())), // kty: EC2
+        (Value::Integer(3.into()), Value::Integer((-7).into())), // alg: ES256
+        (Value::Integer((-1).into()), Value::Integer(2.into())), // crv: P-384 (wrong)
+        (Value::Integer((-2).into()), Value::Bytes(vec![0u8; 32])), // x
+        (Value::Integer((-3).into()), Value::Bytes(vec![0u8; 32])), // y
+    ];
+    let mut cose_key_bytes = Vec::new();
+    ciborium::into_writer(&Value::Map(cose_key), &mut cose_key_bytes).unwrap();
+
+    let result = Passki::verify_signature(&cose_key_bytes, ALG_ES256, b"test", &[0u8; 64]);
+
+    assert!(result.is_err());
+    assert!(
+        result
+            .unwrap_err()
+            .to_string()
+            .contains("Invalid crv in COSE key")
+    );
+}
+
+#[test]
+fn test_verify_es384_wrong_crv() {
+    use ciborium::Value;
+
+    // COSE key with crv P-256 but verified as ES384 (P-384)
+    let cose_key = vec![
+        (Value::Integer(1.into()), Value::Integer(2.into())), // kty: EC2
+        (Value::Integer(3.into()), Value::Integer((-35).into())), // alg: ES384
+        (Value::Integer((-1).into()), Value::Integer(1.into())), // crv: P-256 (wrong)
+        (Value::Integer((-2).into()), Value::Bytes(vec![0u8; 48])), // x
+        (Value::Integer((-3).into()), Value::Bytes(vec![0u8; 48])), // y
+    ];
+    let mut cose_key_bytes = Vec::new();
+    ciborium::into_writer(&Value::Map(cose_key), &mut cose_key_bytes).unwrap();
+
+    let result = Passki::verify_signature(&cose_key_bytes, ALG_ES384, b"test", &[0u8; 96]);
+
+    assert!(result.is_err());
+    assert!(
+        result
+            .unwrap_err()
+            .to_string()
+            .contains("Invalid crv in COSE key")
+    );
+}
+
+#[test]
+fn test_verify_rs256_wrong_kty() {
+    use ciborium::Value;
+
+    // COSE key with kty OKP instead of RSA
+    let cose_key = vec![
+        (Value::Integer(1.into()), Value::Integer(1.into())), // kty: OKP (wrong)
+        (Value::Integer(3.into()), Value::Integer((-257).into())), // alg: RS256
+        (Value::Integer((-1).into()), Value::Bytes(vec![0u8; 256])), // n
+        (Value::Integer((-2).into()), Value::Bytes(vec![1, 0, 1])), // e
+    ];
+    let mut cose_key_bytes = Vec::new();
+    ciborium::into_writer(&Value::Map(cose_key), &mut cose_key_bytes).unwrap();
+
+    let result = Passki::verify_signature(&cose_key_bytes, ALG_RS256, b"test", &[0u8; 256]);
+
+    assert!(result.is_err());
+    assert!(
+        result
+            .unwrap_err()
+            .to_string()
+            .contains("Invalid kty in COSE key")
+    );
+}
+
 // ===== verify_signature dispatch tests =====
 
 #[test]
