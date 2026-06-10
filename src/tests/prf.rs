@@ -48,7 +48,7 @@ fn signed_auth_credential(
         authenticator_data: Passki::base64_encode(&auth_data),
         client_data_json: Passki::base64_encode(&client_data_json),
         signature: Passki::base64_encode(signature.as_ref()),
-        client_extension_results: client_extension_results,
+        client_extension_results,
     }
 }
 
@@ -332,7 +332,7 @@ fn test_prf_outputs_none_when_no_extension_results() {
     let passki = Passki::new("localhost", "http://localhost:3000", "Test");
     let stored = make_stored_passkey(&cred_id, pub_key, 0);
     let (_, state) = passki.start_passkey_authentication(
-        &[stored.clone()],
+        std::slice::from_ref(&stored),
         60000,
         UserVerificationRequirement::Preferred,
         None,
@@ -365,7 +365,7 @@ fn test_prf_outputs_none_when_results_absent_in_extension() {
     let passki = Passki::new("localhost", "http://localhost:3000", "Test");
     let stored = make_stored_passkey(&cred_id, pub_key, 0);
     let (_, state) = passki.start_passkey_authentication(
-        &[stored.clone()],
+        std::slice::from_ref(&stored),
         60000,
         UserVerificationRequirement::Preferred,
         None,
@@ -403,7 +403,7 @@ fn test_prf_first_output_decoded() {
     let passki = Passki::new("localhost", "http://localhost:3000", "Test");
     let stored = make_stored_passkey(&cred_id, pub_key, 0);
     let (_, state) = passki.start_passkey_authentication(
-        &[stored.clone()],
+        std::slice::from_ref(&stored),
         60000,
         UserVerificationRequirement::Preferred,
         None,
@@ -444,7 +444,7 @@ fn test_prf_both_outputs_decoded() {
     let passki = Passki::new("localhost", "http://localhost:3000", "Test");
     let stored = make_stored_passkey(&cred_id, pub_key, 0);
     let (_, state) = passki.start_passkey_authentication(
-        &[stored.clone()],
+        std::slice::from_ref(&stored),
         60000,
         UserVerificationRequirement::Preferred,
         None,
@@ -486,7 +486,7 @@ fn test_prf_invalid_base64_first_returns_error() {
     let passki = Passki::new("localhost", "http://localhost:3000", "Test");
     let stored = make_stored_passkey(&cred_id, pub_key, 0);
     let (_, state) = passki.start_passkey_authentication(
-        &[stored.clone()],
+        std::slice::from_ref(&stored),
         60000,
         UserVerificationRequirement::Preferred,
         None,
@@ -529,7 +529,7 @@ fn test_prf_invalid_base64_second_returns_error() {
     let passki = Passki::new("localhost", "http://localhost:3000", "Test");
     let stored = make_stored_passkey(&cred_id, pub_key, 0);
     let (_, state) = passki.start_passkey_authentication(
-        &[stored.clone()],
+        std::slice::from_ref(&stored),
         60000,
         UserVerificationRequirement::Preferred,
         None,

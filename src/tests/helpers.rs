@@ -34,9 +34,10 @@ pub fn create_test_attestation_object(algorithm: i32, flags: u8) -> Vec<u8> {
     auth_data.extend_from_slice(&[1u8; 16]); // credId
 
     // Create a minimal COSE key based on algorithm
-    let mut cose_key = Vec::new();
-    cose_key.push((Value::Integer(1.into()), Value::Integer(2.into()))); // kty: EC2
-    cose_key.push((Value::Integer(3.into()), Value::Integer(algorithm.into()))); // alg
+    let mut cose_key = vec![
+        (Value::Integer(1.into()), Value::Integer(2.into())), // kty: EC2
+        (Value::Integer(3.into()), Value::Integer(algorithm.into())), // alg
+    ];
 
     if algorithm == -7 {
         // ES256: P-256 curve
@@ -54,13 +55,14 @@ pub fn create_test_attestation_object(algorithm: i32, flags: u8) -> Vec<u8> {
     auth_data.extend_from_slice(&cose_key_bytes);
 
     // Create attestation object
-    let mut att_obj = Vec::new();
-    att_obj.push((
-        Value::Text("fmt".to_string()),
-        Value::Text("none".to_string()),
-    ));
-    att_obj.push((Value::Text("authData".to_string()), Value::Bytes(auth_data)));
-    att_obj.push((Value::Text("attStmt".to_string()), Value::Map(Vec::new())));
+    let att_obj = vec![
+        (
+            Value::Text("fmt".to_string()),
+            Value::Text("none".to_string()),
+        ),
+        (Value::Text("authData".to_string()), Value::Bytes(auth_data)),
+        (Value::Text("attStmt".to_string()), Value::Map(Vec::new())),
+    ];
 
     let mut result = Vec::new();
     ciborium::into_writer(&Value::Map(att_obj), &mut result).unwrap();
@@ -102,14 +104,15 @@ pub fn create_test_auth_client_data_json(challenge: &[u8], origin: &str) -> Vec<
 pub fn create_eddsa_cose_key(public_key: &[u8; 32]) -> Vec<u8> {
     use ciborium::Value;
 
-    let mut cose_key = Vec::new();
-    cose_key.push((Value::Integer(1.into()), Value::Integer(1.into()))); // kty: OKP
-    cose_key.push((Value::Integer(3.into()), Value::Integer((-8).into()))); // alg: EdDSA
-    cose_key.push((Value::Integer((-1).into()), Value::Integer(6.into()))); // crv: Ed25519
-    cose_key.push((
-        Value::Integer((-2).into()),
-        Value::Bytes(public_key.to_vec()),
-    )); // x coordinate
+    let cose_key = vec![
+        (Value::Integer(1.into()), Value::Integer(1.into())), // kty: OKP
+        (Value::Integer(3.into()), Value::Integer((-8).into())), // alg: EdDSA
+        (Value::Integer((-1).into()), Value::Integer(6.into())), // crv: Ed25519
+        (
+            Value::Integer((-2).into()),
+            Value::Bytes(public_key.to_vec()),
+        ), // x coordinate
+    ];
 
     let mut result = Vec::new();
     ciborium::into_writer(&Value::Map(cose_key), &mut result).unwrap();
@@ -120,12 +123,13 @@ pub fn create_eddsa_cose_key(public_key: &[u8; 32]) -> Vec<u8> {
 pub fn create_es256_cose_key(x: &[u8], y: &[u8]) -> Vec<u8> {
     use ciborium::Value;
 
-    let mut cose_key = Vec::new();
-    cose_key.push((Value::Integer(1.into()), Value::Integer(2.into()))); // kty: EC2
-    cose_key.push((Value::Integer(3.into()), Value::Integer((-7).into()))); // alg: ES256
-    cose_key.push((Value::Integer((-1).into()), Value::Integer(1.into()))); // crv: P-256
-    cose_key.push((Value::Integer((-2).into()), Value::Bytes(x.to_vec()))); // x coordinate
-    cose_key.push((Value::Integer((-3).into()), Value::Bytes(y.to_vec()))); // y coordinate
+    let cose_key = vec![
+        (Value::Integer(1.into()), Value::Integer(2.into())), // kty: EC2
+        (Value::Integer(3.into()), Value::Integer((-7).into())), // alg: ES256
+        (Value::Integer((-1).into()), Value::Integer(1.into())), // crv: P-256
+        (Value::Integer((-2).into()), Value::Bytes(x.to_vec())), // x coordinate
+        (Value::Integer((-3).into()), Value::Bytes(y.to_vec())), // y coordinate
+    ];
 
     let mut result = Vec::new();
     ciborium::into_writer(&Value::Map(cose_key), &mut result).unwrap();
@@ -136,12 +140,13 @@ pub fn create_es256_cose_key(x: &[u8], y: &[u8]) -> Vec<u8> {
 pub fn create_es384_cose_key(x: &[u8], y: &[u8]) -> Vec<u8> {
     use ciborium::Value;
 
-    let mut cose_key = Vec::new();
-    cose_key.push((Value::Integer(1.into()), Value::Integer(2.into()))); // kty: EC2
-    cose_key.push((Value::Integer(3.into()), Value::Integer((-35).into()))); // alg: ES384
-    cose_key.push((Value::Integer((-1).into()), Value::Integer(2.into()))); // crv: P-384
-    cose_key.push((Value::Integer((-2).into()), Value::Bytes(x.to_vec()))); // x coordinate
-    cose_key.push((Value::Integer((-3).into()), Value::Bytes(y.to_vec()))); // y coordinate
+    let cose_key = vec![
+        (Value::Integer(1.into()), Value::Integer(2.into())), // kty: EC2
+        (Value::Integer(3.into()), Value::Integer((-35).into())), // alg: ES384
+        (Value::Integer((-1).into()), Value::Integer(2.into())), // crv: P-384
+        (Value::Integer((-2).into()), Value::Bytes(x.to_vec())), // x coordinate
+        (Value::Integer((-3).into()), Value::Bytes(y.to_vec())), // y coordinate
+    ];
 
     let mut result = Vec::new();
     ciborium::into_writer(&Value::Map(cose_key), &mut result).unwrap();
@@ -152,11 +157,12 @@ pub fn create_es384_cose_key(x: &[u8], y: &[u8]) -> Vec<u8> {
 pub fn create_rs256_cose_key(n: &[u8], e: &[u8]) -> Vec<u8> {
     use ciborium::Value;
 
-    let mut cose_key = Vec::new();
-    cose_key.push((Value::Integer(1.into()), Value::Integer(3.into()))); // kty: RSA
-    cose_key.push((Value::Integer(3.into()), Value::Integer((-257).into()))); // alg: RS256
-    cose_key.push((Value::Integer((-1).into()), Value::Bytes(n.to_vec()))); // n (modulus)
-    cose_key.push((Value::Integer((-2).into()), Value::Bytes(e.to_vec()))); // e (exponent)
+    let cose_key = vec![
+        (Value::Integer(1.into()), Value::Integer(3.into())), // kty: RSA
+        (Value::Integer(3.into()), Value::Integer((-257).into())), // alg: RS256
+        (Value::Integer((-1).into()), Value::Bytes(n.to_vec())), // n (modulus)
+        (Value::Integer((-2).into()), Value::Bytes(e.to_vec())), // e (exponent)
+    ];
 
     let mut result = Vec::new();
     ciborium::into_writer(&Value::Map(cose_key), &mut result).unwrap();
@@ -167,11 +173,12 @@ pub fn create_rs256_cose_key(n: &[u8], e: &[u8]) -> Vec<u8> {
 pub fn create_rs384_cose_key(n: &[u8], e: &[u8]) -> Vec<u8> {
     use ciborium::Value;
 
-    let mut cose_key = Vec::new();
-    cose_key.push((Value::Integer(1.into()), Value::Integer(3.into()))); // kty: RSA
-    cose_key.push((Value::Integer(3.into()), Value::Integer((-258).into()))); // alg: RS384
-    cose_key.push((Value::Integer((-1).into()), Value::Bytes(n.to_vec()))); // n (modulus)
-    cose_key.push((Value::Integer((-2).into()), Value::Bytes(e.to_vec()))); // e (exponent)
+    let cose_key = vec![
+        (Value::Integer(1.into()), Value::Integer(3.into())), // kty: RSA
+        (Value::Integer(3.into()), Value::Integer((-258).into())), // alg: RS384
+        (Value::Integer((-1).into()), Value::Bytes(n.to_vec())), // n (modulus)
+        (Value::Integer((-2).into()), Value::Bytes(e.to_vec())), // e (exponent)
+    ];
 
     let mut result = Vec::new();
     ciborium::into_writer(&Value::Map(cose_key), &mut result).unwrap();

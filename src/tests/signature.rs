@@ -124,11 +124,12 @@ fn test_verify_eddsa_wrong_key_length() {
     use ciborium::Value;
 
     // Create COSE key with wrong x coordinate length
-    let mut cose_key = Vec::new();
-    cose_key.push((Value::Integer(1.into()), Value::Integer(1.into())));
-    cose_key.push((Value::Integer(3.into()), Value::Integer((-8).into())));
-    cose_key.push((Value::Integer((-1).into()), Value::Integer(6.into())));
-    cose_key.push((Value::Integer((-2).into()), Value::Bytes(vec![0u8; 16]))); // Wrong length
+    let cose_key = vec![
+        (Value::Integer(1.into()), Value::Integer(1.into())),
+        (Value::Integer(3.into()), Value::Integer((-8).into())),
+        (Value::Integer((-1).into()), Value::Integer(6.into())),
+        (Value::Integer((-2).into()), Value::Bytes(vec![0u8; 16])), // Wrong length
+    ];
 
     let mut cose_key_bytes = Vec::new();
     ciborium::into_writer(&Value::Map(cose_key), &mut cose_key_bytes).unwrap();
@@ -151,12 +152,12 @@ fn test_verify_eddsa_wrong_key_length() {
 fn test_verify_eddsa_missing_x_coordinate() {
     use ciborium::Value;
 
-    // Create COSE key without x coordinate
-    let mut cose_key = Vec::new();
-    cose_key.push((Value::Integer(1.into()), Value::Integer(1.into())));
-    cose_key.push((Value::Integer(3.into()), Value::Integer((-8).into())));
-    cose_key.push((Value::Integer((-1).into()), Value::Integer(6.into())));
-    // Missing x coordinate (label -2)
+    // Create COSE key without x coordinate (label -2)
+    let cose_key = vec![
+        (Value::Integer(1.into()), Value::Integer(1.into())),
+        (Value::Integer(3.into()), Value::Integer((-8).into())),
+        (Value::Integer((-1).into()), Value::Integer(6.into())),
+    ];
 
     let mut cose_key_bytes = Vec::new();
     ciborium::into_writer(&Value::Map(cose_key), &mut cose_key_bytes).unwrap();
@@ -312,11 +313,12 @@ fn test_verify_es256_missing_x_coordinate() {
     use ciborium::Value;
 
     // Create COSE key without x coordinate
-    let mut cose_key = Vec::new();
-    cose_key.push((Value::Integer(1.into()), Value::Integer(2.into())));
-    cose_key.push((Value::Integer(3.into()), Value::Integer((-7).into())));
-    cose_key.push((Value::Integer((-1).into()), Value::Integer(1.into())));
-    cose_key.push((Value::Integer((-3).into()), Value::Bytes(vec![0u8; 32]))); // y only
+    let cose_key = vec![
+        (Value::Integer(1.into()), Value::Integer(2.into())),
+        (Value::Integer(3.into()), Value::Integer((-7).into())),
+        (Value::Integer((-1).into()), Value::Integer(1.into())),
+        (Value::Integer((-3).into()), Value::Bytes(vec![0u8; 32])), // y only
+    ];
 
     let mut cose_key_bytes = Vec::new();
     ciborium::into_writer(&Value::Map(cose_key), &mut cose_key_bytes).unwrap();
@@ -340,11 +342,12 @@ fn test_verify_es256_missing_y_coordinate() {
     use ciborium::Value;
 
     // Create COSE key without y coordinate
-    let mut cose_key = Vec::new();
-    cose_key.push((Value::Integer(1.into()), Value::Integer(2.into())));
-    cose_key.push((Value::Integer(3.into()), Value::Integer((-7).into())));
-    cose_key.push((Value::Integer((-1).into()), Value::Integer(1.into())));
-    cose_key.push((Value::Integer((-2).into()), Value::Bytes(vec![0u8; 32]))); // x only
+    let cose_key = vec![
+        (Value::Integer(1.into()), Value::Integer(2.into())),
+        (Value::Integer(3.into()), Value::Integer((-7).into())),
+        (Value::Integer((-1).into()), Value::Integer(1.into())),
+        (Value::Integer((-2).into()), Value::Bytes(vec![0u8; 32])), // x only
+    ];
 
     let mut cose_key_bytes = Vec::new();
     ciborium::into_writer(&Value::Map(cose_key), &mut cose_key_bytes).unwrap();
@@ -552,10 +555,11 @@ fn test_verify_rs256_missing_modulus() {
     use ciborium::Value;
 
     // Create COSE key without n (modulus)
-    let mut cose_key = Vec::new();
-    cose_key.push((Value::Integer(1.into()), Value::Integer(3.into())));
-    cose_key.push((Value::Integer(3.into()), Value::Integer((-257).into())));
-    cose_key.push((Value::Integer((-2).into()), Value::Bytes(vec![1, 0, 1]))); // e only
+    let cose_key = vec![
+        (Value::Integer(1.into()), Value::Integer(3.into())),
+        (Value::Integer(3.into()), Value::Integer((-257).into())),
+        (Value::Integer((-2).into()), Value::Bytes(vec![1, 0, 1])), // e only
+    ];
 
     let mut cose_key_bytes = Vec::new();
     ciborium::into_writer(&Value::Map(cose_key), &mut cose_key_bytes).unwrap();
@@ -579,10 +583,11 @@ fn test_verify_rs256_missing_exponent() {
     use ciborium::Value;
 
     // Create COSE key without e (exponent)
-    let mut cose_key = Vec::new();
-    cose_key.push((Value::Integer(1.into()), Value::Integer(3.into())));
-    cose_key.push((Value::Integer(3.into()), Value::Integer((-257).into())));
-    cose_key.push((Value::Integer((-1).into()), Value::Bytes(vec![0u8; 256]))); // n only
+    let cose_key = vec![
+        (Value::Integer(1.into()), Value::Integer(3.into())),
+        (Value::Integer(3.into()), Value::Integer((-257).into())),
+        (Value::Integer((-1).into()), Value::Bytes(vec![0u8; 256])), // n only
+    ];
 
     let mut cose_key_bytes = Vec::new();
     ciborium::into_writer(&Value::Map(cose_key), &mut cose_key_bytes).unwrap();

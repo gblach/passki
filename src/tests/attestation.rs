@@ -59,12 +59,13 @@ fn test_parse_attestation_object_invalid_cbor() {
 fn test_parse_attestation_object_missing_auth_data() {
     use ciborium::Value;
 
-    let mut att_obj = Vec::new();
-    att_obj.push((
-        Value::Text("fmt".to_string()),
-        Value::Text("none".to_string()),
-    ));
-    att_obj.push((Value::Text("attStmt".to_string()), Value::Map(Vec::new())));
+    let att_obj = vec![
+        (
+            Value::Text("fmt".to_string()),
+            Value::Text("none".to_string()),
+        ),
+        (Value::Text("attStmt".to_string()), Value::Map(Vec::new())),
+    ];
 
     let mut bytes = Vec::new();
     ciborium::into_writer(&Value::Map(att_obj), &mut bytes).unwrap();
@@ -78,16 +79,17 @@ fn test_parse_attestation_object_missing_auth_data() {
 fn test_parse_attestation_object_too_short_auth_data() {
     use ciborium::Value;
 
-    let mut att_obj = Vec::new();
-    att_obj.push((
-        Value::Text("fmt".to_string()),
-        Value::Text("none".to_string()),
-    ));
-    att_obj.push((
-        Value::Text("authData".to_string()),
-        Value::Bytes(vec![0u8; 36]),
-    ));
-    att_obj.push((Value::Text("attStmt".to_string()), Value::Map(Vec::new())));
+    let att_obj = vec![
+        (
+            Value::Text("fmt".to_string()),
+            Value::Text("none".to_string()),
+        ),
+        (
+            Value::Text("authData".to_string()),
+            Value::Bytes(vec![0u8; 36]),
+        ),
+        (Value::Text("attStmt".to_string()), Value::Map(Vec::new())),
+    ];
 
     let mut bytes = Vec::new();
     ciborium::into_writer(&Value::Map(att_obj), &mut bytes).unwrap();
@@ -111,13 +113,14 @@ fn test_parse_attestation_object_no_attested_credential_data() {
     auth_data.push(0x01); // flags: UP=1, UV=0, AT=0 (no attested credential data)
     auth_data.extend_from_slice(&[0, 0, 0, 0]); // counter
 
-    let mut att_obj = Vec::new();
-    att_obj.push((
-        Value::Text("fmt".to_string()),
-        Value::Text("none".to_string()),
-    ));
-    att_obj.push((Value::Text("authData".to_string()), Value::Bytes(auth_data)));
-    att_obj.push((Value::Text("attStmt".to_string()), Value::Map(Vec::new())));
+    let att_obj = vec![
+        (
+            Value::Text("fmt".to_string()),
+            Value::Text("none".to_string()),
+        ),
+        (Value::Text("authData".to_string()), Value::Bytes(auth_data)),
+        (Value::Text("attStmt".to_string()), Value::Map(Vec::new())),
+    ];
 
     let mut bytes = Vec::new();
     ciborium::into_writer(&Value::Map(att_obj), &mut bytes).unwrap();
@@ -144,19 +147,19 @@ fn test_parse_attestation_object_invalid_cose_key() {
     auth_data.extend_from_slice(&[0, 16]); // credIdLen = 16
     auth_data.extend_from_slice(&[1u8; 16]); // credId
 
-    let mut cose_key = Vec::new();
-    cose_key.push((Value::Integer(1.into()), Value::Integer(2.into()))); // kty: EC2 (missing alg)
+    let cose_key = vec![(Value::Integer(1.into()), Value::Integer(2.into()))]; // kty: EC2 (missing alg)
     let mut cose_key_bytes = Vec::new();
     ciborium::into_writer(&Value::Map(cose_key), &mut cose_key_bytes).unwrap();
     auth_data.extend_from_slice(&cose_key_bytes);
 
-    let mut att_obj = Vec::new();
-    att_obj.push((
-        Value::Text("fmt".to_string()),
-        Value::Text("none".to_string()),
-    ));
-    att_obj.push((Value::Text("authData".to_string()), Value::Bytes(auth_data)));
-    att_obj.push((Value::Text("attStmt".to_string()), Value::Map(Vec::new())));
+    let att_obj = vec![
+        (
+            Value::Text("fmt".to_string()),
+            Value::Text("none".to_string()),
+        ),
+        (Value::Text("authData".to_string()), Value::Bytes(auth_data)),
+        (Value::Text("attStmt".to_string()), Value::Map(Vec::new())),
+    ];
 
     let mut bytes = Vec::new();
     ciborium::into_writer(&Value::Map(att_obj), &mut bytes).unwrap();

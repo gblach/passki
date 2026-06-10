@@ -177,7 +177,7 @@ fn test_start_passkey_registration_with_single_existing_credential() {
             AttestationConveyancePreference::None,
             ResidentKeyRequirement::Preferred,
             UserVerificationRequirement::Preferred,
-            Some(&[existing_passkey.clone()]),
+            Some(std::slice::from_ref(&existing_passkey)),
             None,
         )
         .unwrap();
