@@ -12,7 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use super::helpers::{create_test_attestation_object, create_test_client_data_json};
+use super::helpers::{
+    create_test_attestation_object, create_test_attestation_object_with_counter,
+    create_test_client_data_json,
+};
 use crate::*;
 
 #[test]
@@ -406,6 +409,44 @@ fn test_finish_passkey_registration_success() {
     assert_eq!(passkey.algorithm, -7);
     assert_eq!(passkey.counter, 0);
     assert!(!passkey.public_key.is_empty());
+}
+
+#[test]
+fn test_finish_passkey_registration_stores_initial_counter() {
+    let passki = Passki::new("localhost", "http://localhost:3000", "Test App");
+
+    let user_id = b"user123_16bytes_";
+    let (_challenge, state) = passki
+        .start_passkey_registration(
+            user_id,
+            "testuser",
+            "Test User",
+            60000,
+            AttestationConveyancePreference::None,
+            ResidentKeyRequirement::Preferred,
+            UserVerificationRequirement::Preferred,
+            None,
+            None,
+        )
+        .unwrap();
+
+    let attestation_obj = create_test_attestation_object_with_counter(-7, 0x45, 42);
+    let client_data_json = create_test_client_data_json(&state.challenge, "http://localhost:3000");
+
+    let credential = RegistrationCredential {
+        credential_id: Passki::base64_encode(&[1u8; 16]),
+        public_key: Passki::base64_encode(&attestation_obj),
+        client_data_json: Passki::base64_encode(&client_data_json),
+        client_extension_results: None,
+    };
+
+    let passkey = passki
+        .finish_passkey_registration(&credential, &state)
+        .unwrap();
+    assert_eq!(
+        passkey.counter, 42,
+        "stored passkey must carry the registration-time signCount"
+    );
 }
 
 #[test]

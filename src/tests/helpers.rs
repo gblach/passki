@@ -23,12 +23,21 @@ pub fn rp_id_hash(rp_id: &str) -> Vec<u8> {
 
 /// Helper function to create a minimal valid attestation object
 pub fn create_test_attestation_object(algorithm: i32, flags: u8) -> Vec<u8> {
+    create_test_attestation_object_with_counter(algorithm, flags, 0)
+}
+
+/// Helper function to create a minimal valid attestation object with a specific counter
+pub fn create_test_attestation_object_with_counter(
+    algorithm: i32,
+    flags: u8,
+    counter: u32,
+) -> Vec<u8> {
     use ciborium::Value;
 
     let mut auth_data = Vec::new();
     auth_data.extend_from_slice(&rp_id_hash("localhost")); // rpIdHash
     auth_data.push(flags);
-    auth_data.extend_from_slice(&[0, 0, 0, 0]); // counter
+    auth_data.extend_from_slice(&counter.to_be_bytes()); // counter
     auth_data.extend_from_slice(&[0u8; 16]); // aaguid
     auth_data.extend_from_slice(&[0, 16]); // credIdLen = 16
     auth_data.extend_from_slice(&[1u8; 16]); // credId

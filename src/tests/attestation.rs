@@ -12,7 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use super::helpers::{create_test_attestation_object, rp_id_hash};
+use super::helpers::{
+    create_test_attestation_object, create_test_attestation_object_with_counter, rp_id_hash,
+};
 use crate::Passki;
 
 fn passki() -> Passki {
@@ -25,7 +27,7 @@ fn test_parse_attestation_object_es256() {
     let result = passki().parse_attestation_object(&attestation_obj);
 
     assert!(result.is_ok());
-    let (public_key, algorithm, _) = result.unwrap();
+    let (public_key, algorithm, _, _) = result.unwrap();
     assert_eq!(algorithm, -7);
     assert!(!public_key.is_empty());
 }
@@ -36,9 +38,17 @@ fn test_parse_attestation_object_eddsa() {
     let result = passki().parse_attestation_object(&attestation_obj);
 
     assert!(result.is_ok());
-    let (public_key, algorithm, _) = result.unwrap();
+    let (public_key, algorithm, _, _) = result.unwrap();
     assert_eq!(algorithm, -8);
     assert!(!public_key.is_empty());
+}
+
+#[test]
+fn test_parse_attestation_object_extracts_counter() {
+    let attestation_obj = create_test_attestation_object_with_counter(-7, 0x45, 42);
+    let (_, _, _, counter) = passki().parse_attestation_object(&attestation_obj).unwrap();
+
+    assert_eq!(counter, 42);
 }
 
 #[test]
@@ -177,7 +187,7 @@ fn test_parse_attestation_object_invalid_cose_key() {
 #[test]
 fn test_parse_attestation_object_extracts_correct_cose_key() {
     let attestation_obj = create_test_attestation_object(-7, 0x45);
-    let (public_key_bytes, algorithm, _) =
+    let (public_key_bytes, algorithm, _, _) =
         passki().parse_attestation_object(&attestation_obj).unwrap();
 
     assert_eq!(algorithm, -7);

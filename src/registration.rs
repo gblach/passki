@@ -227,7 +227,7 @@ impl Passki {
 
         // Parse attestation object to extract public key and algorithm
         let attestation_bytes = Self::base64_decode(&credential.public_key)?;
-        let (public_key_bytes, algorithm, flags) =
+        let (public_key_bytes, algorithm, flags, counter) =
             self.parse_attestation_object(&attestation_bytes)?;
 
         if (flags & FLAG_UP) == 0 {
@@ -252,17 +252,18 @@ impl Passki {
         Ok(StoredPasskey {
             credential_id: Self::base64_decode(&credential.credential_id)?,
             public_key: public_key_bytes,
-            counter: 0,
+            counter,
             algorithm,
             rk,
         })
     }
 
-    /// Parses a CBOR attestation object to extract the public key, algorithm, and flags byte.
+    /// Parses a CBOR attestation object to extract the public key, algorithm, flags byte,
+    /// and signature counter.
     pub(crate) fn parse_attestation_object(
         &self,
         attestation_bytes: &[u8],
-    ) -> Result<(Vec<u8>, i32, u8)> {
+    ) -> Result<(Vec<u8>, i32, u8, u32)> {
         // Parse CBOR attestation object
         let attestation: ciborium::Value = ciborium::from_reader(attestation_bytes)
             .map_err(|e| PasskiError::new(format!("Failed to parse attestation object: {}", e)))?;
@@ -288,6 +289,13 @@ impl Passki {
         }
 
         let flags = auth_data_bytes[32];
+
+        let counter = u32::from_be_bytes([
+            auth_data_bytes[33],
+            auth_data_bytes[34],
+            auth_data_bytes[35],
+            auth_data_bytes[36],
+        ]);
 
         // Check if attested credential data is present
         if (flags & FLAG_AT) == 0 {
@@ -326,6 +334,6 @@ impl Passki {
         // Store the raw COSE key bytes
         let public_key_bytes = cose_key_bytes.to_vec();
 
-        Ok((public_key_bytes, algorithm, flags))
+        Ok((public_key_bytes, algorithm, flags, counter))
     }
 }
