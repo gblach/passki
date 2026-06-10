@@ -30,7 +30,7 @@ use crate::types::*;
 ///
 /// This structure contains all the parameters needed by the WebAuthn client
 /// to authenticate using an existing credential.
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 pub struct AuthenticationChallenge {
     /// The challenge value (base64url-encoded).
     pub challenge: String,
@@ -58,7 +58,7 @@ pub struct AuthenticationChallenge {
 /// Server-side state for a passkey authentication in progress.
 ///
 /// This state must be stored temporarily and provided when completing the authentication.
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct AuthenticationState {
     /// The challenge that was sent to the client.
     pub challenge: Vec<u8>,

@@ -200,7 +200,7 @@ pub struct ExcludeCredential {
 }
 
 /// A credential that is allowed for authentication.
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 pub struct AllowCredential {
     /// The credential ID (base64url-encoded).
     pub id: String,
