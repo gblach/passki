@@ -17,6 +17,7 @@ use super::helpers::{
     create_rs384_cose_key, create_test_rsa_keypair,
 };
 use crate::Passki;
+use crate::types::{ALG_ES256, ALG_ES384, ALG_RS256, ALG_RS384};
 use aws_lc_rs::rand::SystemRandom;
 use aws_lc_rs::signature::{
     ECDSA_P256_SHA256_ASN1_SIGNING, ECDSA_P384_SHA384_ASN1_SIGNING, EcdsaKeyPair, Ed25519KeyPair,
@@ -233,7 +234,7 @@ fn test_verify_es256_valid_signature() {
 
     let cose_key_bytes = create_es256_cose_key(x, y);
 
-    let result = Passki::verify_es256(&cose_key_bytes, message, signature.as_ref());
+    let result = Passki::verify_signature(&cose_key_bytes, ALG_ES256, message, signature.as_ref());
 
     assert!(
         result.is_ok(),
@@ -259,7 +260,12 @@ fn test_verify_es256_invalid_signature() {
 
     // Try to verify with different message
     let wrong_message = b"different message";
-    let result = Passki::verify_es256(&cose_key_bytes, wrong_message, signature.as_ref());
+    let result = Passki::verify_signature(
+        &cose_key_bytes,
+        ALG_ES256,
+        wrong_message,
+        signature.as_ref(),
+    );
 
     assert!(
         result.is_err(),
@@ -293,7 +299,7 @@ fn test_verify_es256_corrupted_signature() {
     let mut corrupted_sig = signature.as_ref().to_vec();
     corrupted_sig[8] ^= 0xFF; // Corrupt a byte in the DER-encoded signature
 
-    let result = Passki::verify_es256(&cose_key_bytes, message, &corrupted_sig);
+    let result = Passki::verify_signature(&cose_key_bytes, ALG_ES256, message, &corrupted_sig);
 
     assert!(
         result.is_err(),
@@ -318,7 +324,7 @@ fn test_verify_es256_missing_x_coordinate() {
     let message = b"test";
     let signature = [0u8; 64];
 
-    let result = Passki::verify_es256(&cose_key_bytes, message, &signature);
+    let result = Passki::verify_signature(&cose_key_bytes, ALG_ES256, message, &signature);
 
     assert!(result.is_err());
     assert!(
@@ -346,7 +352,7 @@ fn test_verify_es256_missing_y_coordinate() {
     let message = b"test";
     let signature = [0u8; 64];
 
-    let result = Passki::verify_es256(&cose_key_bytes, message, &signature);
+    let result = Passki::verify_signature(&cose_key_bytes, ALG_ES256, message, &signature);
 
     assert!(result.is_err());
     assert!(
@@ -368,7 +374,7 @@ fn test_verify_es256_invalid_public_key() {
     let message = b"test";
     let signature = [0u8; 64];
 
-    let result = Passki::verify_es256(&cose_key_bytes, message, &signature);
+    let result = Passki::verify_signature(&cose_key_bytes, ALG_ES256, message, &signature);
 
     // Invalid public key or signature format causes verification to fail
     assert!(result.is_err());
@@ -393,7 +399,7 @@ fn test_verify_es384_valid_signature() {
 
     let cose_key_bytes = create_es384_cose_key(x, y);
 
-    let result = Passki::verify_es384(&cose_key_bytes, message, signature.as_ref());
+    let result = Passki::verify_signature(&cose_key_bytes, ALG_ES384, message, signature.as_ref());
 
     assert!(
         result.is_ok(),
@@ -418,7 +424,12 @@ fn test_verify_es384_invalid_signature() {
     let cose_key_bytes = create_es384_cose_key(x, y);
 
     let wrong_message = b"different message";
-    let result = Passki::verify_es384(&cose_key_bytes, wrong_message, signature.as_ref());
+    let result = Passki::verify_signature(
+        &cose_key_bytes,
+        ALG_ES384,
+        wrong_message,
+        signature.as_ref(),
+    );
 
     assert!(
         result.is_err(),
@@ -472,7 +483,7 @@ fn test_verify_rs256_valid_signature() {
 
     let cose_key_bytes = create_rs256_cose_key(&n, &e);
 
-    let result = Passki::verify_rs256(&cose_key_bytes, message, &signature);
+    let result = Passki::verify_signature(&cose_key_bytes, ALG_RS256, message, &signature);
 
     assert!(
         result.is_ok(),
@@ -497,7 +508,7 @@ fn test_verify_rs256_invalid_signature() {
 
     // Try to verify with different message
     let wrong_message = b"different message";
-    let result = Passki::verify_rs256(&cose_key_bytes, wrong_message, &signature);
+    let result = Passki::verify_signature(&cose_key_bytes, ALG_RS256, wrong_message, &signature);
 
     assert!(
         result.is_err(),
@@ -528,7 +539,7 @@ fn test_verify_rs256_corrupted_signature() {
 
     let cose_key_bytes = create_rs256_cose_key(&n, &e);
 
-    let result = Passki::verify_rs256(&cose_key_bytes, message, &signature);
+    let result = Passki::verify_signature(&cose_key_bytes, ALG_RS256, message, &signature);
 
     assert!(
         result.is_err(),
@@ -552,7 +563,7 @@ fn test_verify_rs256_missing_modulus() {
     let message = b"test";
     let signature = vec![0u8; 256];
 
-    let result = Passki::verify_rs256(&cose_key_bytes, message, &signature);
+    let result = Passki::verify_signature(&cose_key_bytes, ALG_RS256, message, &signature);
 
     assert!(result.is_err());
     assert!(
@@ -579,7 +590,7 @@ fn test_verify_rs256_missing_exponent() {
     let message = b"test";
     let signature = vec![0u8; 256];
 
-    let result = Passki::verify_rs256(&cose_key_bytes, message, &signature);
+    let result = Passki::verify_signature(&cose_key_bytes, ALG_RS256, message, &signature);
 
     assert!(result.is_err());
     assert!(
@@ -601,7 +612,7 @@ fn test_verify_rs256_invalid_public_key() {
     let message = b"test";
     let signature = vec![0u8; 32];
 
-    let result = Passki::verify_rs256(&cose_key_bytes, message, &signature);
+    let result = Passki::verify_signature(&cose_key_bytes, ALG_RS256, message, &signature);
 
     assert!(result.is_err(), "Invalid public key should fail");
     // The error could be about invalid key or signature verification failure
@@ -630,7 +641,7 @@ fn test_verify_rs384_valid_signature() {
 
     let cose_key_bytes = create_rs384_cose_key(&n, &e);
 
-    let result = Passki::verify_rs384(&cose_key_bytes, message, &signature);
+    let result = Passki::verify_signature(&cose_key_bytes, ALG_RS384, message, &signature);
 
     assert!(
         result.is_ok(),
@@ -654,7 +665,7 @@ fn test_verify_rs384_invalid_signature() {
     let cose_key_bytes = create_rs384_cose_key(&n, &e);
 
     let wrong_message = b"different message";
-    let result = Passki::verify_rs384(&cose_key_bytes, wrong_message, &signature);
+    let result = Passki::verify_signature(&cose_key_bytes, ALG_RS384, wrong_message, &signature);
 
     assert!(
         result.is_err(),

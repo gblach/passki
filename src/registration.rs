@@ -169,28 +169,13 @@ impl Passki {
             },
             user: user.clone(),
             challenge: Self::base64_encode(&challenge),
-            pub_key_cred_params: vec![
-                PubKeyCredParam {
-                    alg: -8,
+            pub_key_cred_params: [ALG_EDDSA, ALG_ES256, ALG_ES384, ALG_RS256, ALG_RS384]
+                .into_iter()
+                .map(|alg| PubKeyCredParam {
+                    alg,
                     type_: "public-key".to_string(),
-                },
-                PubKeyCredParam {
-                    alg: -7,
-                    type_: "public-key".to_string(),
-                },
-                PubKeyCredParam {
-                    alg: -35,
-                    type_: "public-key".to_string(),
-                },
-                PubKeyCredParam {
-                    alg: -257,
-                    type_: "public-key".to_string(),
-                },
-                PubKeyCredParam {
-                    alg: -258,
-                    type_: "public-key".to_string(),
-                },
-            ],
+                })
+                .collect(),
             timeout,
             attestation,
             authenticator_selection: AuthenticatorSelection {
@@ -245,12 +230,14 @@ impl Passki {
         let (public_key_bytes, algorithm, flags) =
             self.parse_attestation_object(&attestation_bytes)?;
 
-        if (flags & 0x01) == 0 {
+        if (flags & FLAG_UP) == 0 {
             return Err(Box::new(PasskiError::new(
                 "User not present (UP flag not set)",
             )));
         }
-        if state.user_verification == UserVerificationRequirement::Required && (flags & 0x04) == 0 {
+        if state.user_verification == UserVerificationRequirement::Required
+            && (flags & FLAG_UV) == 0
+        {
             return Err(Box::new(PasskiError::new(
                 "User verification required but UV flag not set",
             )));
@@ -302,8 +289,8 @@ impl Passki {
 
         let flags = auth_data_bytes[32];
 
-        // Check if attested credential data is present (bit 6 of flags)
-        if (flags & 0x40) == 0 {
+        // Check if attested credential data is present
+        if (flags & FLAG_AT) == 0 {
             return Err(Box::new(PasskiError::new(
                 "No attested credential data present",
             )));

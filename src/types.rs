@@ -44,6 +44,28 @@ impl StdError for PasskiError {}
 /// Convenience type alias for Results that may return any error.
 pub type Result<T> = std::result::Result<T, Box<dyn StdError>>;
 
+// Authenticator data flag bits
+
+/// UP (user present) flag bit in authenticator data.
+pub(crate) const FLAG_UP: u8 = 0x01;
+/// UV (user verified) flag bit in authenticator data.
+pub(crate) const FLAG_UV: u8 = 0x04;
+/// AT (attested credential data) flag bit in authenticator data.
+pub(crate) const FLAG_AT: u8 = 0x40;
+
+// COSE algorithm identifiers
+
+/// EdDSA (Ed25519).
+pub(crate) const ALG_EDDSA: i32 = -8;
+/// ES256 (ECDSA with P-256 and SHA-256).
+pub(crate) const ALG_ES256: i32 = -7;
+/// ES384 (ECDSA with P-384 and SHA-384).
+pub(crate) const ALG_ES384: i32 = -35;
+/// RS256 (RSASSA-PKCS1-v1_5 with SHA-256).
+pub(crate) const ALG_RS256: i32 = -257;
+/// RS384 (RSASSA-PKCS1-v1_5 with SHA-384).
+pub(crate) const ALG_RS384: i32 = -258;
+
 /// Attestation conveyance preference for passkey registration.
 ///
 /// Specifies whether and how the relying party wants to receive attestation
