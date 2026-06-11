@@ -164,7 +164,8 @@ impl ClientData {
     #[allow(rustdoc::bare_urls)]
     /// Verifies the client data against expected values.
     ///
-    /// Checks that the type, challenge, and origin match the expected values.
+    /// Checks that the type, challenge, and origin match the expected values,
+    /// and that the request did not come from a cross-origin iframe.
     ///
     /// # Arguments
     ///
@@ -201,6 +202,13 @@ impl ClientData {
                 "Invalid origin: expected {}, got {}",
                 expected_origin, self.origin
             ))));
+        }
+
+        // Reject requests from cross-origin iframes
+        if self.cross_origin {
+            return Err(Box::new(PasskiError::new(
+                "Cross-origin requests are not allowed",
+            )));
         }
 
         Ok(())

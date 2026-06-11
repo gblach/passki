@@ -40,6 +40,52 @@ fn test_verify_valid_create() {
 }
 
 #[test]
+fn test_verify_rejects_cross_origin() {
+    let challenge = Passki::generate_challenge();
+    let origin = "http://localhost:3000";
+
+    let client_data_json = serde_json::json!({
+        "type": "webauthn.create",
+        "challenge": Passki::base64_encode(&challenge),
+        "origin": origin,
+        "crossOrigin": true
+    });
+
+    let encoded = Passki::base64_encode(&serde_json::to_vec(&client_data_json).unwrap());
+    let client_data = ClientData::from_base64(&encoded).unwrap();
+
+    let result = client_data.verify(ClientDataType::Create, &challenge, origin);
+
+    assert!(result.is_err());
+    assert!(
+        result
+            .unwrap_err()
+            .to_string()
+            .contains("Cross-origin requests are not allowed")
+    );
+}
+
+#[test]
+fn test_verify_missing_cross_origin_is_allowed() {
+    let challenge = Passki::generate_challenge();
+    let origin = "http://localhost:3000";
+
+    // crossOrigin is optional; browsers may omit it for same-origin requests
+    let client_data_json = serde_json::json!({
+        "type": "webauthn.create",
+        "challenge": Passki::base64_encode(&challenge),
+        "origin": origin
+    });
+
+    let encoded = Passki::base64_encode(&serde_json::to_vec(&client_data_json).unwrap());
+    let client_data = ClientData::from_base64(&encoded).unwrap();
+
+    let result = client_data.verify(ClientDataType::Create, &challenge, origin);
+
+    assert!(result.is_ok());
+}
+
+#[test]
 fn test_verify_valid_get() {
     let challenge = Passki::generate_challenge();
     let origin = "https://example.com";
