@@ -360,10 +360,15 @@ impl Passki {
             .and_then(|i| i.try_into().ok())
             .ok_or_else(|| PasskiError::new("Missing or invalid algorithm in COSE key"))?;
 
+        // Re-serialize the parsed COSE key so trailing authData bytes (extension
+        // data when the ED flag is set) are not stored with the key
+        let mut public_key = Vec::new();
+        ciborium::into_writer(&cose_key_value, &mut public_key)
+            .map_err(|e| PasskiError::new(format!("Failed to serialize COSE key: {}", e)))?;
+
         Ok(ParsedAttestation {
             credential_id,
-            // Store the raw COSE key bytes
-            public_key: cose_key_bytes.to_vec(),
+            public_key,
             algorithm,
             flags,
             counter,

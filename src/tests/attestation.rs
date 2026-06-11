@@ -52,6 +52,57 @@ fn test_parse_attestation_object_extracts_counter() {
 }
 
 #[test]
+fn test_parse_attestation_object_excludes_trailing_extension_data() {
+    use ciborium::Value;
+
+    let mut auth_data = Vec::new();
+    auth_data.extend_from_slice(&rp_id_hash("localhost")); // rpIdHash
+    auth_data.push(0xC5); // flags: UP=1, UV=1, AT=1, ED=1
+    auth_data.extend_from_slice(&[0, 0, 0, 0]); // counter
+    auth_data.extend_from_slice(&[0u8; 16]); // aaguid
+    auth_data.extend_from_slice(&[0, 16]); // credIdLen = 16
+    auth_data.extend_from_slice(&[1u8; 16]); // credId
+
+    let cose_key = vec![
+        (Value::Integer(1.into()), Value::Integer(2.into())), // kty: EC2
+        (Value::Integer(3.into()), Value::Integer((-7).into())), // alg: ES256
+        (Value::Integer((-1).into()), Value::Integer(1.into())), // crv: P-256
+        (Value::Integer((-2).into()), Value::Bytes(vec![2u8; 32])), // x
+        (Value::Integer((-3).into()), Value::Bytes(vec![3u8; 32])), // y
+    ];
+    let mut cose_key_bytes = Vec::new();
+    ciborium::into_writer(&Value::Map(cose_key), &mut cose_key_bytes).unwrap();
+    auth_data.extend_from_slice(&cose_key_bytes);
+
+    // Extension data (ED flag) follows the COSE key in authData
+    let extensions = vec![(
+        Value::Text("credProtect".to_string()),
+        Value::Integer(2.into()),
+    )];
+    let mut extension_bytes = Vec::new();
+    ciborium::into_writer(&Value::Map(extensions), &mut extension_bytes).unwrap();
+    auth_data.extend_from_slice(&extension_bytes);
+
+    let att_obj = vec![
+        (
+            Value::Text("fmt".to_string()),
+            Value::Text("none".to_string()),
+        ),
+        (Value::Text("authData".to_string()), Value::Bytes(auth_data)),
+        (Value::Text("attStmt".to_string()), Value::Map(Vec::new())),
+    ];
+    let mut bytes = Vec::new();
+    ciborium::into_writer(&Value::Map(att_obj), &mut bytes).unwrap();
+
+    let parsed = passki().parse_attestation_object(&bytes).unwrap();
+
+    assert_eq!(
+        parsed.public_key, cose_key_bytes,
+        "stored public key must contain only the COSE key, not trailing extension data"
+    );
+}
+
+#[test]
 fn test_parse_attestation_object_extracts_credential_id() {
     // The test helper writes credId = [1u8; 16] into the attested credential data
     let attestation_obj = create_test_attestation_object(-7, 0x45);
