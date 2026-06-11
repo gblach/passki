@@ -95,6 +95,25 @@ pub struct RegistrationCredential {
     pub client_extension_results: Option<ClientExtensionResults>,
 }
 
+/// Authenticator data parsed from a CBOR attestation object.
+#[derive(Debug)]
+pub(crate) struct ParsedAttestation {
+    /// The credential ID from the attested credential data.
+    pub credential_id: Vec<u8>,
+
+    /// The raw COSE public key bytes.
+    pub public_key: Vec<u8>,
+
+    /// The COSE algorithm identifier.
+    pub algorithm: i32,
+
+    /// The authenticator data flags byte.
+    pub flags: u8,
+
+    /// The signature counter at registration time.
+    pub counter: u32,
+}
+
 impl Passki {
     /// Starts a passkey registration ceremony.
     ///
@@ -227,19 +246,27 @@ impl Passki {
 
         // Parse attestation object to extract public key and algorithm
         let attestation_bytes = Self::base64_decode(&credential.public_key)?;
-        let (public_key_bytes, algorithm, flags, counter) =
-            self.parse_attestation_object(&attestation_bytes)?;
+        let parsed = self.parse_attestation_object(&attestation_bytes)?;
 
-        if (flags & FLAG_UP) == 0 {
+        if (parsed.flags & FLAG_UP) == 0 {
             return Err(Box::new(PasskiError::new(
                 "User not present (UP flag not set)",
             )));
         }
         if state.user_verification == UserVerificationRequirement::Required
-            && (flags & FLAG_UV) == 0
+            && (parsed.flags & FLAG_UV) == 0
         {
             return Err(Box::new(PasskiError::new(
                 "User verification required but UV flag not set",
+            )));
+        }
+
+        // The credential ID in the attested credential data is authoritative;
+        // the client-supplied one must match it.
+        let credential_id = Self::base64_decode(&credential.credential_id)?;
+        if credential_id != parsed.credential_id {
+            return Err(Box::new(PasskiError::new(
+                "Credential ID mismatch between client and attested credential data",
             )));
         }
 
@@ -250,20 +277,20 @@ impl Passki {
             .and_then(|cp| cp.rk);
 
         Ok(StoredPasskey {
-            credential_id: Self::base64_decode(&credential.credential_id)?,
-            public_key: public_key_bytes,
-            counter,
-            algorithm,
+            credential_id: parsed.credential_id,
+            public_key: parsed.public_key,
+            counter: parsed.counter,
+            algorithm: parsed.algorithm,
             rk,
         })
     }
 
-    /// Parses a CBOR attestation object to extract the public key, algorithm, flags byte,
-    /// and signature counter.
+    /// Parses a CBOR attestation object into its credential ID, public key, algorithm,
+    /// flags byte, and signature counter.
     pub(crate) fn parse_attestation_object(
         &self,
         attestation_bytes: &[u8],
-    ) -> Result<(Vec<u8>, i32, u8, u32)> {
+    ) -> Result<ParsedAttestation> {
         // Parse CBOR attestation object
         let attestation: ciborium::Value = ciborium::from_reader(attestation_bytes)
             .map_err(|e| PasskiError::new(format!("Failed to parse attestation object: {}", e)))?;
@@ -318,6 +345,8 @@ impl Passki {
             )));
         }
 
+        let credential_id = auth_data_bytes[55..cose_key_offset].to_vec();
+
         // Parse COSE key as CBOR map
         let cose_key_bytes = &auth_data_bytes[cose_key_offset..];
         let cose_key_value: ciborium::Value = ciborium::from_reader(cose_key_bytes)
@@ -331,9 +360,13 @@ impl Passki {
             .and_then(|i| i.try_into().ok())
             .ok_or_else(|| PasskiError::new("Missing or invalid algorithm in COSE key"))?;
 
-        // Store the raw COSE key bytes
-        let public_key_bytes = cose_key_bytes.to_vec();
-
-        Ok((public_key_bytes, algorithm, flags, counter))
+        Ok(ParsedAttestation {
+            credential_id,
+            // Store the raw COSE key bytes
+            public_key: cose_key_bytes.to_vec(),
+            algorithm,
+            flags,
+            counter,
+        })
     }
 }

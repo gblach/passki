@@ -27,9 +27,9 @@ fn test_parse_attestation_object_es256() {
     let result = passki().parse_attestation_object(&attestation_obj);
 
     assert!(result.is_ok());
-    let (public_key, algorithm, _, _) = result.unwrap();
-    assert_eq!(algorithm, -7);
-    assert!(!public_key.is_empty());
+    let parsed = result.unwrap();
+    assert_eq!(parsed.algorithm, -7);
+    assert!(!parsed.public_key.is_empty());
 }
 
 #[test]
@@ -38,17 +38,26 @@ fn test_parse_attestation_object_eddsa() {
     let result = passki().parse_attestation_object(&attestation_obj);
 
     assert!(result.is_ok());
-    let (public_key, algorithm, _, _) = result.unwrap();
-    assert_eq!(algorithm, -8);
-    assert!(!public_key.is_empty());
+    let parsed = result.unwrap();
+    assert_eq!(parsed.algorithm, -8);
+    assert!(!parsed.public_key.is_empty());
 }
 
 #[test]
 fn test_parse_attestation_object_extracts_counter() {
     let attestation_obj = create_test_attestation_object_with_counter(-7, 0x45, 42);
-    let (_, _, _, counter) = passki().parse_attestation_object(&attestation_obj).unwrap();
+    let parsed = passki().parse_attestation_object(&attestation_obj).unwrap();
 
-    assert_eq!(counter, 42);
+    assert_eq!(parsed.counter, 42);
+}
+
+#[test]
+fn test_parse_attestation_object_extracts_credential_id() {
+    // The test helper writes credId = [1u8; 16] into the attested credential data
+    let attestation_obj = create_test_attestation_object(-7, 0x45);
+    let parsed = passki().parse_attestation_object(&attestation_obj).unwrap();
+
+    assert_eq!(parsed.credential_id, vec![1u8; 16]);
 }
 
 #[test]
@@ -187,12 +196,11 @@ fn test_parse_attestation_object_invalid_cose_key() {
 #[test]
 fn test_parse_attestation_object_extracts_correct_cose_key() {
     let attestation_obj = create_test_attestation_object(-7, 0x45);
-    let (public_key_bytes, algorithm, _, _) =
-        passki().parse_attestation_object(&attestation_obj).unwrap();
+    let parsed = passki().parse_attestation_object(&attestation_obj).unwrap();
 
-    assert_eq!(algorithm, -7);
+    assert_eq!(parsed.algorithm, -7);
 
-    let cose_key_value: ciborium::Value = ciborium::from_reader(&public_key_bytes[..]).unwrap();
+    let cose_key_value: ciborium::Value = ciborium::from_reader(&parsed.public_key[..]).unwrap();
     let cose_map = cose_key_value.as_map().unwrap();
 
     let alg_value = cose_map

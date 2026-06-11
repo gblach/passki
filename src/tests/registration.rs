@@ -687,7 +687,7 @@ fn test_finish_passkey_registration_eddsa_algorithm() {
     let client_data_json = create_test_client_data_json(&state.challenge, "http://localhost:3000");
 
     let credential = RegistrationCredential {
-        credential_id: Passki::base64_encode(&[2u8; 16]),
+        credential_id: Passki::base64_encode(&[1u8; 16]),
         public_key: Passki::base64_encode(&attestation_obj),
         client_data_json: Passki::base64_encode(&client_data_json),
         client_extension_results: None,
@@ -698,4 +698,44 @@ fn test_finish_passkey_registration_eddsa_algorithm() {
 
     let passkey = result.unwrap();
     assert_eq!(passkey.algorithm, -8);
+}
+
+#[test]
+fn test_finish_passkey_registration_credential_id_mismatch() {
+    let passki = Passki::new("localhost", "http://localhost:3000", "Test App");
+
+    let user_id = b"user123_16bytes_";
+    let (_challenge, state) = passki
+        .start_passkey_registration(
+            user_id,
+            "testuser",
+            "Test User",
+            60000,
+            AttestationConveyancePreference::None,
+            ResidentKeyRequirement::Preferred,
+            UserVerificationRequirement::Preferred,
+            None,
+            None,
+        )
+        .unwrap();
+
+    // The attestation object carries credId = [1u8; 16]; the client claims a different one
+    let attestation_obj = create_test_attestation_object(-7, 0x45);
+    let client_data_json = create_test_client_data_json(&state.challenge, "http://localhost:3000");
+
+    let credential = RegistrationCredential {
+        credential_id: Passki::base64_encode(&[2u8; 16]),
+        public_key: Passki::base64_encode(&attestation_obj),
+        client_data_json: Passki::base64_encode(&client_data_json),
+        client_extension_results: None,
+    };
+
+    let result = passki.finish_passkey_registration(&credential, &state);
+    assert!(result.is_err());
+    assert!(
+        result
+            .unwrap_err()
+            .to_string()
+            .contains("Credential ID mismatch")
+    );
 }
