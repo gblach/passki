@@ -117,7 +117,6 @@ mod tests;
 use aws_lc_rs::rand::{SecureRandom, SystemRandom};
 use std::error::Error as StdError;
 
-// Re-export public types
 pub use authentication::{
     AuthenticationChallenge, AuthenticationCredential, AuthenticationResult, AuthenticationState,
 };

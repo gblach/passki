@@ -156,7 +156,6 @@ impl Passki {
         existing_credentials: Option<&[StoredPasskey]>,
         extensions: Option<RegistrationExtensions>,
     ) -> Result<(RegistrationChallenge, RegistrationState)> {
-        // Validate user_id length
         if user_id.len() < 16 {
             return Err(Box::new(PasskiError::new(
                 "user_id must be at least 16 bytes",
@@ -240,7 +239,6 @@ impl Passki {
         credential: &RegistrationCredential,
         state: &RegistrationState,
     ) -> Result<StoredPasskey> {
-        // Verify client data
         let client_data = ClientData::from_base64(&credential.client_data_json)?;
         client_data.verify(ClientDataType::Create, &state.challenge, &self.rp_origin)?;
 
@@ -291,11 +289,9 @@ impl Passki {
         &self,
         attestation_bytes: &[u8],
     ) -> Result<ParsedAttestation> {
-        // Parse CBOR attestation object
         let attestation: ciborium::Value = ciborium::from_reader(attestation_bytes)
             .map_err(|e| PasskiError::new(format!("Failed to parse attestation object: {}", e)))?;
 
-        // Extract authData
         let auth_data_bytes = attestation
             .as_map()
             .and_then(|m| m.iter().find(|(k, _)| k.as_text() == Some("authData")))
@@ -347,12 +343,10 @@ impl Passki {
 
         let credential_id = auth_data_bytes[55..cose_key_offset].to_vec();
 
-        // Parse COSE key as CBOR map
         let cose_key_bytes = &auth_data_bytes[cose_key_offset..];
         let cose_key_value: ciborium::Value = ciborium::from_reader(cose_key_bytes)
             .map_err(|e| PasskiError::new(format!("Failed to parse COSE key: {}", e)))?;
 
-        // Extract algorithm from COSE key
         let algorithm = cose_key_value
             .as_map()
             .and_then(|m| m.iter().find(|(k, _)| k.as_integer() == Some(3.into())))

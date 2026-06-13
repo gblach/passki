@@ -182,7 +182,6 @@ impl ClientData {
         expected_challenge: &[u8],
         expected_origin: &str,
     ) -> Result<()> {
-        // Verify type
         if self.type_ != expected_type {
             return Err(Box::new(PasskiError::new(format!(
                 "Invalid type: expected {}, got {}",
@@ -190,13 +189,11 @@ impl ClientData {
             ))));
         }
 
-        // Verify challenge
         let challenge = crate::Passki::base64_decode(&self.challenge)?;
         if challenge != expected_challenge {
             return Err(Box::new(PasskiError::new("Challenge mismatch")));
         }
 
-        // Verify origin
         if self.origin != expected_origin {
             return Err(Box::new(PasskiError::new(format!(
                 "Invalid origin: expected {}, got {}",

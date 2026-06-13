@@ -200,12 +200,10 @@ impl Passki {
             return Err(Box::new(PasskiError::new("Credential not allowed")));
         }
 
-        // Verify client data
         let client_data_bytes = Self::base64_decode(&credential.client_data_json)?;
         let client_data = ClientData::from_bytes(&client_data_bytes)?;
         client_data.verify(ClientDataType::Get, &state.challenge, &self.rp_origin)?;
 
-        // Verify authenticator data
         let authenticator_data = Self::base64_decode(&credential.authenticator_data)?;
         if authenticator_data.len() < 37 {
             return Err(Box::new(PasskiError::new("Invalid authenticator data")));
@@ -250,7 +248,6 @@ impl Passki {
             )));
         }
 
-        // Verify signature
         let signature = Self::base64_decode(&credential.signature)?;
         let client_data_hash = digest::digest(&SHA256, &client_data_bytes);
 

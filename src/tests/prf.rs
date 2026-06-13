@@ -196,7 +196,7 @@ fn test_registration_challenge_extensions_includes_second_input() {
 #[test]
 fn test_registration_challenge_probe_only_has_no_eval() {
     let passki = Passki::new("localhost", "http://localhost:3000", "Test");
-    // RegistrationExtensions { prf: Some(PrfInput { eval: None }), .. } → { "prf": {} } — asks for support flag without evaluating
+    // RegistrationExtensions { prf: Some(PrfInput { eval: None }), .. } -> { "prf": {} } - asks for support flag without evaluating
     let extensions = Some(RegistrationExtensions {
         prf: Some(PrfInput { eval: None }),
         ..Default::default()
