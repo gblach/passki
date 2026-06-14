@@ -182,8 +182,8 @@ impl Passki {
     /// A base64url-encoded string without padding.
     #[inline]
     pub fn base64_encode(data: &[u8]) -> String {
-        use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
-        URL_SAFE_NO_PAD.encode(data)
+        use base64ct::{Base64UrlUnpadded, Encoding as _};
+        Base64UrlUnpadded::encode_string(data)
     }
 
     /// Decodes a base64url-encoded string (without padding).
@@ -201,8 +201,8 @@ impl Passki {
     /// Returns an error if the input is not valid base64url.
     #[inline]
     pub fn base64_decode(s: &str) -> types::Result<Vec<u8>> {
-        use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
-        URL_SAFE_NO_PAD.decode(s).map_err(|e| {
+        use base64ct::{Base64UrlUnpadded, Encoding as _};
+        Base64UrlUnpadded::decode_vec(s).map_err(|e| {
             Box::new(types::PasskiError::new(format!(
                 "Base64 decode error: {}",
                 e
