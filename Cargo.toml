@@ -25,7 +25,7 @@ env_logger = "0.11"
 poem = "3"
 rocket = { version = "0.5", features = ["json"] }
 tokio = { version = "1", features = ["full"] }
-tower-http = { version = "0.6", features = ["cors", "trace"] }
+tower-http = { version = "0.7", features = ["cors", "trace"] }
 tracing-subscriber = "0.3"
 uuid = { version = "1", features = ["v4"] }
 warp = { version = "0.4", features = ["server"] }
