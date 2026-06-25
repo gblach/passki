@@ -106,6 +106,7 @@
 //! - Use credential exclusion during registration to prevent duplicate credentials
 //! - User IDs must be at least 16 bytes for security (recommended: use UUIDs or random bytes)
 
+mod attestation;
 mod authentication;
 mod client_data;
 mod registration;

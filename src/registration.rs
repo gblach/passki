@@ -112,6 +112,9 @@ pub(crate) struct ParsedAttestation {
 
     /// The signature counter at registration time.
     pub counter: u32,
+
+    /// The AAGUID of the authenticator that created the credential.
+    pub aaguid: [u8; 16],
 }
 
 impl Passki {
@@ -239,12 +242,15 @@ impl Passki {
         credential: &RegistrationCredential,
         state: &RegistrationState,
     ) -> Result<StoredPasskey> {
-        let client_data = ClientData::from_base64(&credential.client_data_json)?;
+        let client_data_bytes = Self::base64_decode(&credential.client_data_json)?;
+        let client_data = ClientData::from_bytes(&client_data_bytes)?;
         client_data.verify(ClientDataType::Create, &state.challenge, &self.rp_origin)?;
+        let client_data_hash = digest::digest(&SHA256, &client_data_bytes);
 
-        // Parse attestation object to extract public key and algorithm
+        // Parse the attestation object, extract the public key, and verify the
+        // attestation statement.
         let attestation_bytes = Self::base64_decode(&credential.public_key)?;
-        let parsed = self.parse_attestation_object(&attestation_bytes)?;
+        let parsed = self.verify_attestation(&attestation_bytes, client_data_hash.as_ref())?;
 
         if (parsed.flags & FLAG_UP) == 0 {
             return Err(Box::new(PasskiError::new(
@@ -283,21 +289,53 @@ impl Passki {
         })
     }
 
+    /// Splits a CBOR attestation object into its `fmt`, raw `authData`, and `attStmt`.
+    pub(crate) fn split_attestation_object(
+        attestation_bytes: &[u8],
+    ) -> Result<(Option<String>, Vec<u8>, ciborium::Value)> {
+        let attestation: ciborium::Value = ciborium::from_reader(attestation_bytes)
+            .map_err(|e| PasskiError::new(format!("Failed to parse attestation object: {}", e)))?;
+
+        let map = attestation
+            .as_map()
+            .ok_or_else(|| PasskiError::new("Attestation object is not a map"))?;
+
+        let auth_data = map
+            .iter()
+            .find(|(k, _)| k.as_text() == Some("authData"))
+            .and_then(|(_, v)| v.as_bytes())
+            .ok_or_else(|| PasskiError::new("Missing authData in attestation"))?
+            .to_vec();
+
+        let fmt = map
+            .iter()
+            .find(|(k, _)| k.as_text() == Some("fmt"))
+            .and_then(|(_, v)| v.as_text())
+            .map(str::to_string);
+
+        let att_stmt = map
+            .iter()
+            .find(|(k, _)| k.as_text() == Some("attStmt"))
+            .map(|(_, v)| v.clone())
+            .unwrap_or_else(|| ciborium::Value::Map(Vec::new()));
+
+        Ok((fmt, auth_data, att_stmt))
+    }
+
     /// Parses a CBOR attestation object into its credential ID, public key, algorithm,
     /// flags byte, and signature counter.
+    #[cfg(test)]
     pub(crate) fn parse_attestation_object(
         &self,
         attestation_bytes: &[u8],
     ) -> Result<ParsedAttestation> {
-        let attestation: ciborium::Value = ciborium::from_reader(attestation_bytes)
-            .map_err(|e| PasskiError::new(format!("Failed to parse attestation object: {}", e)))?;
+        let (_, auth_data, _) = Self::split_attestation_object(attestation_bytes)?;
+        self.parse_auth_data(&auth_data)
+    }
 
-        let auth_data_bytes = attestation
-            .as_map()
-            .and_then(|m| m.iter().find(|(k, _)| k.as_text() == Some("authData")))
-            .and_then(|(_, v)| v.as_bytes())
-            .ok_or_else(|| PasskiError::new("Missing authData in attestation"))?;
-
+    /// Parses authenticator data into its credential ID, public key, algorithm,
+    /// flags byte, signature counter, and AAGUID.
+    pub(crate) fn parse_auth_data(&self, auth_data_bytes: &[u8]) -> Result<ParsedAttestation> {
         // Parse authenticator data
         if auth_data_bytes.len() < 37 {
             return Err(Box::new(PasskiError::new(
@@ -331,6 +369,9 @@ impl Passki {
         if auth_data_bytes.len() < 55 {
             return Err(Box::new(PasskiError::new("Authenticator data too short")));
         }
+
+        let mut aaguid = [0u8; 16];
+        aaguid.copy_from_slice(&auth_data_bytes[37..53]);
 
         let cred_id_len = u16::from_be_bytes([auth_data_bytes[53], auth_data_bytes[54]]) as usize;
         let cose_key_offset = 55 + cred_id_len;
@@ -366,6 +407,7 @@ impl Passki {
             algorithm,
             flags,
             counter,
+            aaguid,
         })
     }
 }

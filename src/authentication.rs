@@ -333,7 +333,9 @@ impl Passki {
     }
 
     /// Parses COSE key bytes into a CBOR map.
-    fn cose_parse(cose_key_bytes: &[u8]) -> Result<Vec<(ciborium::Value, ciborium::Value)>> {
+    pub(crate) fn cose_parse(
+        cose_key_bytes: &[u8],
+    ) -> Result<Vec<(ciborium::Value, ciborium::Value)>> {
         let cose_key_value: ciborium::Value = ciborium::from_reader(cose_key_bytes)
             .map_err(|e| PasskiError::new(format!("Failed to parse COSE key: {}", e)))?;
 
@@ -344,7 +346,7 @@ impl Passki {
     }
 
     /// Looks up a byte-string field in a COSE key map by its integer label.
-    fn cose_field<'a>(
+    pub(crate) fn cose_field<'a>(
         cose_map: &'a [(ciborium::Value, ciborium::Value)],
         label: i64,
         name: &str,
