@@ -37,7 +37,7 @@
 //! **Usernameless** (no username):
 //! - Server returns empty credential list
 //! - Browser shows all available passkeys (discoverable credentials)
-//! - Server identifies the user by the credential used
+//! - Server identifies the user by the returned userHandle (user.id)
 //!
 //! ### PRF key derivation (optional)
 //! If the client sends a `prf_salt` with the authentication request, the server
@@ -161,6 +161,8 @@ struct AuthFinishRequest {
     client_data_json: String,
     /// Base64url-encoded signature over authenticator_data + hash(client_data_json)
     signature: String,
+    /// Base64url-encoded user handle (user.id), returned for discoverable credentials
+    user_handle: Option<String>,
     /// Extension results from the browser (e.g., PRF outputs)
     client_extension_results: Option<ClientExtensionResults>,
 }
@@ -394,17 +396,31 @@ async fn auth_finish(
     // Decode credential ID to find the matching passkey
     let credential_id = Passki::base64_decode(&req.credential_id).map_err(err)?;
 
-    // Find user by credential_id
+    // Prefer the userHandle (user.id) for a direct lookup in usernameless flows,
+    // falling back to a scan by credential ID when the authenticator omits it.
     let mut users = store.users.lock().unwrap();
-    let (username, passkey) = users
-        .iter_mut()
-        .find_map(|(name, user)| {
+    let (username, passkey) = match req.user_handle.as_deref() {
+        Some(handle) => {
+            let user_id =
+                Uuid::from_slice(&Passki::base64_decode(handle).map_err(err)?).map_err(err)?;
+            users
+                .iter_mut()
+                .find(|(_, user)| user.id == user_id)
+                .and_then(|(name, user)| {
+                    user.passkeys
+                        .iter_mut()
+                        .find(|pk| pk.credential_id == credential_id)
+                        .map(|pk| (name.clone(), pk))
+                })
+        }
+        None => users.iter_mut().find_map(|(name, user)| {
             user.passkeys
                 .iter_mut()
                 .find(|pk| pk.credential_id == credential_id)
                 .map(|pk| (name.clone(), pk))
-        })
-        .ok_or_else(|| err("Unknown credential"))?;
+        }),
+    }
+    .ok_or_else(|| err("Unknown credential"))?;
 
     // Package the authentication response from the client
     let credential = AuthenticationCredential {
@@ -412,6 +428,7 @@ async fn auth_finish(
         authenticator_data: req.authenticator_data,
         client_data_json: req.client_data_json,
         signature: req.signature,
+        user_handle: req.user_handle,
         client_extension_results: req.client_extension_results,
     };
 

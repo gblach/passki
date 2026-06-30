@@ -48,6 +48,7 @@ fn signed_auth_credential(
         authenticator_data: Passki::base64_encode(&auth_data),
         client_data_json: Passki::base64_encode(&client_data_json),
         signature: Passki::base64_encode(signature.as_ref()),
+        user_handle: None,
         client_extension_results,
     }
 }

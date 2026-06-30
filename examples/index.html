@@ -455,6 +455,9 @@
                         signature: bufferToBase64url(
                             credential.response.signature,
                         ),
+                        user_handle: credential.response.userHandle
+                            ? bufferToBase64url(credential.response.userHandle)
+                            : null,
                         client_extension_results: clientExtensionResults,
                     }),
                 });
@@ -502,6 +505,9 @@
                             authenticator_data: bufferToBase64url(credential.response.authenticatorData),
                             client_data_json: bufferToBase64url(credential.response.clientDataJSON),
                             signature: bufferToBase64url(credential.response.signature),
+                            user_handle: credential.response.userHandle
+                                ? bufferToBase64url(credential.response.userHandle)
+                                : null,
                             client_extension_results: clientExtensionResults,
                         }),
                     });

@@ -203,6 +203,7 @@ fn test_finish_passkey_authentication_success() {
         authenticator_data: Passki::base64_encode(&authenticator_data),
         client_data_json: Passki::base64_encode(&client_data_json),
         signature: Passki::base64_encode(&[9u8; 64]),
+        user_handle: None,
         client_extension_results: None,
     };
 
@@ -243,6 +244,7 @@ fn test_finish_passkey_authentication_wrong_credential_id() {
         authenticator_data: Passki::base64_encode(&authenticator_data),
         client_data_json: Passki::base64_encode(&client_data_json),
         signature: Passki::base64_encode(&[9u8; 64]),
+        user_handle: None,
         client_extension_results: None,
     };
 
@@ -286,6 +288,7 @@ fn test_finish_passkey_authentication_wrong_challenge() {
         authenticator_data: Passki::base64_encode(&authenticator_data),
         client_data_json: Passki::base64_encode(&client_data_json),
         signature: Passki::base64_encode(&[9u8; 64]),
+        user_handle: None,
         client_extension_results: None,
     };
 
@@ -327,6 +330,7 @@ fn test_finish_passkey_authentication_wrong_origin() {
         authenticator_data: Passki::base64_encode(&authenticator_data),
         client_data_json: Passki::base64_encode(&client_data_json),
         signature: Passki::base64_encode(&[9u8; 64]),
+        user_handle: None,
         client_extension_results: None,
     };
 
@@ -364,6 +368,7 @@ fn test_finish_passkey_authentication_invalid_counter() {
         authenticator_data: Passki::base64_encode(&authenticator_data),
         client_data_json: Passki::base64_encode(&client_data_json),
         signature: Passki::base64_encode(&[9u8; 64]),
+        user_handle: None,
         client_extension_results: None,
     };
 
@@ -401,6 +406,7 @@ fn test_finish_passkey_authentication_too_short_authenticator_data() {
         authenticator_data: Passki::base64_encode(&authenticator_data),
         client_data_json: Passki::base64_encode(&client_data_json),
         signature: Passki::base64_encode(&[9u8; 64]),
+        user_handle: None,
         client_extension_results: None,
     };
 
@@ -443,6 +449,7 @@ fn test_finish_passkey_authentication_uv_required_flag_set() {
         authenticator_data: Passki::base64_encode(&authenticator_data),
         client_data_json: Passki::base64_encode(&client_data_json),
         signature: Passki::base64_encode(&[9u8; 64]),
+        user_handle: None,
         client_extension_results: None,
     };
 
@@ -486,6 +493,7 @@ fn test_finish_passkey_authentication_uv_required_flag_not_set() {
         authenticator_data: Passki::base64_encode(&authenticator_data),
         client_data_json: Passki::base64_encode(&client_data_json),
         signature: Passki::base64_encode(&[9u8; 64]),
+        user_handle: None,
         client_extension_results: None,
     };
 
@@ -523,6 +531,7 @@ fn test_finish_passkey_authentication_uv_preferred_flag_not_set() {
         authenticator_data: Passki::base64_encode(&authenticator_data),
         client_data_json: Passki::base64_encode(&client_data_json),
         signature: Passki::base64_encode(&[9u8; 64]),
+        user_handle: None,
         client_extension_results: None,
     };
 
@@ -567,6 +576,7 @@ fn test_finish_passkey_authentication_up_flag_not_set() {
         authenticator_data: Passki::base64_encode(&authenticator_data),
         client_data_json: Passki::base64_encode(&client_data_json),
         signature: Passki::base64_encode(&[9u8; 64]),
+        user_handle: None,
         client_extension_results: None,
     };
 
@@ -610,6 +620,7 @@ fn test_finish_passkey_authentication_usernameless() {
         authenticator_data: Passki::base64_encode(&authenticator_data),
         client_data_json: Passki::base64_encode(&client_data_json),
         signature: Passki::base64_encode(&[9u8; 64]),
+        user_handle: None,
         client_extension_results: None,
     };
 

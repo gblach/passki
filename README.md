@@ -235,7 +235,7 @@ A substantial expansion, still the most widely implemented level today:
 - [ ] `minPinLength` extension - query or enforce minimum PIN length
 - [ ] `credProtect` extension - control UV requirement for credential access
 - [ ] `uvm` extension - user verification method details
-- [ ] `userHandle` in authentication response - needed to identify the user in usernameless flows
+- [x] `userHandle` in authentication response - needed to identify the user in usernameless flows
 
 ### Level 3 (Candidate Recommendation, not yet a W3C Recommendation)
 

@@ -88,6 +88,13 @@ pub struct AuthenticationCredential {
     /// The signature over the authenticator data and client data hash (base64url-encoded).
     pub signature: String,
 
+    /// The user handle returned by the authenticator (base64url-encoded).
+    ///
+    /// This is the `user.id` set during registration. Authenticators only return it
+    /// for discoverable credentials, so it is the primary way to identify the user in
+    /// usernameless flows where `allowCredentials` was empty.
+    pub user_handle: Option<String>,
+
     /// Extension results from the client (e.g., PRF outputs).
     pub client_extension_results: Option<ClientExtensionResults>,
 }
@@ -102,6 +109,10 @@ pub struct AuthenticationResult {
 
     /// The updated signature counter from the authenticator.
     pub counter: u32,
+
+    /// The decoded user handle (`user.id` from registration), if the authenticator
+    /// returned one. Use this to identify the user in usernameless flows.
+    pub user_handle: Option<Vec<u8>>,
 
     /// Decoded first PRF output, if the PRF extension was requested and supported.
     pub prf_first: Option<Vec<u8>>,
@@ -277,9 +288,16 @@ impl Passki {
             .map(Self::base64_decode)
             .transpose()?;
 
+        let user_handle = credential
+            .user_handle
+            .as_deref()
+            .map(Self::base64_decode)
+            .transpose()?;
+
         Ok(AuthenticationResult {
             credential_id,
             counter,
+            user_handle,
             prf_first,
             prf_second,
         })

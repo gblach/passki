@@ -23,3 +23,4 @@ mod prf;
 mod registration;
 mod serde;
 mod signature;
+mod user_handle;
