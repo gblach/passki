@@ -1,6 +1,6 @@
 [package]
 name = "passki"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2024"
 description = "A simple and secure WebAuthn/Passkey authentication library"
 documentation = "https://docs.rs/passki"
