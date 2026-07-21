@@ -63,7 +63,8 @@ impl Passki {
     ) -> Result<ParsedAttestation> {
         let (fmt, auth_data, att_stmt) = Self::split_attestation_object(attestation_bytes)?;
         let parsed = self.parse_auth_data(&auth_data)?;
-        let fmt = fmt.ok_or_else(|| PasskiError::new("Missing fmt in attestation"))?;
+        let fmt =
+            fmt.ok_or_else(|| PasskiError::InvalidAttestationObject("Missing fmt".to_string()))?;
 
         match fmt.as_str() {
             "none" => {}
@@ -72,10 +73,7 @@ impl Passki {
             "android-key" => verify_android_key(&att_stmt, &auth_data, &parsed, client_data_hash)?,
             "tpm" => verify_tpm(&att_stmt, &auth_data, &parsed, client_data_hash)?,
             other => {
-                return Err(Box::new(PasskiError::new(format!(
-                    "Unsupported attestation format: {}",
-                    other
-                ))));
+                return Err(PasskiError::UnsupportedAttestationFormat(other.to_string()));
             }
         }
 
@@ -109,9 +107,9 @@ fn verify_packed(
             // Self attestation: the credential key signs, and the statement's alg
             // must match the credential key's alg.
             if alg != parsed.algorithm {
-                return Err(Box::new(PasskiError::new(
-                    "packed self-attestation algorithm does not match credential key",
-                )));
+                return Err(PasskiError::InvalidAttestation(
+                    "packed self-attestation algorithm does not match credential key".to_string(),
+                ));
             }
             Passki::verify_signature(&parsed.public_key, alg, &signed_data, sig)?;
         }
@@ -129,27 +127,28 @@ fn verify_fido_u2f(
 ) -> Result<()> {
     let map = att_map(att_stmt)?;
     let sig = att_bytes(map, "sig")?;
-    let x5c =
-        att_x5c(map)?.ok_or_else(|| PasskiError::new("fido-u2f attestation is missing x5c"))?;
+    let x5c = att_x5c(map)?.ok_or_else(|| {
+        PasskiError::InvalidAttestation("fido-u2f attestation is missing x5c".to_string())
+    })?;
     if x5c.len() != 1 {
-        return Err(Box::new(PasskiError::new(
-            "fido-u2f attestation must contain exactly one certificate",
-        )));
+        return Err(PasskiError::InvalidAttestation(
+            "fido-u2f attestation must contain exactly one certificate".to_string(),
+        ));
     }
     let cert = parse_cert(&x5c[0])?;
 
     let (x, y) = match cose_public_key(&parsed.public_key)? {
         PublicKey::Ec { x, y } => (x, y),
         PublicKey::Rsa { .. } => {
-            return Err(Box::new(PasskiError::new(
-                "fido-u2f credential key must be an EC key",
-            )));
+            return Err(PasskiError::InvalidAttestation(
+                "fido-u2f credential key must be an EC key".to_string(),
+            ));
         }
     };
     if x.len() != 32 || y.len() != 32 {
-        return Err(Box::new(PasskiError::new(
-            "fido-u2f requires 32-byte P-256 coordinates",
-        )));
+        return Err(PasskiError::InvalidAttestation(
+            "fido-u2f requires 32-byte P-256 coordinates".to_string(),
+        ));
     }
 
     // publicKeyU2F = 0x04 || x || y
@@ -180,8 +179,9 @@ fn verify_android_key(
     let map = att_map(att_stmt)?;
     let alg = att_int(map, "alg")? as i32;
     let sig = att_bytes(map, "sig")?;
-    let x5c =
-        att_x5c(map)?.ok_or_else(|| PasskiError::new("android-key attestation is missing x5c"))?;
+    let x5c = att_x5c(map)?.ok_or_else(|| {
+        PasskiError::InvalidAttestation("android-key attestation is missing x5c".to_string())
+    })?;
     let cert = parse_cert(&x5c[0])?;
 
     let mut signed_data = auth_data.to_vec();
@@ -190,14 +190,15 @@ fn verify_android_key(
 
     // The certificate's public key must match the credential public key.
     if !cert_key_matches(&cert, &cose_public_key(&parsed.public_key)?)? {
-        return Err(Box::new(PasskiError::new(
-            "android-key certificate public key does not match credential key",
-        )));
+        return Err(PasskiError::InvalidAttestation(
+            "android-key certificate public key does not match credential key".to_string(),
+        ));
     }
 
     let extension = cert_extension(&cert, &OID_ANDROID_KEY).ok_or_else(|| {
-        PasskiError::new(
-            "android-key attestation certificate is missing the key attestation extension",
+        PasskiError::InvalidCertificate(
+            "android-key attestation certificate is missing the key attestation extension"
+                .to_string(),
         )
     })?;
     verify_android_key_description(extension, client_data_hash)
@@ -212,44 +213,52 @@ fn verify_tpm(
 ) -> Result<()> {
     let map = att_map(att_stmt)?;
     if att_text(map, "ver")? != "2.0" {
-        return Err(Box::new(PasskiError::new("Unsupported TPM version")));
+        return Err(PasskiError::InvalidAttestation(
+            "Unsupported TPM version".to_string(),
+        ));
     }
     let alg = att_int(map, "alg")? as i32;
     let sig = att_bytes(map, "sig")?;
     let cert_info = att_bytes(map, "certInfo")?;
     let pub_area = att_bytes(map, "pubArea")?;
-    let x5c = att_x5c(map)?.ok_or_else(|| PasskiError::new("tpm attestation is missing x5c"))?;
+    let x5c = att_x5c(map)?.ok_or_else(|| {
+        PasskiError::InvalidAttestation("tpm attestation is missing x5c".to_string())
+    })?;
 
     // The key in pubArea must match the credential public key.
     let (name_alg, tpm_key) = parse_tpmt_public(pub_area)?;
     if !public_keys_match(&tpm_key, &cose_public_key(&parsed.public_key)?) {
-        return Err(Box::new(PasskiError::new(
-            "tpm pubArea key does not match credential key",
-        )));
+        return Err(PasskiError::InvalidAttestation(
+            "tpm pubArea key does not match credential key".to_string(),
+        ));
     }
 
     let (magic, attest_type, extra_data, attested_name) = parse_tpms_attest(cert_info)?;
     if magic != 0xff54_4347 {
-        return Err(Box::new(PasskiError::new("Invalid TPM_GENERATED_VALUE")));
+        return Err(PasskiError::InvalidAttestation(
+            "Invalid TPM_GENERATED_VALUE".to_string(),
+        ));
     }
     if attest_type != 0x8017 {
-        return Err(Box::new(PasskiError::new(
-            "certInfo is not a TPM_ST_ATTEST_CERTIFY",
-        )));
+        return Err(PasskiError::InvalidAttestation(
+            "certInfo is not a TPM_ST_ATTEST_CERTIFY".to_string(),
+        ));
     }
 
     // extraData must be the hash of (authData || clientDataHash).
     let mut att_to_be_signed = auth_data.to_vec();
     att_to_be_signed.extend_from_slice(client_data_hash);
     if extra_data != digest_for_alg(alg, &att_to_be_signed)? {
-        return Err(Box::new(PasskiError::new("certInfo extraData mismatch")));
+        return Err(PasskiError::InvalidAttestation(
+            "certInfo extraData mismatch".to_string(),
+        ));
     }
 
     // The attested name must be nameAlg || H_nameAlg(pubArea).
     if attested_name != tpm_name(name_alg, pub_area)? {
-        return Err(Box::new(PasskiError::new(
-            "certInfo attested name mismatch",
-        )));
+        return Err(PasskiError::InvalidAttestation(
+            "certInfo attested name mismatch".to_string(),
+        ));
     }
 
     let cert = parse_cert(&x5c[0])?;
@@ -257,14 +266,14 @@ fn verify_tpm(
 
     check_cert_version_3(&cert)?;
     if !cert.tbs_certificate.subject.0.is_empty() {
-        return Err(Box::new(PasskiError::new(
-            "tpm certificate subject must be empty",
-        )));
+        return Err(PasskiError::InvalidCertificate(
+            "tpm certificate subject must be empty".to_string(),
+        ));
     }
     if cert_extension(&cert, &OID_SUBJECT_ALT_NAME).is_none() {
-        return Err(Box::new(PasskiError::new(
-            "tpm certificate is missing subjectAltName",
-        )));
+        return Err(PasskiError::InvalidCertificate(
+            "tpm certificate is missing subjectAltName".to_string(),
+        ));
     }
     check_eku_contains(&cert, &OID_TCG_KP_AIK)?;
     check_not_ca(&cert)?;
@@ -279,7 +288,7 @@ fn verify_tpm(
 fn att_map(att_stmt: &Value) -> Result<&Vec<(Value, Value)>> {
     att_stmt
         .as_map()
-        .ok_or_else(|| PasskiError::new("attStmt is not a map").into())
+        .ok_or_else(|| PasskiError::InvalidAttestationObject("attStmt is not a map".to_string()))
 }
 
 /// Looks up a text-keyed byte-string field in an `attStmt` map.
@@ -288,7 +297,7 @@ fn att_bytes<'a>(map: &'a [(Value, Value)], key: &str) -> Result<&'a [u8]> {
         .find(|(k, _)| k.as_text() == Some(key))
         .and_then(|(_, v)| v.as_bytes())
         .map(Vec::as_slice)
-        .ok_or_else(|| PasskiError::new(format!("Missing {} in attStmt", key)).into())
+        .ok_or_else(|| PasskiError::MissingAttStmtField(key.to_string()))
 }
 
 /// Looks up a text-keyed integer field in an `attStmt` map.
@@ -297,7 +306,7 @@ fn att_int(map: &[(Value, Value)], key: &str) -> Result<i64> {
         .find(|(k, _)| k.as_text() == Some(key))
         .and_then(|(_, v)| v.as_integer())
         .and_then(|i| i.try_into().ok())
-        .ok_or_else(|| PasskiError::new(format!("Missing {} in attStmt", key)).into())
+        .ok_or_else(|| PasskiError::MissingAttStmtField(key.to_string()))
 }
 
 /// Looks up a text-keyed text field in an `attStmt` map.
@@ -305,7 +314,7 @@ fn att_text<'a>(map: &'a [(Value, Value)], key: &str) -> Result<&'a str> {
     map.iter()
         .find(|(k, _)| k.as_text() == Some(key))
         .and_then(|(_, v)| v.as_text())
-        .ok_or_else(|| PasskiError::new(format!("Missing {} in attStmt", key)).into())
+        .ok_or_else(|| PasskiError::MissingAttStmtField(key.to_string()))
 }
 
 /// Returns the `x5c` certificate chain from an `attStmt` map, if present and non-empty.
@@ -313,7 +322,7 @@ fn att_x5c(map: &[(Value, Value)]) -> Result<Option<Vec<Vec<u8>>>> {
     let array = match map.iter().find(|(k, _)| k.as_text() == Some("x5c")) {
         Some((_, v)) => v
             .as_array()
-            .ok_or_else(|| PasskiError::new("x5c is not an array"))?,
+            .ok_or_else(|| PasskiError::InvalidAttestation("x5c is not an array".to_string()))?,
         None => return Ok(None),
     };
 
@@ -324,9 +333,9 @@ fn att_x5c(map: &[(Value, Value)]) -> Result<Option<Vec<Vec<u8>>>> {
     let chain = array
         .iter()
         .map(|v| {
-            v.as_bytes()
-                .cloned()
-                .ok_or_else(|| PasskiError::new("x5c entry is not a byte string").into())
+            v.as_bytes().cloned().ok_or_else(|| {
+                PasskiError::InvalidAttestation("x5c entry is not a byte string".to_string())
+            })
         })
         .collect::<Result<Vec<Vec<u8>>>>()?;
 
@@ -338,7 +347,7 @@ fn att_x5c(map: &[(Value, Value)]) -> Result<Option<Vec<Vec<u8>>>> {
 /// Parses a DER-encoded X.509 certificate.
 fn parse_cert(der: &[u8]) -> Result<Certificate> {
     Certificate::from_der(der)
-        .map_err(|e| PasskiError::new(format!("Failed to parse certificate: {}", e)).into())
+        .map_err(|e| PasskiError::InvalidCertificate(format!("Failed to parse: {}", e)))
 }
 
 /// Returns the value bytes of the extension with the given OID, if present.
@@ -364,7 +373,9 @@ fn verify_cert_signature(
         .subject_public_key_info
         .subject_public_key
         .as_bytes()
-        .ok_or_else(|| PasskiError::new("Invalid certificate public key encoding"))?;
+        .ok_or_else(|| {
+            PasskiError::InvalidCertificate("Invalid public key encoding".to_string())
+        })?;
     verify_with_key(alg, key, signed_data, signature)
 }
 
@@ -373,38 +384,33 @@ fn verify_with_key(alg: i32, key: &[u8], signed_data: &[u8], signature: &[u8]) -
     match alg {
         ALG_ES256 => UnparsedPublicKey::new(&ECDSA_P256_SHA256_ASN1, key)
             .verify(signed_data, signature)
-            .map_err(|_| PasskiError::new("Attestation signature verification failed").into()),
+            .map_err(|_| PasskiError::SignatureVerificationFailed),
         ALG_ES384 => UnparsedPublicKey::new(&ECDSA_P384_SHA384_ASN1, key)
             .verify(signed_data, signature)
-            .map_err(|_| PasskiError::new("Attestation signature verification failed").into()),
+            .map_err(|_| PasskiError::SignatureVerificationFailed),
         ALG_EDDSA => UnparsedPublicKey::new(&ED25519, key)
             .verify(signed_data, signature)
-            .map_err(|_| PasskiError::new("Attestation signature verification failed").into()),
+            .map_err(|_| PasskiError::SignatureVerificationFailed),
         ALG_RS256 => {
             let (n, e) = parse_rsa_public_key(key)?;
             RsaPublicKeyComponents { n: &n, e: &e }
                 .verify(&RSA_PKCS1_2048_8192_SHA256, signed_data, signature)
-                .map_err(|_| PasskiError::new("Attestation signature verification failed").into())
+                .map_err(|_| PasskiError::SignatureVerificationFailed)
         }
         ALG_RS384 => {
             let (n, e) = parse_rsa_public_key(key)?;
             RsaPublicKeyComponents { n: &n, e: &e }
                 .verify(&RSA_PKCS1_2048_8192_SHA384, signed_data, signature)
-                .map_err(|_| PasskiError::new("Attestation signature verification failed").into())
+                .map_err(|_| PasskiError::SignatureVerificationFailed)
         }
-        _ => Err(Box::new(PasskiError::new(format!(
-            "Unsupported attestation algorithm: {}",
-            alg
-        )))),
+        _ => Err(PasskiError::UnsupportedAlgorithm(alg)),
     }
 }
 
 /// Returns an error unless the certificate is X.509 v3.
 fn check_cert_version_3(cert: &Certificate) -> Result<()> {
     if cert.tbs_certificate.version != Version::V3 {
-        return Err(Box::new(PasskiError::new(
-            "Attestation certificate is not version 3",
-        )));
+        return Err(PasskiError::InvalidCertificate("not version 3".to_string()));
     }
     Ok(())
 }
@@ -412,12 +418,13 @@ fn check_cert_version_3(cert: &Certificate) -> Result<()> {
 /// Returns an error if the certificate's Basic Constraints mark it as a CA.
 fn check_not_ca(cert: &Certificate) -> Result<()> {
     if let Some(value) = cert_extension(cert, &BasicConstraints::OID) {
-        let bc = BasicConstraints::from_der(value)
-            .map_err(|e| PasskiError::new(format!("Invalid Basic Constraints: {}", e)))?;
+        let bc = BasicConstraints::from_der(value).map_err(|e| {
+            PasskiError::InvalidCertificate(format!("Invalid Basic Constraints: {}", e))
+        })?;
         if bc.ca {
-            return Err(Box::new(PasskiError::new(
-                "Attestation certificate must not be a CA",
-            )));
+            return Err(PasskiError::InvalidCertificate(
+                "must not be a CA".to_string(),
+            ));
         }
     }
     Ok(())
@@ -426,13 +433,14 @@ fn check_not_ca(cert: &Certificate) -> Result<()> {
 /// Returns an error unless the certificate's extended key usage contains `oid`.
 fn check_eku_contains(cert: &Certificate, oid: &ObjectIdentifier) -> Result<()> {
     let value = cert_extension(cert, &ExtendedKeyUsage::OID)
-        .ok_or_else(|| PasskiError::new("Attestation certificate is missing extended key usage"))?;
-    let eku = ExtendedKeyUsage::from_der(value)
-        .map_err(|e| PasskiError::new(format!("Invalid extended key usage: {}", e)))?;
+        .ok_or_else(|| PasskiError::InvalidCertificate("missing extended key usage".to_string()))?;
+    let eku = ExtendedKeyUsage::from_der(value).map_err(|e| {
+        PasskiError::InvalidCertificate(format!("Invalid extended key usage: {}", e))
+    })?;
     if !eku.0.contains(oid) {
-        return Err(Box::new(PasskiError::new(
-            "Attestation certificate has wrong extended key usage",
-        )));
+        return Err(PasskiError::InvalidCertificate(
+            "wrong extended key usage".to_string(),
+        ));
     }
     Ok(())
 }
@@ -441,12 +449,13 @@ fn check_eku_contains(cert: &Certificate, oid: &ObjectIdentifier) -> Result<()> 
 fn check_aaguid_extension(cert: &Certificate, aaguid: &[u8; 16]) -> Result<()> {
     if let Some(value) = cert_extension(cert, &OID_FIDO_AAGUID) {
         // The extension value is a DER OCTET STRING wrapping the 16-byte AAGUID.
-        let wrapped = OctetString::from_der(value)
-            .map_err(|e| PasskiError::new(format!("Invalid AAGUID extension: {}", e)))?;
+        let wrapped = OctetString::from_der(value).map_err(|e| {
+            PasskiError::InvalidCertificate(format!("Invalid AAGUID extension: {}", e))
+        })?;
         if wrapped.as_bytes() != aaguid {
-            return Err(Box::new(PasskiError::new(
-                "Attestation certificate AAGUID does not match authenticator data",
-            )));
+            return Err(PasskiError::InvalidCertificate(
+                "AAGUID does not match authenticator data".to_string(),
+            ));
         }
     }
     Ok(())
@@ -459,7 +468,9 @@ fn cert_key_matches(cert: &Certificate, key: &PublicKey) -> Result<bool> {
         .subject_public_key_info
         .subject_public_key
         .as_bytes()
-        .ok_or_else(|| PasskiError::new("Invalid certificate public key encoding"))?;
+        .ok_or_else(|| {
+            PasskiError::InvalidCertificate("Invalid public key encoding".to_string())
+        })?;
 
     Ok(match key {
         PublicKey::Ec { x, y } => {
@@ -486,7 +497,7 @@ fn cose_public_key(cose_key_bytes: &[u8]) -> Result<PublicKey> {
         .find(|(k, _)| k.as_integer() == Some(1.into()))
         .and_then(|(_, v)| v.as_integer())
         .and_then(|i| i.try_into().ok())
-        .ok_or_else(|| PasskiError::new("Missing kty in COSE key"))?;
+        .ok_or_else(|| PasskiError::InvalidCoseKey("Missing kty".to_string()))?;
 
     match kty {
         KTY_EC2 => Ok(PublicKey::Ec {
@@ -497,9 +508,9 @@ fn cose_public_key(cose_key_bytes: &[u8]) -> Result<PublicKey> {
             n: Passki::cose_field(&map, -1, "n (modulus)")?.to_vec(),
             e: Passki::cose_field(&map, -2, "e (exponent)")?.to_vec(),
         }),
-        _ => Err(Box::new(PasskiError::new(
-            "Unsupported COSE key type for attestation key matching",
-        ))),
+        _ => Err(PasskiError::InvalidCoseKey(
+            "Unsupported key type for attestation key matching".to_string(),
+        )),
     }
 }
 
@@ -517,12 +528,7 @@ fn digest_for_alg(alg: i32, data: &[u8]) -> Result<Vec<u8>> {
     let algorithm = match alg {
         ALG_ES256 | ALG_RS256 => &SHA256,
         ALG_ES384 | ALG_RS384 => &SHA384,
-        _ => {
-            return Err(Box::new(PasskiError::new(format!(
-                "Unsupported attestation algorithm: {}",
-                alg
-            ))));
-        }
+        _ => return Err(PasskiError::UnsupportedAlgorithm(alg)),
     };
     Ok(digest::digest(algorithm, data).as_ref().to_vec())
 }
@@ -558,9 +564,9 @@ fn verify_android_key_description(extension: &[u8], client_data_hash: &[u8]) -> 
     kd.skip()?; // keymasterSecurityLevel
     let challenge = kd.read_octet_string()?;
     if challenge != client_data_hash {
-        return Err(Box::new(PasskiError::new(
-            "android-key attestation challenge does not match client data hash",
-        )));
+        return Err(PasskiError::InvalidAttestation(
+            "android-key attestation challenge does not match client data hash".to_string(),
+        ));
     }
     kd.skip()?; // uniqueId
     let software_enforced = kd.read_sequence_bytes()?;
@@ -568,18 +574,18 @@ fn verify_android_key_description(extension: &[u8], client_data_hash: &[u8]) -> 
 
     // allApplications must not appear in either list: the key must be bound to this RP.
     if authz_has_all_applications(software_enforced)? || authz_has_all_applications(tee_enforced)? {
-        return Err(Box::new(PasskiError::new(
-            "android-key attestation must not allow all applications",
-        )));
+        return Err(PasskiError::InvalidAttestation(
+            "android-key attestation must not allow all applications".to_string(),
+        ));
     }
 
     // origin must be KM_ORIGIN_GENERATED and purpose must contain KM_PURPOSE_SIGN.
     if !authz_origin_and_purpose_ok(tee_enforced)?
         && !authz_origin_and_purpose_ok(software_enforced)?
     {
-        return Err(Box::new(PasskiError::new(
-            "android-key attestation has wrong key origin or purpose",
-        )));
+        return Err(PasskiError::InvalidAttestation(
+            "android-key attestation has wrong key origin or purpose".to_string(),
+        ));
     }
 
     Ok(())
@@ -668,7 +674,9 @@ fn parse_tpmt_public(pub_area: &[u8]) -> Result<(u16, PublicKey)> {
             PublicKey::Ec { x, y }
         }
         _ => {
-            return Err(Box::new(PasskiError::new("Unsupported TPM key type")));
+            return Err(PasskiError::InvalidAttestation(
+                "Unsupported TPM key type".to_string(),
+            ));
         }
     };
 
@@ -694,7 +702,11 @@ fn tpm_name(name_alg: u16, pub_area: &[u8]) -> Result<Vec<u8>> {
     let algorithm = match name_alg {
         0x000B => &SHA256,
         0x000C => &SHA384,
-        _ => return Err(Box::new(PasskiError::new("Unsupported TPM name algorithm"))),
+        _ => {
+            return Err(PasskiError::InvalidAttestation(
+                "Unsupported TPM name algorithm".to_string(),
+            ));
+        }
     };
     let mut name = name_alg.to_be_bytes().to_vec();
     name.extend_from_slice(digest::digest(algorithm, pub_area).as_ref());
@@ -717,7 +729,9 @@ impl<'a> BeReader<'a> {
             .pos
             .checked_add(n)
             .filter(|&end| end <= self.bytes.len())
-            .ok_or_else(|| PasskiError::new("Truncated TPM structure"))?;
+            .ok_or_else(|| {
+                PasskiError::InvalidAttestation("Truncated TPM structure".to_string())
+            })?;
         let slice = &self.bytes[self.pos..end];
         self.pos = end;
         Ok(slice)
@@ -758,7 +772,7 @@ impl<'a> DerReader<'a> {
         let first = *self
             .bytes
             .get(self.pos)
-            .ok_or_else(|| PasskiError::new("Truncated DER element"))?;
+            .ok_or_else(|| PasskiError::InvalidAttestation("Truncated DER element".to_string()))?;
         self.pos += 1;
         let class = first & 0xC0;
         let constructed = first & 0x20 != 0;
@@ -768,10 +782,9 @@ impl<'a> DerReader<'a> {
             // High-tag-number form: base-128 with continuation bits.
             tag_number = 0;
             loop {
-                let byte = *self
-                    .bytes
-                    .get(self.pos)
-                    .ok_or_else(|| PasskiError::new("Truncated DER tag"))?;
+                let byte = *self.bytes.get(self.pos).ok_or_else(|| {
+                    PasskiError::InvalidAttestation("Truncated DER tag".to_string())
+                })?;
                 self.pos += 1;
                 tag_number = (tag_number << 7) | (byte & 0x7F) as u32;
                 if byte & 0x80 == 0 {
@@ -783,7 +796,7 @@ impl<'a> DerReader<'a> {
         let first_len = *self
             .bytes
             .get(self.pos)
-            .ok_or_else(|| PasskiError::new("Truncated DER length"))?;
+            .ok_or_else(|| PasskiError::InvalidAttestation("Truncated DER length".to_string()))?;
         self.pos += 1;
         let len = if first_len & 0x80 == 0 {
             first_len as usize
@@ -791,10 +804,9 @@ impl<'a> DerReader<'a> {
             let count = (first_len & 0x7F) as usize;
             let mut len = 0usize;
             for _ in 0..count {
-                let byte = *self
-                    .bytes
-                    .get(self.pos)
-                    .ok_or_else(|| PasskiError::new("Truncated DER length"))?;
+                let byte = *self.bytes.get(self.pos).ok_or_else(|| {
+                    PasskiError::InvalidAttestation("Truncated DER length".to_string())
+                })?;
                 self.pos += 1;
                 len = (len << 8) | byte as usize;
             }
@@ -805,7 +817,9 @@ impl<'a> DerReader<'a> {
             .pos
             .checked_add(len)
             .filter(|&end| end <= self.bytes.len())
-            .ok_or_else(|| PasskiError::new("DER length exceeds buffer"))?;
+            .ok_or_else(|| {
+                PasskiError::InvalidAttestation("DER length exceeds buffer".to_string())
+            })?;
         let content = &self.bytes[self.pos..end];
         self.pos = end;
         Ok((class, constructed, tag_number, content))
@@ -820,7 +834,9 @@ impl<'a> DerReader<'a> {
     fn read_sequence_bytes(&mut self) -> Result<&'a [u8]> {
         let (class, constructed, tag, content) = self.read_tlv()?;
         if class != 0x00 || !constructed || tag != 0x10 {
-            return Err(Box::new(PasskiError::new("Expected DER SEQUENCE")));
+            return Err(PasskiError::InvalidAttestation(
+                "Expected DER SEQUENCE".to_string(),
+            ));
         }
         Ok(content)
     }
@@ -829,7 +845,9 @@ impl<'a> DerReader<'a> {
     fn read_set(&mut self) -> Result<DerReader<'a>> {
         let (class, constructed, tag, content) = self.read_tlv()?;
         if class != 0x00 || !constructed || tag != 0x11 {
-            return Err(Box::new(PasskiError::new("Expected DER SET")));
+            return Err(PasskiError::InvalidAttestation(
+                "Expected DER SET".to_string(),
+            ));
         }
         Ok(DerReader::new(content))
     }
@@ -838,7 +856,9 @@ impl<'a> DerReader<'a> {
     fn read_integer(&mut self) -> Result<&'a [u8]> {
         let (class, constructed, tag, content) = self.read_tlv()?;
         if class != 0x00 || constructed || tag != 0x02 {
-            return Err(Box::new(PasskiError::new("Expected DER INTEGER")));
+            return Err(PasskiError::InvalidAttestation(
+                "Expected DER INTEGER".to_string(),
+            ));
         }
         Ok(content)
     }
@@ -847,7 +867,9 @@ impl<'a> DerReader<'a> {
     fn read_integer_value(&mut self) -> Result<i64> {
         let content = self.read_integer()?;
         if content.is_empty() || content.len() > 8 {
-            return Err(Box::new(PasskiError::new("Unsupported DER INTEGER width")));
+            return Err(PasskiError::InvalidAttestation(
+                "Unsupported DER INTEGER width".to_string(),
+            ));
         }
         let mut value = if content[0] & 0x80 != 0 { -1i64 } else { 0i64 };
         for &byte in content {
@@ -860,7 +882,9 @@ impl<'a> DerReader<'a> {
     fn read_octet_string(&mut self) -> Result<&'a [u8]> {
         let (class, constructed, tag, content) = self.read_tlv()?;
         if class != 0x00 || constructed || tag != 0x04 {
-            return Err(Box::new(PasskiError::new("Expected DER OCTET STRING")));
+            return Err(PasskiError::InvalidAttestation(
+                "Expected DER OCTET STRING".to_string(),
+            ));
         }
         Ok(content)
     }

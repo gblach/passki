@@ -54,8 +54,9 @@ use actix_web::{App, HttpResponse, HttpServer, web};
 use passki::{
     AttestationConveyancePreference, AuthenticationChallenge, AuthenticationCredential,
     AuthenticationExtensions, AuthenticationState, ClientData, ClientExtensionResults, Passki,
-    PrfEval, PrfInput, RegistrationChallenge, RegistrationCredential, RegistrationExtensions,
-    RegistrationState, ResidentKeyRequirement, StoredPasskey, UserVerificationRequirement,
+    PasskiError, PrfEval, PrfInput, RegistrationChallenge, RegistrationCredential,
+    RegistrationExtensions, RegistrationState, ResidentKeyRequirement, StoredPasskey,
+    UserVerificationRequirement,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -81,8 +82,8 @@ impl actix_web::ResponseError for AppError {
     }
 }
 
-impl From<Box<dyn std::error::Error>> for AppError {
-    fn from(err: Box<dyn std::error::Error>) -> Self {
+impl From<PasskiError> for AppError {
+    fn from(err: PasskiError) -> Self {
         AppError(err.to_string())
     }
 }

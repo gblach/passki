@@ -160,9 +160,7 @@ impl Passki {
         extensions: Option<RegistrationExtensions>,
     ) -> Result<(RegistrationChallenge, RegistrationState)> {
         if user_id.len() < 16 {
-            return Err(Box::new(PasskiError::new(
-                "user_id must be at least 16 bytes",
-            )));
+            return Err(PasskiError::UserIdTooShort);
         }
 
         let challenge = Self::generate_challenge();
@@ -253,25 +251,19 @@ impl Passki {
         let parsed = self.verify_attestation(&attestation_bytes, client_data_hash.as_ref())?;
 
         if (parsed.flags & FLAG_UP) == 0 {
-            return Err(Box::new(PasskiError::new(
-                "User not present (UP flag not set)",
-            )));
+            return Err(PasskiError::UserNotPresent);
         }
         if state.user_verification == UserVerificationRequirement::Required
             && (parsed.flags & FLAG_UV) == 0
         {
-            return Err(Box::new(PasskiError::new(
-                "User verification required but UV flag not set",
-            )));
+            return Err(PasskiError::UserVerificationRequired);
         }
 
         // The credential ID in the attested credential data is authoritative;
         // the client-supplied one must match it.
         let credential_id = Self::base64_decode(&credential.credential_id)?;
         if credential_id != parsed.credential_id {
-            return Err(Box::new(PasskiError::new(
-                "Credential ID mismatch between client and attested credential data",
-            )));
+            return Err(PasskiError::CredentialIdMismatch);
         }
 
         let rk = credential
@@ -293,18 +285,17 @@ impl Passki {
     pub(crate) fn split_attestation_object(
         attestation_bytes: &[u8],
     ) -> Result<(Option<String>, Vec<u8>, ciborium::Value)> {
-        let attestation: ciborium::Value = ciborium::from_reader(attestation_bytes)
-            .map_err(|e| PasskiError::new(format!("Failed to parse attestation object: {}", e)))?;
+        let attestation: ciborium::Value = ciborium::from_reader(attestation_bytes)?;
 
         let map = attestation
             .as_map()
-            .ok_or_else(|| PasskiError::new("Attestation object is not a map"))?;
+            .ok_or_else(|| PasskiError::InvalidAttestationObject("not a map".to_string()))?;
 
         let auth_data = map
             .iter()
             .find(|(k, _)| k.as_text() == Some("authData"))
             .and_then(|(_, v)| v.as_bytes())
-            .ok_or_else(|| PasskiError::new("Missing authData in attestation"))?
+            .ok_or_else(|| PasskiError::InvalidAttestationObject("Missing authData".to_string()))?
             .to_vec();
 
         let fmt = map
@@ -338,15 +329,13 @@ impl Passki {
     pub(crate) fn parse_auth_data(&self, auth_data_bytes: &[u8]) -> Result<ParsedAttestation> {
         // Parse authenticator data
         if auth_data_bytes.len() < 37 {
-            return Err(Box::new(PasskiError::new(
-                "Invalid authenticator data length",
-            )));
+            return Err(PasskiError::InvalidAuthenticatorData);
         }
 
         // Verify rpId hash (bytes 0-31)
         let rp_id_hash = digest::digest(&SHA256, self.rp_id.as_bytes());
         if &auth_data_bytes[..32] != rp_id_hash.as_ref() {
-            return Err(Box::new(PasskiError::new("rpId hash mismatch")));
+            return Err(PasskiError::RpIdHashMismatch);
         }
 
         let flags = auth_data_bytes[32];
@@ -360,14 +349,12 @@ impl Passki {
 
         // Check if attested credential data is present
         if (flags & FLAG_AT) == 0 {
-            return Err(Box::new(PasskiError::new(
-                "No attested credential data present",
-            )));
+            return Err(PasskiError::NoAttestedCredentialData);
         }
 
         // Skip: rpIdHash (32) + flags (1) + signCount (4) + aaguid (16) + credIdLen (2) = 55 bytes
         if auth_data_bytes.len() < 55 {
-            return Err(Box::new(PasskiError::new("Authenticator data too short")));
+            return Err(PasskiError::InvalidAuthenticatorData);
         }
 
         let mut aaguid = [0u8; 16];
@@ -377,29 +364,27 @@ impl Passki {
         let cose_key_offset = 55 + cred_id_len;
 
         if auth_data_bytes.len() < cose_key_offset {
-            return Err(Box::new(PasskiError::new(
-                "Authenticator data too short for credential",
-            )));
+            return Err(PasskiError::InvalidAuthenticatorData);
         }
 
         let credential_id = auth_data_bytes[55..cose_key_offset].to_vec();
 
         let cose_key_bytes = &auth_data_bytes[cose_key_offset..];
-        let cose_key_value: ciborium::Value = ciborium::from_reader(cose_key_bytes)
-            .map_err(|e| PasskiError::new(format!("Failed to parse COSE key: {}", e)))?;
+        let cose_key_value: ciborium::Value = ciborium::from_reader(cose_key_bytes)?;
 
         let algorithm = cose_key_value
             .as_map()
             .and_then(|m| m.iter().find(|(k, _)| k.as_integer() == Some(3.into())))
             .and_then(|(_, v)| v.as_integer())
             .and_then(|i| i.try_into().ok())
-            .ok_or_else(|| PasskiError::new("Missing or invalid algorithm in COSE key"))?;
+            .ok_or_else(|| {
+                PasskiError::InvalidCoseKey("Missing or invalid algorithm".to_string())
+            })?;
 
         // Re-serialize the parsed COSE key so trailing authData bytes (extension
         // data when the ED flag is set) are not stored with the key
         let mut public_key = Vec::new();
-        ciborium::into_writer(&cose_key_value, &mut public_key)
-            .map_err(|e| PasskiError::new(format!("Failed to serialize COSE key: {}", e)))?;
+        ciborium::into_writer(&cose_key_value, &mut public_key)?;
 
         Ok(ParsedAttestation {
             credential_id,

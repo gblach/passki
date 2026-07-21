@@ -116,7 +116,6 @@ mod types;
 mod tests;
 
 use aws_lc_rs::rand::{SecureRandom, SystemRandom};
-use std::error::Error as StdError;
 
 pub use authentication::{
     AuthenticationChallenge, AuthenticationCredential, AuthenticationResult, AuthenticationState,
@@ -203,11 +202,6 @@ impl Passki {
     #[inline]
     pub fn base64_decode(s: &str) -> types::Result<Vec<u8>> {
         use base64ct::{Base64UrlUnpadded, Encoding as _};
-        Base64UrlUnpadded::decode_vec(s).map_err(|e| {
-            Box::new(types::PasskiError::new(format!(
-                "Base64 decode error: {}",
-                e
-            ))) as Box<dyn StdError>
-        })
+        Ok(Base64UrlUnpadded::decode_vec(s)?)
     }
 }

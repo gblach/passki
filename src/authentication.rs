@@ -208,7 +208,7 @@ impl Passki {
         if !state.allowed_credentials.is_empty()
             && !state.allowed_credentials.contains(&credential_id)
         {
-            return Err(Box::new(PasskiError::new("Credential not allowed")));
+            return Err(PasskiError::CredentialNotAllowed);
         }
 
         let client_data_bytes = Self::base64_decode(&credential.client_data_json)?;
@@ -217,30 +217,26 @@ impl Passki {
 
         let authenticator_data = Self::base64_decode(&credential.authenticator_data)?;
         if authenticator_data.len() < 37 {
-            return Err(Box::new(PasskiError::new("Invalid authenticator data")));
+            return Err(PasskiError::InvalidAuthenticatorData);
         }
 
         // Verify rpId hash (bytes 0-31)
         let rp_id_hash = digest::digest(&SHA256, self.rp_id.as_bytes());
         if &authenticator_data[..32] != rp_id_hash.as_ref() {
-            return Err(Box::new(PasskiError::new("rpId hash mismatch")));
+            return Err(PasskiError::RpIdHashMismatch);
         }
 
         // Check UP flag - user must be present
         let flags = authenticator_data[32];
         if (flags & FLAG_UP) == 0 {
-            return Err(Box::new(PasskiError::new(
-                "User not present (UP flag not set)",
-            )));
+            return Err(PasskiError::UserNotPresent);
         }
 
         // Check UV flag - required only when user_verification is Required
         if state.user_verification == UserVerificationRequirement::Required
             && (flags & FLAG_UV) == 0
         {
-            return Err(Box::new(PasskiError::new(
-                "User verification required but UV flag not set",
-            )));
+            return Err(PasskiError::UserVerificationRequired);
         }
 
         let counter = u32::from_be_bytes([
@@ -254,9 +250,7 @@ impl Passki {
         // of the values is nonzero. Both being zero means the authenticator does
         // not use counters (e.g. Google Password Manager), which is valid.
         if (counter != 0 || stored_passkey.counter != 0) && counter <= stored_passkey.counter {
-            return Err(Box::new(PasskiError::new(
-                "Invalid counter (possible replay attack)",
-            )));
+            return Err(PasskiError::CounterRegression);
         }
 
         let signature = Self::base64_decode(&credential.signature)?;
@@ -316,7 +310,6 @@ impl Passki {
             ALG_ES256 => Self::verify_ecdsa(
                 &ECDSA_P256_SHA256_ASN1,
                 CRV_P256,
-                "ES256",
                 cose_key_bytes,
                 signed_data,
                 signature,
@@ -324,29 +317,23 @@ impl Passki {
             ALG_ES384 => Self::verify_ecdsa(
                 &ECDSA_P384_SHA384_ASN1,
                 CRV_P384,
-                "ES384",
                 cose_key_bytes,
                 signed_data,
                 signature,
             ),
             ALG_RS256 => Self::verify_rsa(
                 &RSA_PKCS1_2048_8192_SHA256,
-                "RS256",
                 cose_key_bytes,
                 signed_data,
                 signature,
             ),
             ALG_RS384 => Self::verify_rsa(
                 &RSA_PKCS1_2048_8192_SHA384,
-                "RS384",
                 cose_key_bytes,
                 signed_data,
                 signature,
             ),
-            _ => Err(Box::new(PasskiError::new(format!(
-                "Unsupported algorithm: {}",
-                algorithm
-            )))),
+            _ => Err(PasskiError::UnsupportedAlgorithm(algorithm)),
         }
     }
 
@@ -354,12 +341,11 @@ impl Passki {
     pub(crate) fn cose_parse(
         cose_key_bytes: &[u8],
     ) -> Result<Vec<(ciborium::Value, ciborium::Value)>> {
-        let cose_key_value: ciborium::Value = ciborium::from_reader(cose_key_bytes)
-            .map_err(|e| PasskiError::new(format!("Failed to parse COSE key: {}", e)))?;
+        let cose_key_value: ciborium::Value = ciborium::from_reader(cose_key_bytes)?;
 
         match cose_key_value {
             ciborium::Value::Map(map) => Ok(map),
-            _ => Err(Box::new(PasskiError::new("COSE key is not a map"))),
+            _ => Err(PasskiError::InvalidCoseKey("not a map".to_string())),
         }
     }
 
@@ -374,7 +360,7 @@ impl Passki {
             .find(|(k, _)| k.as_integer() == Some(label.into()))
             .and_then(|(_, v)| v.as_bytes())
             .map(Vec::as_slice)
-            .ok_or_else(|| PasskiError::new(format!("Missing {} in COSE key", name)).into())
+            .ok_or_else(|| PasskiError::InvalidCoseKey(format!("Missing {}", name)))
     }
 
     /// Verifies that an integer field in a COSE key map has the expected value.
@@ -389,13 +375,13 @@ impl Passki {
             .find(|(k, _)| k.as_integer() == Some(label.into()))
             .and_then(|(_, v)| v.as_integer())
             .and_then(|i| i.try_into().ok())
-            .ok_or_else(|| PasskiError::new(format!("Missing {} in COSE key", name)))?;
+            .ok_or_else(|| PasskiError::InvalidCoseKey(format!("Missing {}", name)))?;
 
         if value != expected {
-            return Err(Box::new(PasskiError::new(format!(
-                "Invalid {} in COSE key: expected {}, got {}",
+            return Err(PasskiError::InvalidCoseKey(format!(
+                "Invalid {}: expected {}, got {}",
                 name, expected, value
-            ))));
+            )));
         }
 
         Ok(())
@@ -413,15 +399,15 @@ impl Passki {
         let x = Self::cose_field(&cose_map, -2, "x coordinate")?;
 
         if x.len() != 32 {
-            return Err(Box::new(PasskiError::new(
-                "Invalid Ed25519 public key length",
-            )));
+            return Err(PasskiError::InvalidCoseKey(
+                "Invalid Ed25519 public key length".to_string(),
+            ));
         }
 
         let public_key = UnparsedPublicKey::new(&ED25519, x);
         public_key
             .verify(signed_data, signature)
-            .map_err(|_| PasskiError::new("EdDSA signature verification failed"))?;
+            .map_err(|_| PasskiError::SignatureVerificationFailed)?;
 
         Ok(())
     }
@@ -430,7 +416,6 @@ impl Passki {
     pub(crate) fn verify_ecdsa(
         algorithm: &'static EcdsaVerificationAlgorithm,
         crv: i64,
-        name: &str,
         cose_key_bytes: &[u8],
         signed_data: &[u8],
         signature: &[u8],
@@ -450,7 +435,7 @@ impl Passki {
         let public_key = UnparsedPublicKey::new(algorithm, &public_key_bytes);
         public_key
             .verify(signed_data, signature)
-            .map_err(|_| PasskiError::new(format!("{} signature verification failed", name)))?;
+            .map_err(|_| PasskiError::SignatureVerificationFailed)?;
 
         Ok(())
     }
@@ -458,7 +443,6 @@ impl Passki {
     /// Verifies an RSA PKCS#1 v1.5 signature (RS256 or RS384).
     pub(crate) fn verify_rsa(
         algorithm: &'static RsaParameters,
-        name: &str,
         cose_key_bytes: &[u8],
         signed_data: &[u8],
         signature: &[u8],
@@ -472,7 +456,7 @@ impl Passki {
         let public_key = RsaPublicKeyComponents { n, e };
         public_key
             .verify(algorithm, signed_data, signature)
-            .map_err(|_| PasskiError::new(format!("{} signature verification failed", name)))?;
+            .map_err(|_| PasskiError::SignatureVerificationFailed)?;
 
         Ok(())
     }

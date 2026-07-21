@@ -248,13 +248,10 @@ fn test_parse_attestation_object_invalid_cbor() {
     let invalid_cbor = vec![0xFF, 0xFE, 0xFD];
     let result = passki().parse_attestation_object(&invalid_cbor);
 
-    assert!(result.is_err());
-    assert!(
-        result
-            .unwrap_err()
-            .to_string()
-            .contains("Failed to parse attestation object")
-    );
+    assert!(matches!(
+        result.unwrap_err(),
+        crate::PasskiError::CborDecode(_)
+    ));
 }
 
 #[test]
@@ -297,13 +294,10 @@ fn test_parse_attestation_object_too_short_auth_data() {
     ciborium::into_writer(&Value::Map(att_obj), &mut bytes).unwrap();
 
     let result = passki().parse_attestation_object(&bytes);
-    assert!(result.is_err());
-    assert!(
-        result
-            .unwrap_err()
-            .to_string()
-            .contains("Invalid authenticator data length")
-    );
+    assert!(matches!(
+        result.unwrap_err(),
+        crate::PasskiError::InvalidAuthenticatorData
+    ));
 }
 
 #[test]

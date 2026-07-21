@@ -15,34 +15,139 @@
 //! Data structures and error types for WebAuthn/Passkey operations.
 
 use serde::{Deserialize, Serialize};
-use std::error::Error as StdError;
-use std::fmt;
+use thiserror::Error;
+
+use crate::client_data::ClientDataType;
 
 // Error handling
 
 /// Error type for Passki operations.
 ///
-/// This error type wraps a string message describing what went wrong during
-/// passkey registration or authentication operations.
-#[derive(Debug)]
-pub struct PasskiError(pub String);
+/// Distinguishes the different ways a passkey registration or authentication
+/// ceremony can fail, so callers can react to specific failures (e.g. a
+/// [`PasskiError::CounterRegression`] indicating a possibly cloned
+/// authenticator) instead of matching on error message strings.
+#[derive(Debug, Error)]
+#[non_exhaustive]
+pub enum PasskiError {
+    /// `user_id` passed to [`crate::Passki::start_passkey_registration`] was too short.
+    #[error("user_id must be at least 16 bytes")]
+    UserIdTooShort,
 
-impl PasskiError {
-    pub(crate) fn new(msg: impl Into<String>) -> Self {
-        Self(msg.into())
-    }
+    /// Base64url decoding failed.
+    #[error("Base64 decode error: {0}")]
+    Base64Decode(#[from] base64ct::Error),
+
+    /// Client data JSON could not be parsed.
+    #[error("Invalid client data JSON: {0}")]
+    InvalidClientDataJson(#[from] serde_json::Error),
+
+    /// CBOR decoding failed.
+    #[error("Failed to parse CBOR: {0}")]
+    CborDecode(#[from] ciborium::de::Error<std::io::Error>),
+
+    /// CBOR encoding failed.
+    #[error("Failed to serialize CBOR: {0}")]
+    CborEncode(#[from] ciborium::ser::Error<std::io::Error>),
+
+    /// A required field was missing from the client data JSON.
+    #[error("Missing {0} in client data")]
+    MissingClientDataField(String),
+
+    /// The client data `type` field was not a recognized WebAuthn operation.
+    #[error("Invalid type in client data: {0}")]
+    InvalidClientDataType(String),
+
+    /// The client data `type` did not match the expected operation.
+    #[error("Invalid type: expected {expected}, got {got}")]
+    ClientDataTypeMismatch {
+        expected: ClientDataType,
+        got: ClientDataType,
+    },
+
+    /// The client data challenge did not match the one that was issued.
+    #[error("Challenge mismatch")]
+    ChallengeMismatch,
+
+    /// The client data origin did not match the relying party's origin.
+    #[error("Invalid origin: expected {expected}, got {got}")]
+    OriginMismatch { expected: String, got: String },
+
+    /// The client data indicated a cross-origin iframe request.
+    #[error("Cross-origin requests are not allowed")]
+    CrossOriginNotAllowed,
+
+    /// The authenticator data was truncated or otherwise malformed.
+    #[error("Invalid authenticator data")]
+    InvalidAuthenticatorData,
+
+    /// The `rpIdHash` in the authenticator data did not match the relying party.
+    #[error("rpId hash mismatch")]
+    RpIdHashMismatch,
+
+    /// The UP (user present) flag was not set.
+    #[error("User not present (UP flag not set)")]
+    UserNotPresent,
+
+    /// User verification was required but the UV flag was not set.
+    #[error("User verification required but UV flag not set")]
+    UserVerificationRequired,
+
+    /// The signature counter did not increase, indicating a possible replay
+    /// attack or a cloned authenticator.
+    #[error("Invalid counter (possible replay attack)")]
+    CounterRegression,
+
+    /// The authenticator data did not contain attested credential data.
+    #[error("No attested credential data present")]
+    NoAttestedCredentialData,
+
+    /// The credential used for authentication was not in the allowed list.
+    #[error("Credential not allowed")]
+    CredentialNotAllowed,
+
+    /// The credential ID reported by the client did not match the one in the
+    /// attested credential data.
+    #[error("Credential ID mismatch between client and attested credential data")]
+    CredentialIdMismatch,
+
+    /// The COSE algorithm identifier is not supported.
+    #[error("Unsupported algorithm: {0}")]
+    UnsupportedAlgorithm(i32),
+
+    /// Signature verification failed.
+    #[error("Signature verification failed")]
+    SignatureVerificationFailed,
+
+    /// A COSE key was malformed or missing a required field.
+    #[error("Invalid COSE key: {0}")]
+    InvalidCoseKey(String),
+
+    /// The attestation object did not have the expected structure.
+    #[error("Invalid attestation object: {0}")]
+    InvalidAttestationObject(String),
+
+    /// The attestation format (`fmt`) is not supported.
+    #[error("Unsupported attestation format: {0}")]
+    UnsupportedAttestationFormat(String),
+
+    /// A required field was missing from the attestation statement.
+    #[error("Missing {0} in attStmt")]
+    MissingAttStmtField(String),
+
+    /// The attestation statement failed a format-specific structural or
+    /// signature check.
+    #[error("Invalid attestation: {0}")]
+    InvalidAttestation(String),
+
+    /// The attestation certificate was malformed or did not satisfy the
+    /// WebAuthn attestation certificate requirements.
+    #[error("Invalid attestation certificate: {0}")]
+    InvalidCertificate(String),
 }
 
-impl fmt::Display for PasskiError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
-
-impl StdError for PasskiError {}
-
-/// Convenience type alias for Results that may return any error.
-pub type Result<T> = std::result::Result<T, Box<dyn StdError>>;
+/// Convenience type alias for Results returned by Passki operations.
+pub type Result<T> = std::result::Result<T, PasskiError>;
 
 // Authenticator data flag bits
 

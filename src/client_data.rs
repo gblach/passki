@@ -45,10 +45,7 @@ impl FromStr for ClientDataType {
         match s {
             "webauthn.create" => Ok(ClientDataType::Create),
             "webauthn.get" => Ok(ClientDataType::Get),
-            _ => Err(PasskiError::new(format!(
-                "Invalid type in client data: {}",
-                s
-            ))),
+            _ => Err(PasskiError::InvalidClientDataType(s.to_string())),
         }
     }
 }
@@ -95,23 +92,22 @@ impl ClientData {
     /// * The JSON parsing fails
     /// * Required fields are missing
     pub fn from_bytes(bytes: &[u8]) -> Result<ClientData> {
-        let json: serde_json::Value = serde_json::from_slice(bytes)
-            .map_err(|e| PasskiError::new(format!("Invalid client data JSON: {}", e)))?;
+        let json: serde_json::Value = serde_json::from_slice(bytes)?;
 
         let type_str = json["type"]
             .as_str()
-            .ok_or_else(|| PasskiError::new("Missing type in client data"))?;
+            .ok_or_else(|| PasskiError::MissingClientDataField("type".to_string()))?;
 
         let type_ = type_str.parse::<ClientDataType>()?;
 
         let challenge = json["challenge"]
             .as_str()
-            .ok_or_else(|| PasskiError::new("Missing challenge in client data"))?
+            .ok_or_else(|| PasskiError::MissingClientDataField("challenge".to_string()))?
             .to_string();
 
         let origin = json["origin"]
             .as_str()
-            .ok_or_else(|| PasskiError::new("Missing origin in client data"))?
+            .ok_or_else(|| PasskiError::MissingClientDataField("origin".to_string()))?
             .to_string();
 
         let cross_origin = json["crossOrigin"].as_bool().unwrap_or(false);
@@ -183,29 +179,27 @@ impl ClientData {
         expected_origin: &str,
     ) -> Result<()> {
         if self.type_ != expected_type {
-            return Err(Box::new(PasskiError::new(format!(
-                "Invalid type: expected {}, got {}",
-                expected_type, self.type_
-            ))));
+            return Err(PasskiError::ClientDataTypeMismatch {
+                expected: expected_type,
+                got: self.type_,
+            });
         }
 
         let challenge = crate::Passki::base64_decode(&self.challenge)?;
         if challenge != expected_challenge {
-            return Err(Box::new(PasskiError::new("Challenge mismatch")));
+            return Err(PasskiError::ChallengeMismatch);
         }
 
         if self.origin != expected_origin {
-            return Err(Box::new(PasskiError::new(format!(
-                "Invalid origin: expected {}, got {}",
-                expected_origin, self.origin
-            ))));
+            return Err(PasskiError::OriginMismatch {
+                expected: expected_origin.to_string(),
+                got: self.origin.clone(),
+            });
         }
 
         // Reject requests from cross-origin iframes
         if self.cross_origin {
-            return Err(Box::new(PasskiError::new(
-                "Cross-origin requests are not allowed",
-            )));
+            return Err(PasskiError::CrossOriginNotAllowed);
         }
 
         Ok(())

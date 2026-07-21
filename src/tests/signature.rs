@@ -70,7 +70,7 @@ fn test_verify_eddsa_invalid_signature() {
         result
             .unwrap_err()
             .to_string()
-            .contains("EdDSA signature verification failed")
+            .contains("Signature verification failed")
     );
 }
 
@@ -113,7 +113,7 @@ fn test_verify_eddsa_invalid_public_key() {
     let error = result.unwrap_err().to_string();
     assert!(
         error.contains("Invalid Ed25519 public key")
-            || error.contains("EdDSA signature verification failed"),
+            || error.contains("Signature verification failed"),
         "Error was: {}",
         error
     );
@@ -184,13 +184,10 @@ fn test_verify_eddsa_invalid_cbor() {
 
     let result = Passki::verify_eddsa(&invalid_cbor, message, &signature);
 
-    assert!(result.is_err());
-    assert!(
-        result
-            .unwrap_err()
-            .to_string()
-            .contains("Failed to parse COSE key")
-    );
+    assert!(matches!(
+        result.unwrap_err(),
+        crate::PasskiError::CborDecode(_)
+    ));
 }
 
 #[test]
@@ -207,13 +204,7 @@ fn test_verify_eddsa_cose_key_not_map() {
 
     let result = Passki::verify_eddsa(&cose_key_bytes, message, &signature);
 
-    assert!(result.is_err());
-    assert!(
-        result
-            .unwrap_err()
-            .to_string()
-            .contains("COSE key is not a map")
-    );
+    assert!(result.unwrap_err().to_string().contains("not a map"));
 }
 
 // ===== ES256 signature tests =====
@@ -276,7 +267,7 @@ fn test_verify_es256_invalid_signature() {
         result
             .unwrap_err()
             .to_string()
-            .contains("ES256 signature verification failed")
+            .contains("Signature verification failed")
     );
 }
 
@@ -442,7 +433,7 @@ fn test_verify_es384_invalid_signature() {
         result
             .unwrap_err()
             .to_string()
-            .contains("ES384 signature verification failed")
+            .contains("Signature verification failed")
     );
 }
 
@@ -521,7 +512,7 @@ fn test_verify_rs256_invalid_signature() {
         result
             .unwrap_err()
             .to_string()
-            .contains("RS256 signature verification failed")
+            .contains("Signature verification failed")
     );
 }
 
@@ -623,8 +614,7 @@ fn test_verify_rs256_invalid_public_key() {
     // The error could be about invalid key or signature verification failure
     let error = result.unwrap_err().to_string();
     assert!(
-        error.contains("Invalid RSA public key")
-            || error.contains("RS256 signature verification failed"),
+        error.contains("Invalid RSA public key") || error.contains("Signature verification failed"),
         "Error was: {}",
         error
     );
@@ -680,7 +670,7 @@ fn test_verify_rs384_invalid_signature() {
         result
             .unwrap_err()
             .to_string()
-            .contains("RS384 signature verification failed")
+            .contains("Signature verification failed")
     );
 }
 
@@ -726,12 +716,7 @@ fn test_verify_eddsa_wrong_kty() {
     let result = Passki::verify_eddsa(&cose_key_bytes, b"test", &[0u8; 64]);
 
     assert!(result.is_err());
-    assert!(
-        result
-            .unwrap_err()
-            .to_string()
-            .contains("Invalid kty in COSE key")
-    );
+    assert!(result.unwrap_err().to_string().contains("Invalid kty"));
 }
 
 #[test]
@@ -751,12 +736,7 @@ fn test_verify_eddsa_wrong_crv() {
     let result = Passki::verify_eddsa(&cose_key_bytes, b"test", &[0u8; 64]);
 
     assert!(result.is_err());
-    assert!(
-        result
-            .unwrap_err()
-            .to_string()
-            .contains("Invalid crv in COSE key")
-    );
+    assert!(result.unwrap_err().to_string().contains("Invalid crv"));
 }
 
 #[test]
@@ -775,12 +755,7 @@ fn test_verify_eddsa_missing_kty() {
     let result = Passki::verify_eddsa(&cose_key_bytes, b"test", &[0u8; 64]);
 
     assert!(result.is_err());
-    assert!(
-        result
-            .unwrap_err()
-            .to_string()
-            .contains("Missing kty in COSE key")
-    );
+    assert!(result.unwrap_err().to_string().contains("Missing kty"));
 }
 
 #[test]
@@ -801,12 +776,7 @@ fn test_verify_es256_wrong_crv() {
     let result = Passki::verify_signature(&cose_key_bytes, ALG_ES256, b"test", &[0u8; 64]);
 
     assert!(result.is_err());
-    assert!(
-        result
-            .unwrap_err()
-            .to_string()
-            .contains("Invalid crv in COSE key")
-    );
+    assert!(result.unwrap_err().to_string().contains("Invalid crv"));
 }
 
 #[test]
@@ -827,12 +797,7 @@ fn test_verify_es384_wrong_crv() {
     let result = Passki::verify_signature(&cose_key_bytes, ALG_ES384, b"test", &[0u8; 96]);
 
     assert!(result.is_err());
-    assert!(
-        result
-            .unwrap_err()
-            .to_string()
-            .contains("Invalid crv in COSE key")
-    );
+    assert!(result.unwrap_err().to_string().contains("Invalid crv"));
 }
 
 #[test]
@@ -852,12 +817,7 @@ fn test_verify_rs256_wrong_kty() {
     let result = Passki::verify_signature(&cose_key_bytes, ALG_RS256, b"test", &[0u8; 256]);
 
     assert!(result.is_err());
-    assert!(
-        result
-            .unwrap_err()
-            .to_string()
-            .contains("Invalid kty in COSE key")
-    );
+    assert!(result.unwrap_err().to_string().contains("Invalid kty"));
 }
 
 // ===== verify_signature dispatch tests =====
