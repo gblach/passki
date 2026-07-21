@@ -294,7 +294,7 @@ pub struct PubKeyCredParam {
 
     /// Credential type (always "public-key" for passkeys).
     #[serde(rename = "type")]
-    pub type_: String,
+    pub type_: &'static str,
 }
 
 /// Authenticator selection criteria for passkey registration.
@@ -319,7 +319,7 @@ pub struct ExcludeCredential {
 
     /// Credential type (always "public-key" for passkeys).
     #[serde(rename = "type")]
-    pub type_: String,
+    pub type_: &'static str,
 }
 
 /// A credential that is allowed for authentication.
@@ -330,7 +330,7 @@ pub struct AllowCredential {
 
     /// Credential type (always "public-key" for passkeys).
     #[serde(rename = "type")]
-    pub type_: String,
+    pub type_: &'static str,
 }
 
 /// Extensions included in a registration challenge.

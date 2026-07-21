@@ -171,7 +171,7 @@ impl Passki {
             .iter()
             .map(|pk| ExcludeCredential {
                 id: Self::base64_encode(&pk.credential_id),
-                type_: "public-key".to_string(),
+                type_: "public-key",
             })
             .collect();
 
@@ -192,7 +192,7 @@ impl Passki {
                 .into_iter()
                 .map(|alg| PubKeyCredParam {
                     alg,
-                    type_: "public-key".to_string(),
+                    type_: "public-key",
                 })
                 .collect(),
             timeout,
