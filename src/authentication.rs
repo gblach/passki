@@ -232,6 +232,10 @@ impl Passki {
             return Err(PasskiError::UserNotPresent);
         }
 
+        if (flags & FLAG_BS) != 0 && (flags & FLAG_BE) == 0 {
+            return Err(PasskiError::InvalidBackupFlags);
+        }
+
         // Check UV flag - required only when user_verification is Required
         if state.user_verification == UserVerificationRequirement::Required
             && (flags & FLAG_UV) == 0

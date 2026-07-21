@@ -16,6 +16,7 @@ mod helpers;
 
 mod attestation;
 mod authentication;
+mod backup_flags;
 mod base64;
 mod client_data;
 mod cred_props;

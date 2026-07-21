@@ -93,6 +93,11 @@ pub enum PasskiError {
     #[error("User verification required but UV flag not set")]
     UserVerificationRequired,
 
+    /// The BS (backup state) flag was set without the BE (backup eligibility)
+    /// flag, which the WebAuthn spec forbids.
+    #[error("BS flag set without BE flag")]
+    InvalidBackupFlags,
+
     /// The signature counter did not increase, indicating a possible replay
     /// attack or a cloned authenticator.
     #[error("Invalid counter (possible replay attack)")]
@@ -155,6 +160,10 @@ pub type Result<T> = std::result::Result<T, PasskiError>;
 pub(crate) const FLAG_UP: u8 = 0x01;
 /// UV (user verified) flag bit in authenticator data.
 pub(crate) const FLAG_UV: u8 = 0x04;
+/// BE (backup eligible) flag bit in authenticator data.
+pub(crate) const FLAG_BE: u8 = 0x08;
+/// BS (backup state) flag bit in authenticator data.
+pub(crate) const FLAG_BS: u8 = 0x10;
 /// AT (attested credential data) flag bit in authenticator data.
 pub(crate) const FLAG_AT: u8 = 0x40;
 
@@ -258,6 +267,18 @@ pub struct StoredPasskey {
     /// extension during registration. `None` if `credProps` was not requested or not reported.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rk: Option<bool>,
+
+    /// Whether the authenticator reported this credential as eligible for backup
+    /// (BE flag), e.g. a credential synced across devices. `false` for passkeys
+    /// stored before this field was introduced.
+    #[serde(default)]
+    pub be: bool,
+
+    /// Whether the authenticator reported this credential as currently backed up
+    /// (BS flag). Always `false` when `be` is `false`. `false` for passkeys
+    /// stored before this field was introduced.
+    #[serde(default)]
+    pub bs: bool,
 }
 
 /// Information about the relying party (RP).

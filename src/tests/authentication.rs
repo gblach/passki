@@ -25,6 +25,8 @@ fn test_start_passkey_authentication_returns_challenge() {
         counter: 0,
         algorithm: -7,
         rk: None,
+        be: false,
+        bs: false,
     }];
 
     let (challenge, state) = passki.start_passkey_authentication(
@@ -58,6 +60,8 @@ fn test_start_passkey_authentication_multiple_credentials() {
             counter: 0,
             algorithm: -7,
             rk: None,
+            be: false,
+            bs: false,
         },
         StoredPasskey {
             credential_id: vec![3u8; 16],
@@ -65,6 +69,8 @@ fn test_start_passkey_authentication_multiple_credentials() {
             counter: 5,
             algorithm: -8,
             rk: None,
+            be: false,
+            bs: false,
         },
         StoredPasskey {
             credential_id: vec![5u8; 16],
@@ -72,6 +78,8 @@ fn test_start_passkey_authentication_multiple_credentials() {
             counter: 10,
             algorithm: -257,
             rk: None,
+            be: false,
+            bs: false,
         },
     ];
 
@@ -130,6 +138,8 @@ fn test_start_passkey_authentication_generates_unique_challenges() {
         counter: 0,
         algorithm: -7,
         rk: None,
+        be: false,
+        bs: false,
     }];
 
     let (challenge1, state1) = passki.start_passkey_authentication(
@@ -161,6 +171,8 @@ fn test_start_passkey_authentication_with_different_settings() {
         counter: 100,
         algorithm: -8,
         rk: None,
+        be: false,
+        bs: false,
     }];
 
     let (challenge, _state) = passki.start_passkey_authentication(
@@ -184,6 +196,8 @@ fn test_finish_passkey_authentication_success() {
         counter: 5,
         algorithm: -7,
         rk: None,
+        be: false,
+        bs: false,
     };
 
     let passkeys = vec![stored_passkey.clone()];
@@ -225,6 +239,8 @@ fn test_finish_passkey_authentication_wrong_credential_id() {
         counter: 5,
         algorithm: -7,
         rk: None,
+        be: false,
+        bs: false,
     };
 
     let passkeys = vec![stored_passkey.clone()];
@@ -268,6 +284,8 @@ fn test_finish_passkey_authentication_wrong_challenge() {
         counter: 5,
         algorithm: -7,
         rk: None,
+        be: false,
+        bs: false,
     };
 
     let passkeys = vec![stored_passkey.clone()];
@@ -312,6 +330,8 @@ fn test_finish_passkey_authentication_wrong_origin() {
         counter: 5,
         algorithm: -7,
         rk: None,
+        be: false,
+        bs: false,
     };
 
     let passkeys = vec![stored_passkey.clone()];
@@ -349,6 +369,8 @@ fn test_finish_passkey_authentication_invalid_counter() {
         counter: 10,
         algorithm: -7,
         rk: None,
+        be: false,
+        bs: false,
     };
 
     let passkeys = vec![stored_passkey.clone()];
@@ -387,6 +409,8 @@ fn test_finish_passkey_authentication_too_short_authenticator_data() {
         counter: 5,
         algorithm: -7,
         rk: None,
+        be: false,
+        bs: false,
     };
 
     let passkeys = vec![stored_passkey.clone()];
@@ -430,6 +454,8 @@ fn test_finish_passkey_authentication_uv_required_flag_set() {
         counter: 5,
         algorithm: -7,
         rk: None,
+        be: false,
+        bs: false,
     };
 
     let passkeys = vec![stored_passkey.clone()];
@@ -474,6 +500,8 @@ fn test_finish_passkey_authentication_uv_required_flag_not_set() {
         counter: 5,
         algorithm: -7,
         rk: None,
+        be: false,
+        bs: false,
     };
 
     let passkeys = vec![stored_passkey.clone()];
@@ -512,6 +540,8 @@ fn test_finish_passkey_authentication_uv_preferred_flag_not_set() {
         counter: 5,
         algorithm: -7,
         rk: None,
+        be: false,
+        bs: false,
     };
 
     let passkeys = vec![stored_passkey.clone()];
@@ -556,6 +586,8 @@ fn test_finish_passkey_authentication_up_flag_not_set() {
         counter: 5,
         algorithm: -7,
         rk: None,
+        be: false,
+        bs: false,
     };
 
     let passkeys = vec![stored_passkey.clone()];
@@ -596,6 +628,8 @@ fn test_finish_passkey_authentication_usernameless() {
         counter: 5,
         algorithm: -7,
         rk: None,
+        be: false,
+        bs: false,
     };
 
     // Start authentication with EMPTY credentials list (usernameless flow)

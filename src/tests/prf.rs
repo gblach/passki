@@ -64,6 +64,8 @@ fn make_stored_passkey(
         counter,
         algorithm: -8,
         rk: None,
+        be: false,
+        bs: false,
     }
 }
 

@@ -61,6 +61,8 @@ fn authenticate_with_user_handle(user_handle: Option<String>) -> AuthenticationR
         counter: 0,
         algorithm: -8,
         rk: None,
+        be: false,
+        bs: false,
     };
 
     // Usernameless flow: empty allowCredentials so the user is identified by the handle.
@@ -113,6 +115,8 @@ fn test_user_handle_invalid_base64_returns_error() {
         counter: 0,
         algorithm: -8,
         rk: None,
+        be: false,
+        bs: false,
     };
     let (_, state) = passki.start_passkey_authentication(
         std::slice::from_ref(&stored),

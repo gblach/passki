@@ -278,6 +278,8 @@ impl Passki {
             counter: parsed.counter,
             algorithm: parsed.algorithm,
             rk,
+            be: (parsed.flags & FLAG_BE) != 0,
+            bs: (parsed.flags & FLAG_BS) != 0,
         })
     }
 
@@ -339,6 +341,10 @@ impl Passki {
         }
 
         let flags = auth_data_bytes[32];
+
+        if (flags & FLAG_BS) != 0 && (flags & FLAG_BE) == 0 {
+            return Err(PasskiError::InvalidBackupFlags);
+        }
 
         let counter = u32::from_be_bytes([
             auth_data_bytes[33],

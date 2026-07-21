@@ -242,6 +242,7 @@ A substantial expansion, still the most widely implemented level today:
 Still under active development:
 
 - [x] PRF extension (`prf`) - deterministic key derivation via HMAC-Secret
+- [x] BE/BS flags (backup eligibility/state) - exposed on `StoredPasskey`; rejects BS set without BE
 - [ ] `payment` extension - Secure Payment Confirmation (SPC) integration
 - [ ] Related origin requests - use credentials across subdomains / related origins
 - [ ] JSON serialization helpers (`parseCreationOptionsFromJSON`, `toJSON`, etc.)
