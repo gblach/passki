@@ -19,7 +19,7 @@ use crate::*;
 
 #[test]
 fn test_cred_props_in_challenge_when_requested() {
-    let passki = Passki::new("localhost", "http://localhost:3000", "Test");
+    let passki = Passki::new("localhost", &["http://localhost:3000"], "Test");
     let (challenge, _) = passki
         .start_passkey_registration(
             b"user123_16bytes_",
@@ -43,7 +43,7 @@ fn test_cred_props_in_challenge_when_requested() {
 
 #[test]
 fn test_cred_props_absent_from_challenge_when_not_requested() {
-    let passki = Passki::new("localhost", "http://localhost:3000", "Test");
+    let passki = Passki::new("localhost", &["http://localhost:3000"], "Test");
     let (challenge, _) = passki
         .start_passkey_registration(
             b"user123_16bytes_",
@@ -64,7 +64,7 @@ fn test_cred_props_absent_from_challenge_when_not_requested() {
 
 #[test]
 fn test_cred_props_and_prf_can_be_requested_together() {
-    let passki = Passki::new("localhost", "http://localhost:3000", "Test");
+    let passki = Passki::new("localhost", &["http://localhost:3000"], "Test");
     let (challenge, _) = passki
         .start_passkey_registration(
             b"user123_16bytes_",
@@ -108,7 +108,7 @@ fn make_credential(
 
 #[test]
 fn test_cred_props_rk_true_surfaced_in_result() {
-    let passki = Passki::new("localhost", "http://localhost:3000", "Test App");
+    let passki = Passki::new("localhost", &["http://localhost:3000"], "Test App");
     let (_, state) = passki
         .start_passkey_registration(
             b"user123_16bytes_",
@@ -135,7 +135,7 @@ fn test_cred_props_rk_true_surfaced_in_result() {
 
 #[test]
 fn test_cred_props_rk_false_surfaced_in_result() {
-    let passki = Passki::new("localhost", "http://localhost:3000", "Test App");
+    let passki = Passki::new("localhost", &["http://localhost:3000"], "Test App");
     let (_, state) = passki
         .start_passkey_registration(
             b"user123_16bytes_",
@@ -162,7 +162,7 @@ fn test_cred_props_rk_false_surfaced_in_result() {
 
 #[test]
 fn test_cred_props_rk_none_when_no_extension_results() {
-    let passki = Passki::new("localhost", "http://localhost:3000", "Test App");
+    let passki = Passki::new("localhost", &["http://localhost:3000"], "Test App");
     let (_, state) = passki
         .start_passkey_registration(
             b"user123_16bytes_",
@@ -194,7 +194,7 @@ fn test_cred_props_rk_none_when_no_extension_results() {
 
 #[test]
 fn test_cred_props_rk_none_when_rk_not_reported() {
-    let passki = Passki::new("localhost", "http://localhost:3000", "Test App");
+    let passki = Passki::new("localhost", &["http://localhost:3000"], "Test App");
     let (_, state) = passki
         .start_passkey_registration(
             b"user123_16bytes_",

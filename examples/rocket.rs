@@ -481,9 +481,9 @@ fn auth_finish(
 fn rocket() -> Rocket<Build> {
     // Initialize Passki with relying party information.
     // - rp_id: The domain name (no protocol or port). Credentials are bound to this.
-    // - origin: The full origin URL. Must match what the browser sends.
+    // - origins: The accepted origin URLs. Must match what the browser sends.
     // - rp_name: Human-readable name shown by authenticators.
-    let passki = Passki::new("localhost", "http://localhost:3000", "Passkeys Demo");
+    let passki = Passki::new("localhost", &["http://localhost:3000"], "Passkeys Demo");
 
     let figment = rocket::Config::figment().merge(("port", 3000));
 

@@ -35,7 +35,7 @@ use passki::{
 // Initialize Passki with your relying party information
 let passki = Passki::new(
     "example.com",              // Relying Party ID (domain)
-    "https://example.com",      // Relying Party Origin
+    &["https://example.com"],   // Accepted Relying Party Origins
     "Example Corp"              // Relying Party Name
 );
 

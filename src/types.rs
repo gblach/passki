@@ -69,9 +69,9 @@ pub enum PasskiError {
     #[error("Challenge mismatch")]
     ChallengeMismatch,
 
-    /// The client data origin did not match the relying party's origin.
-    #[error("Invalid origin: expected {expected}, got {got}")]
-    OriginMismatch { expected: String, got: String },
+    /// The client data origin did not match any of the relying party's origins.
+    #[error("Invalid origin: expected one of {expected:?}, got {got}")]
+    OriginMismatch { expected: Vec<String>, got: String },
 
     /// The client data indicated a cross-origin iframe request.
     #[error("Cross-origin requests are not allowed")]

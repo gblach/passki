@@ -20,16 +20,16 @@ use crate::*;
 
 #[test]
 fn test_passki_new() {
-    let passki = Passki::new("localhost", "http://localhost:3000", "Test App");
+    let passki = Passki::new("localhost", &["http://localhost:3000"], "Test App");
 
     assert_eq!(passki.rp_id, "localhost");
-    assert_eq!(passki.rp_origin, "http://localhost:3000");
+    assert_eq!(passki.rp_origins, ["http://localhost:3000"]);
     assert_eq!(passki.rp_name, "Test App");
 }
 
 #[test]
 fn test_start_passkey_registration_returns_challenge() {
-    let passki = Passki::new("localhost", "http://localhost:3000", "Test App");
+    let passki = Passki::new("localhost", &["http://localhost:3000"], "Test App");
 
     let user_id = b"user123_16_bytes";
     let (challenge, state) = passki
@@ -69,7 +69,7 @@ fn test_start_passkey_registration_returns_challenge() {
 
 #[test]
 fn test_start_passkey_registration_with_different_settings() {
-    let passki = Passki::new("example.com", "https://example.com", "Example App");
+    let passki = Passki::new("example.com", &["https://example.com"], "Example App");
 
     let user_id = b"admin_user_id_16";
     let (challenge, _state) = passki
@@ -93,7 +93,7 @@ fn test_start_passkey_registration_with_different_settings() {
 
 #[test]
 fn test_start_passkey_registration_generates_unique_challenges() {
-    let passki = Passki::new("localhost", "http://localhost:3000", "Test App");
+    let passki = Passki::new("localhost", &["http://localhost:3000"], "Test App");
 
     let user_id1 = b"user1_identifier";
     let (challenge1, state1) = passki
@@ -132,7 +132,7 @@ fn test_start_passkey_registration_generates_unique_challenges() {
 
 #[test]
 fn test_start_passkey_registration_user_id_stored_as_bytes() {
-    let passki = Passki::new("localhost", "http://localhost:3000", "Test App");
+    let passki = Passki::new("localhost", &["http://localhost:3000"], "Test App");
 
     let user_id = b"testuser_16bytes";
     let (challenge, state) = passki
@@ -160,7 +160,7 @@ fn test_start_passkey_registration_user_id_stored_as_bytes() {
 
 #[test]
 fn test_start_passkey_registration_with_single_existing_credential() {
-    let passki = Passki::new("localhost", "http://localhost:3000", "Test App");
+    let passki = Passki::new("localhost", &["http://localhost:3000"], "Test App");
 
     let existing_passkey = StoredPasskey {
         credential_id: vec![1u8; 16],
@@ -202,7 +202,7 @@ fn test_start_passkey_registration_with_single_existing_credential() {
 
 #[test]
 fn test_start_passkey_registration_with_multiple_existing_credentials() {
-    let passki = Passki::new("localhost", "http://localhost:3000", "Test App");
+    let passki = Passki::new("localhost", &["http://localhost:3000"], "Test App");
 
     let existing_passkeys = vec![
         StoredPasskey {
@@ -266,7 +266,7 @@ fn test_start_passkey_registration_with_multiple_existing_credentials() {
 
 #[test]
 fn test_start_passkey_registration_none_vs_empty_slice() {
-    let passki = Passki::new("localhost", "http://localhost:3000", "Test App");
+    let passki = Passki::new("localhost", &["http://localhost:3000"], "Test App");
 
     let user_id = b"user123_16bytes_";
 
@@ -308,7 +308,7 @@ fn test_start_passkey_registration_none_vs_empty_slice() {
 
 #[test]
 fn test_start_passkey_registration_user_id_validation_success() {
-    let passki = Passki::new("localhost", "http://localhost:3000", "Test App");
+    let passki = Passki::new("localhost", &["http://localhost:3000"], "Test App");
 
     // Exactly 16 bytes
     let user_id = b"1234567890123456";
@@ -329,7 +329,7 @@ fn test_start_passkey_registration_user_id_validation_success() {
 
 #[test]
 fn test_start_passkey_registration_user_id_validation_fails_empty() {
-    let passki = Passki::new("localhost", "http://localhost:3000", "Test App");
+    let passki = Passki::new("localhost", &["http://localhost:3000"], "Test App");
 
     let user_id = b"";
     let result = passki.start_passkey_registration(
@@ -355,7 +355,7 @@ fn test_start_passkey_registration_user_id_validation_fails_empty() {
 
 #[test]
 fn test_start_passkey_registration_user_id_validation_fails_15_bytes() {
-    let passki = Passki::new("localhost", "http://localhost:3000", "Test App");
+    let passki = Passki::new("localhost", &["http://localhost:3000"], "Test App");
 
     // 15 bytes - one less than minimum
     let user_id = b"123456789012345";
@@ -382,7 +382,7 @@ fn test_start_passkey_registration_user_id_validation_fails_15_bytes() {
 
 #[test]
 fn test_finish_passkey_registration_success() {
-    let passki = Passki::new("localhost", "http://localhost:3000", "Test App");
+    let passki = Passki::new("localhost", &["http://localhost:3000"], "Test App");
 
     let user_id = b"user123_16bytes_";
     let (_challenge, state) = passki
@@ -421,7 +421,7 @@ fn test_finish_passkey_registration_success() {
 
 #[test]
 fn test_finish_passkey_registration_stores_initial_counter() {
-    let passki = Passki::new("localhost", "http://localhost:3000", "Test App");
+    let passki = Passki::new("localhost", &["http://localhost:3000"], "Test App");
 
     let user_id = b"user123_16bytes_";
     let (_challenge, state) = passki
@@ -459,7 +459,7 @@ fn test_finish_passkey_registration_stores_initial_counter() {
 
 #[test]
 fn test_finish_passkey_registration_wrong_challenge() {
-    let passki = Passki::new("localhost", "http://localhost:3000", "Test App");
+    let passki = Passki::new("localhost", &["http://localhost:3000"], "Test App");
 
     let user_id = b"user123_16bytes_";
     let (_challenge, state) = passki
@@ -499,7 +499,7 @@ fn test_finish_passkey_registration_wrong_challenge() {
 
 #[test]
 fn test_finish_passkey_registration_wrong_origin() {
-    let passki = Passki::new("localhost", "http://localhost:3000", "Test App");
+    let passki = Passki::new("localhost", &["http://localhost:3000"], "Test App");
 
     let user_id = b"user123_16bytes_";
     let (_challenge, state) = passki
@@ -533,7 +533,7 @@ fn test_finish_passkey_registration_wrong_origin() {
 
 #[test]
 fn test_finish_passkey_registration_uv_required_flag_set() {
-    let passki = Passki::new("localhost", "http://localhost:3000", "Test App");
+    let passki = Passki::new("localhost", &["http://localhost:3000"], "Test App");
 
     let user_id = b"user123_16bytes_";
     let (_challenge, state) = passki
@@ -569,7 +569,7 @@ fn test_finish_passkey_registration_uv_required_flag_set() {
 
 #[test]
 fn test_finish_passkey_registration_uv_required_flag_not_set() {
-    let passki = Passki::new("localhost", "http://localhost:3000", "Test App");
+    let passki = Passki::new("localhost", &["http://localhost:3000"], "Test App");
 
     let user_id = b"user123_16bytes_";
     let (_challenge, state) = passki
@@ -603,7 +603,7 @@ fn test_finish_passkey_registration_uv_required_flag_not_set() {
 
 #[test]
 fn test_finish_passkey_registration_uv_preferred_flag_not_set() {
-    let passki = Passki::new("localhost", "http://localhost:3000", "Test App");
+    let passki = Passki::new("localhost", &["http://localhost:3000"], "Test App");
 
     let user_id = b"user123_16bytes_";
     let (_challenge, state) = passki
@@ -639,7 +639,7 @@ fn test_finish_passkey_registration_uv_preferred_flag_not_set() {
 
 #[test]
 fn test_finish_passkey_registration_up_flag_not_set() {
-    let passki = Passki::new("localhost", "http://localhost:3000", "Test App");
+    let passki = Passki::new("localhost", &["http://localhost:3000"], "Test App");
 
     let user_id = b"user123_16bytes_";
     let (_challenge, state) = passki
@@ -674,7 +674,7 @@ fn test_finish_passkey_registration_up_flag_not_set() {
 
 #[test]
 fn test_finish_passkey_registration_eddsa_algorithm() {
-    let passki = Passki::new("localhost", "http://localhost:3000", "Test App");
+    let passki = Passki::new("localhost", &["http://localhost:3000"], "Test App");
 
     let user_id = b"user123_16bytes_";
     let (_challenge, state) = passki
@@ -710,7 +710,7 @@ fn test_finish_passkey_registration_eddsa_algorithm() {
 
 #[test]
 fn test_finish_passkey_registration_credential_id_mismatch() {
-    let passki = Passki::new("localhost", "http://localhost:3000", "Test App");
+    let passki = Passki::new("localhost", &["http://localhost:3000"], "Test App");
 
     let user_id = b"user123_16bytes_";
     let (_challenge, state) = passki

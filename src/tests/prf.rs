@@ -73,7 +73,7 @@ fn make_stored_passkey(
 
 #[test]
 fn test_registration_challenge_omits_extensions_when_prf_none() {
-    let passki = Passki::new("localhost", "http://localhost:3000", "Test");
+    let passki = Passki::new("localhost", &["http://localhost:3000"], "Test");
     let (challenge, _) = passki
         .start_passkey_registration(
             b"user123_16bytes_",
@@ -97,7 +97,7 @@ fn test_registration_challenge_omits_extensions_when_prf_none() {
 
 #[test]
 fn test_registration_challenge_includes_extensions_when_prf_some() {
-    let passki = Passki::new("localhost", "http://localhost:3000", "Test");
+    let passki = Passki::new("localhost", &["http://localhost:3000"], "Test");
     let extensions = Some(RegistrationExtensions {
         prf: Some(PrfInput {
             eval: Some(PrfEval {
@@ -130,7 +130,7 @@ fn test_registration_challenge_includes_extensions_when_prf_some() {
 
 #[test]
 fn test_registration_challenge_extensions_json_shape() {
-    let passki = Passki::new("localhost", "http://localhost:3000", "Test");
+    let passki = Passki::new("localhost", &["http://localhost:3000"], "Test");
     let salt = b"my-salt-bytes";
     let extensions = Some(RegistrationExtensions {
         prf: Some(PrfInput {
@@ -166,7 +166,7 @@ fn test_registration_challenge_extensions_json_shape() {
 
 #[test]
 fn test_registration_challenge_extensions_includes_second_input() {
-    let passki = Passki::new("localhost", "http://localhost:3000", "Test");
+    let passki = Passki::new("localhost", &["http://localhost:3000"], "Test");
     let extensions = Some(RegistrationExtensions {
         prf: Some(PrfInput {
             eval: Some(PrfEval {
@@ -198,7 +198,7 @@ fn test_registration_challenge_extensions_includes_second_input() {
 
 #[test]
 fn test_registration_challenge_probe_only_has_no_eval() {
-    let passki = Passki::new("localhost", "http://localhost:3000", "Test");
+    let passki = Passki::new("localhost", &["http://localhost:3000"], "Test");
     // RegistrationExtensions { prf: Some(PrfInput { eval: None }), .. } -> { "prf": {} } - asks for support flag without evaluating
     let extensions = Some(RegistrationExtensions {
         prf: Some(PrfInput { eval: None }),
@@ -231,7 +231,7 @@ fn test_registration_challenge_probe_only_has_no_eval() {
 
 #[test]
 fn test_authentication_challenge_omits_extensions_when_prf_none() {
-    let passki = Passki::new("localhost", "http://localhost:3000", "Test");
+    let passki = Passki::new("localhost", &["http://localhost:3000"], "Test");
     let (challenge, _) = passki.start_passkey_authentication(
         &[],
         60000,
@@ -248,7 +248,7 @@ fn test_authentication_challenge_omits_extensions_when_prf_none() {
 
 #[test]
 fn test_authentication_challenge_includes_extensions_when_prf_some() {
-    let passki = Passki::new("localhost", "http://localhost:3000", "Test");
+    let passki = Passki::new("localhost", &["http://localhost:3000"], "Test");
     let extensions = Some(AuthenticationExtensions {
         prf: PrfInput {
             eval: Some(PrfEval {
@@ -273,7 +273,7 @@ fn test_authentication_challenge_includes_extensions_when_prf_some() {
 
 #[test]
 fn test_authentication_challenge_extensions_json_shape() {
-    let passki = Passki::new("localhost", "http://localhost:3000", "Test");
+    let passki = Passki::new("localhost", &["http://localhost:3000"], "Test");
     let salt = b"app-context-v1";
     let extensions = Some(AuthenticationExtensions {
         prf: PrfInput {
@@ -301,7 +301,7 @@ fn test_authentication_challenge_extensions_json_shape() {
 
 #[test]
 fn test_authentication_challenge_extensions_includes_second_input() {
-    let passki = Passki::new("localhost", "http://localhost:3000", "Test");
+    let passki = Passki::new("localhost", &["http://localhost:3000"], "Test");
     let extensions = Some(AuthenticationExtensions {
         prf: PrfInput {
             eval: Some(PrfEval {
@@ -332,7 +332,7 @@ fn test_prf_outputs_none_when_no_extension_results() {
     let pub_key: &[u8; 32] = key_pair.public_key().as_ref().try_into().unwrap();
     let cred_id = vec![1u8; 16];
 
-    let passki = Passki::new("localhost", "http://localhost:3000", "Test");
+    let passki = Passki::new("localhost", &["http://localhost:3000"], "Test");
     let stored = make_stored_passkey(&cred_id, pub_key, 0);
     let (_, state) = passki.start_passkey_authentication(
         std::slice::from_ref(&stored),
@@ -365,7 +365,7 @@ fn test_prf_outputs_none_when_results_absent_in_extension() {
     let pub_key: &[u8; 32] = key_pair.public_key().as_ref().try_into().unwrap();
     let cred_id = vec![2u8; 16];
 
-    let passki = Passki::new("localhost", "http://localhost:3000", "Test");
+    let passki = Passki::new("localhost", &["http://localhost:3000"], "Test");
     let stored = make_stored_passkey(&cred_id, pub_key, 0);
     let (_, state) = passki.start_passkey_authentication(
         std::slice::from_ref(&stored),
@@ -403,7 +403,7 @@ fn test_prf_first_output_decoded() {
     let pub_key: &[u8; 32] = key_pair.public_key().as_ref().try_into().unwrap();
     let cred_id = vec![3u8; 16];
 
-    let passki = Passki::new("localhost", "http://localhost:3000", "Test");
+    let passki = Passki::new("localhost", &["http://localhost:3000"], "Test");
     let stored = make_stored_passkey(&cred_id, pub_key, 0);
     let (_, state) = passki.start_passkey_authentication(
         std::slice::from_ref(&stored),
@@ -444,7 +444,7 @@ fn test_prf_both_outputs_decoded() {
     let pub_key: &[u8; 32] = key_pair.public_key().as_ref().try_into().unwrap();
     let cred_id = vec![4u8; 16];
 
-    let passki = Passki::new("localhost", "http://localhost:3000", "Test");
+    let passki = Passki::new("localhost", &["http://localhost:3000"], "Test");
     let stored = make_stored_passkey(&cred_id, pub_key, 0);
     let (_, state) = passki.start_passkey_authentication(
         std::slice::from_ref(&stored),
@@ -486,7 +486,7 @@ fn test_prf_invalid_base64_first_returns_error() {
     let pub_key: &[u8; 32] = key_pair.public_key().as_ref().try_into().unwrap();
     let cred_id = vec![5u8; 16];
 
-    let passki = Passki::new("localhost", "http://localhost:3000", "Test");
+    let passki = Passki::new("localhost", &["http://localhost:3000"], "Test");
     let stored = make_stored_passkey(&cred_id, pub_key, 0);
     let (_, state) = passki.start_passkey_authentication(
         std::slice::from_ref(&stored),
@@ -529,7 +529,7 @@ fn test_prf_invalid_base64_second_returns_error() {
     let pub_key: &[u8; 32] = key_pair.public_key().as_ref().try_into().unwrap();
     let cred_id = vec![6u8; 16];
 
-    let passki = Passki::new("localhost", "http://localhost:3000", "Test");
+    let passki = Passki::new("localhost", &["http://localhost:3000"], "Test");
     let stored = make_stored_passkey(&cred_id, pub_key, 0);
     let (_, state) = passki.start_passkey_authentication(
         std::slice::from_ref(&stored),

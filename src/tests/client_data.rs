@@ -31,7 +31,7 @@ fn test_verify_valid_create() {
     let encoded = Passki::base64_encode(&serde_json::to_vec(&client_data_json).unwrap());
     let client_data = ClientData::from_base64(&encoded).unwrap();
 
-    let result = client_data.verify(ClientDataType::Create, &challenge, origin);
+    let result = client_data.verify(ClientDataType::Create, &challenge, &[origin]);
 
     assert!(
         result.is_ok(),
@@ -54,7 +54,7 @@ fn test_verify_rejects_cross_origin() {
     let encoded = Passki::base64_encode(&serde_json::to_vec(&client_data_json).unwrap());
     let client_data = ClientData::from_base64(&encoded).unwrap();
 
-    let result = client_data.verify(ClientDataType::Create, &challenge, origin);
+    let result = client_data.verify(ClientDataType::Create, &challenge, &[origin]);
 
     assert!(result.is_err());
     assert!(
@@ -80,7 +80,7 @@ fn test_verify_missing_cross_origin_is_allowed() {
     let encoded = Passki::base64_encode(&serde_json::to_vec(&client_data_json).unwrap());
     let client_data = ClientData::from_base64(&encoded).unwrap();
 
-    let result = client_data.verify(ClientDataType::Create, &challenge, origin);
+    let result = client_data.verify(ClientDataType::Create, &challenge, &[origin]);
 
     assert!(result.is_ok());
 }
@@ -100,7 +100,7 @@ fn test_verify_valid_get() {
     let encoded = Passki::base64_encode(&serde_json::to_vec(&client_data_json).unwrap());
     let client_data = ClientData::from_base64(&encoded).unwrap();
 
-    let result = client_data.verify(ClientDataType::Get, &challenge, origin);
+    let result = client_data.verify(ClientDataType::Get, &challenge, &[origin]);
 
     assert!(
         result.is_ok(),
@@ -126,7 +126,7 @@ fn test_verify_wrong_type() {
     let result = client_data.verify(
         ClientDataType::Create, // Expected create, but got get
         &challenge,
-        origin,
+        &[origin],
     );
 
     assert!(result.is_err(), "Wrong type should fail");
@@ -166,7 +166,7 @@ fn test_verify_wrong_challenge() {
     let encoded = Passki::base64_encode(&serde_json::to_vec(&client_data_json).unwrap());
     let client_data = ClientData::from_base64(&encoded).unwrap();
 
-    let result = client_data.verify(ClientDataType::Create, &challenge, origin);
+    let result = client_data.verify(ClientDataType::Create, &challenge, &[origin]);
 
     assert!(result.is_err(), "Wrong challenge should fail");
     assert!(
@@ -214,7 +214,7 @@ fn test_verify_wrong_origin() {
     let encoded = Passki::base64_encode(&serde_json::to_vec(&client_data_json).unwrap());
     let client_data = ClientData::from_base64(&encoded).unwrap();
 
-    let result = client_data.verify(ClientDataType::Create, &challenge, origin);
+    let result = client_data.verify(ClientDataType::Create, &challenge, &[origin]);
 
     assert!(result.is_err(), "Wrong origin should fail");
     let error = result.unwrap_err().to_string();
@@ -275,7 +275,7 @@ fn test_verify_origin_case_sensitive() {
     let encoded = Passki::base64_encode(&serde_json::to_vec(&client_data_json).unwrap());
     let client_data = ClientData::from_base64(&encoded).unwrap();
 
-    let result = client_data.verify(ClientDataType::Create, &challenge, origin);
+    let result = client_data.verify(ClientDataType::Create, &challenge, &[origin]);
 
     assert!(result.is_err(), "Origin should be case-sensitive");
     assert!(result.unwrap_err().to_string().contains("Invalid origin"));
@@ -296,7 +296,7 @@ fn test_verify_origin_with_trailing_slash() {
     let encoded = Passki::base64_encode(&serde_json::to_vec(&client_data_json).unwrap());
     let client_data = ClientData::from_base64(&encoded).unwrap();
 
-    let result = client_data.verify(ClientDataType::Create, &challenge, origin);
+    let result = client_data.verify(ClientDataType::Create, &challenge, &[origin]);
 
     assert!(
         result.is_err(),
@@ -339,7 +339,7 @@ fn test_verify_invalid_base64_challenge() {
     let encoded = Passki::base64_encode(&serde_json::to_vec(&client_data_json).unwrap());
     let client_data = ClientData::from_base64(&encoded).unwrap();
 
-    let result = client_data.verify(ClientDataType::Create, &challenge, origin);
+    let result = client_data.verify(ClientDataType::Create, &challenge, &[origin]);
 
     assert!(result.is_err(), "Invalid base64 challenge should fail");
     assert!(
@@ -366,7 +366,7 @@ fn test_verify_with_extra_fields() {
     let encoded = Passki::base64_encode(&serde_json::to_vec(&client_data_json).unwrap());
     let client_data = ClientData::from_base64(&encoded).unwrap();
 
-    let result = client_data.verify(ClientDataType::Create, &challenge, origin);
+    let result = client_data.verify(ClientDataType::Create, &challenge, &[origin]);
 
     assert!(result.is_ok(), "Extra fields should be ignored");
 }
@@ -385,7 +385,7 @@ fn test_verify_different_rp_origins() {
     });
     let encoded_http = Passki::base64_encode(&serde_json::to_vec(&client_data_http).unwrap());
     let client_data = ClientData::from_base64(&encoded_http).unwrap();
-    let result_http = client_data.verify(ClientDataType::Create, &challenge, origin_http);
+    let result_http = client_data.verify(ClientDataType::Create, &challenge, &[origin_http]);
     assert!(result_http.is_ok());
 
     // Test with HTTPS
@@ -398,8 +398,30 @@ fn test_verify_different_rp_origins() {
     });
     let encoded_https = Passki::base64_encode(&serde_json::to_vec(&client_data_https).unwrap());
     let client_data = ClientData::from_base64(&encoded_https).unwrap();
-    let result_https = client_data.verify(ClientDataType::Create, &challenge, origin_https);
+    let result_https = client_data.verify(ClientDataType::Create, &challenge, &[origin_https]);
     assert!(result_https.is_ok());
+}
+
+#[test]
+fn test_verify_multiple_origins() {
+    let challenge = Passki::generate_challenge();
+    let origins = ["https://example.com", "https://www.example.com"];
+
+    let client_data_json = serde_json::json!({
+        "type": "webauthn.create",
+        "challenge": Passki::base64_encode(&challenge),
+        "origin": "https://www.example.com",
+        "crossOrigin": false
+    });
+
+    let encoded = Passki::base64_encode(&serde_json::to_vec(&client_data_json).unwrap());
+    let client_data = ClientData::from_base64(&encoded).unwrap();
+
+    let result = client_data.verify(ClientDataType::Create, &challenge, &origins);
+    assert!(result.is_ok(), "Any origin from the list should verify");
+
+    let result = client_data.verify(ClientDataType::Create, &challenge, &["https://example.com"]);
+    assert!(result.is_err(), "Origin not in the list should fail");
 }
 
 #[test]
@@ -417,7 +439,7 @@ fn test_verify_port_mismatch() {
     let encoded = Passki::base64_encode(&serde_json::to_vec(&client_data_json).unwrap());
     let client_data = ClientData::from_base64(&encoded).unwrap();
 
-    let result = client_data.verify(ClientDataType::Create, &challenge, origin);
+    let result = client_data.verify(ClientDataType::Create, &challenge, &[origin]);
 
     assert!(result.is_err(), "Port mismatch should fail");
     assert!(result.unwrap_err().to_string().contains("Invalid origin"));
@@ -438,7 +460,7 @@ fn test_verify_protocol_mismatch() {
     let encoded = Passki::base64_encode(&serde_json::to_vec(&client_data_json).unwrap());
     let client_data = ClientData::from_base64(&encoded).unwrap();
 
-    let result = client_data.verify(ClientDataType::Create, &challenge, origin);
+    let result = client_data.verify(ClientDataType::Create, &challenge, &[origin]);
 
     assert!(result.is_err(), "Protocol mismatch should fail");
     assert!(result.unwrap_err().to_string().contains("Invalid origin"));
@@ -461,7 +483,7 @@ fn test_verify_multiple_valid_calls() {
         let encoded = Passki::base64_encode(&serde_json::to_vec(&client_data_json).unwrap());
         let client_data = ClientData::from_base64(&encoded).unwrap();
 
-        let result = client_data.verify(ClientDataType::Create, &challenge, origin);
+        let result = client_data.verify(ClientDataType::Create, &challenge, &[origin]);
 
         assert!(result.is_ok(), "All valid calls should succeed");
     }

@@ -17,7 +17,7 @@ use crate::*;
 
 #[test]
 fn test_start_passkey_authentication_returns_challenge() {
-    let passki = Passki::new("localhost", "http://localhost:3000", "Test App");
+    let passki = Passki::new("localhost", &["http://localhost:3000"], "Test App");
 
     let passkeys = vec![StoredPasskey {
         credential_id: vec![1u8; 16],
@@ -51,7 +51,7 @@ fn test_start_passkey_authentication_returns_challenge() {
 
 #[test]
 fn test_start_passkey_authentication_multiple_credentials() {
-    let passki = Passki::new("localhost", "http://localhost:3000", "Test App");
+    let passki = Passki::new("localhost", &["http://localhost:3000"], "Test App");
 
     let passkeys = vec![
         StoredPasskey {
@@ -111,7 +111,7 @@ fn test_start_passkey_authentication_multiple_credentials() {
 
 #[test]
 fn test_start_passkey_authentication_empty_credentials() {
-    let passki = Passki::new("localhost", "http://localhost:3000", "Test App");
+    let passki = Passki::new("localhost", &["http://localhost:3000"], "Test App");
 
     let passkeys: Vec<StoredPasskey> = vec![];
 
@@ -130,7 +130,7 @@ fn test_start_passkey_authentication_empty_credentials() {
 
 #[test]
 fn test_start_passkey_authentication_generates_unique_challenges() {
-    let passki = Passki::new("localhost", "http://localhost:3000", "Test App");
+    let passki = Passki::new("localhost", &["http://localhost:3000"], "Test App");
 
     let passkeys = vec![StoredPasskey {
         credential_id: vec![1u8; 16],
@@ -163,7 +163,7 @@ fn test_start_passkey_authentication_generates_unique_challenges() {
 
 #[test]
 fn test_start_passkey_authentication_with_different_settings() {
-    let passki = Passki::new("example.com", "https://example.com", "Example App");
+    let passki = Passki::new("example.com", &["https://example.com"], "Example App");
 
     let passkeys = vec![StoredPasskey {
         credential_id: vec![7u8; 20],
@@ -188,7 +188,7 @@ fn test_start_passkey_authentication_with_different_settings() {
 
 #[test]
 fn test_finish_passkey_authentication_success() {
-    let passki = Passki::new("localhost", "http://localhost:3000", "Test App");
+    let passki = Passki::new("localhost", &["http://localhost:3000"], "Test App");
 
     let stored_passkey = StoredPasskey {
         credential_id: vec![1u8; 16],
@@ -231,7 +231,7 @@ fn test_finish_passkey_authentication_success() {
 
 #[test]
 fn test_finish_passkey_authentication_wrong_credential_id() {
-    let passki = Passki::new("localhost", "http://localhost:3000", "Test App");
+    let passki = Passki::new("localhost", &["http://localhost:3000"], "Test App");
 
     let stored_passkey = StoredPasskey {
         credential_id: vec![1u8; 16],
@@ -276,7 +276,7 @@ fn test_finish_passkey_authentication_wrong_credential_id() {
 
 #[test]
 fn test_finish_passkey_authentication_wrong_challenge() {
-    let passki = Passki::new("localhost", "http://localhost:3000", "Test App");
+    let passki = Passki::new("localhost", &["http://localhost:3000"], "Test App");
 
     let stored_passkey = StoredPasskey {
         credential_id: vec![1u8; 16],
@@ -322,7 +322,7 @@ fn test_finish_passkey_authentication_wrong_challenge() {
 
 #[test]
 fn test_finish_passkey_authentication_wrong_origin() {
-    let passki = Passki::new("localhost", "http://localhost:3000", "Test App");
+    let passki = Passki::new("localhost", &["http://localhost:3000"], "Test App");
 
     let stored_passkey = StoredPasskey {
         credential_id: vec![1u8; 16],
@@ -361,7 +361,7 @@ fn test_finish_passkey_authentication_wrong_origin() {
 
 #[test]
 fn test_finish_passkey_authentication_invalid_counter() {
-    let passki = Passki::new("localhost", "http://localhost:3000", "Test App");
+    let passki = Passki::new("localhost", &["http://localhost:3000"], "Test App");
 
     let stored_passkey = StoredPasskey {
         credential_id: vec![1u8; 16],
@@ -401,7 +401,7 @@ fn test_finish_passkey_authentication_invalid_counter() {
 
 #[test]
 fn test_finish_passkey_authentication_too_short_authenticator_data() {
-    let passki = Passki::new("localhost", "http://localhost:3000", "Test App");
+    let passki = Passki::new("localhost", &["http://localhost:3000"], "Test App");
 
     let stored_passkey = StoredPasskey {
         credential_id: vec![1u8; 16],
@@ -446,7 +446,7 @@ fn test_finish_passkey_authentication_too_short_authenticator_data() {
 
 #[test]
 fn test_finish_passkey_authentication_uv_required_flag_set() {
-    let passki = Passki::new("localhost", "http://localhost:3000", "Test App");
+    let passki = Passki::new("localhost", &["http://localhost:3000"], "Test App");
 
     let stored_passkey = StoredPasskey {
         credential_id: vec![1u8; 16],
@@ -492,7 +492,7 @@ fn test_finish_passkey_authentication_uv_required_flag_set() {
 
 #[test]
 fn test_finish_passkey_authentication_uv_required_flag_not_set() {
-    let passki = Passki::new("localhost", "http://localhost:3000", "Test App");
+    let passki = Passki::new("localhost", &["http://localhost:3000"], "Test App");
 
     let stored_passkey = StoredPasskey {
         credential_id: vec![1u8; 16],
@@ -532,7 +532,7 @@ fn test_finish_passkey_authentication_uv_required_flag_not_set() {
 
 #[test]
 fn test_finish_passkey_authentication_uv_preferred_flag_not_set() {
-    let passki = Passki::new("localhost", "http://localhost:3000", "Test App");
+    let passki = Passki::new("localhost", &["http://localhost:3000"], "Test App");
 
     let stored_passkey = StoredPasskey {
         credential_id: vec![1u8; 16],
@@ -578,7 +578,7 @@ fn test_finish_passkey_authentication_uv_preferred_flag_not_set() {
 
 #[test]
 fn test_finish_passkey_authentication_up_flag_not_set() {
-    let passki = Passki::new("localhost", "http://localhost:3000", "Test App");
+    let passki = Passki::new("localhost", &["http://localhost:3000"], "Test App");
 
     let stored_passkey = StoredPasskey {
         credential_id: vec![1u8; 16],
@@ -619,7 +619,7 @@ fn test_finish_passkey_authentication_up_flag_not_set() {
 
 #[test]
 fn test_finish_passkey_authentication_usernameless() {
-    let passki = Passki::new("localhost", "http://localhost:3000", "Test App");
+    let passki = Passki::new("localhost", &["http://localhost:3000"], "Test App");
 
     // Stored passkey that would be looked up by credential_id after authenticator responds
     let stored_passkey = StoredPasskey {

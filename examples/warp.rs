@@ -491,12 +491,12 @@ async fn auth_finish(
 async fn main() {
     // Initialize Passki with relying party information.
     // - rp_id: The domain name (no protocol or port). Credentials are bound to this.
-    // - origin: The full origin URL. Must match what the browser sends.
+    // - origins: The accepted origin URLs. Must match what the browser sends.
     // - rp_name: Human-readable name shown by authenticators.
     let state = AppState {
         passki: Arc::new(Passki::new(
             "localhost",
-            "http://localhost:3000",
+            &["http://localhost:3000"],
             "Passkeys Demo",
         )),
         store: Store::default(),

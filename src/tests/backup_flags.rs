@@ -37,7 +37,7 @@ fn registration_state(passki: &Passki) -> RegistrationState {
 
 #[test]
 fn test_finish_passkey_registration_populates_be_and_bs() {
-    let passki = Passki::new("localhost", "http://localhost:3000", "Test App");
+    let passki = Passki::new("localhost", &["http://localhost:3000"], "Test App");
     let state = registration_state(&passki);
 
     // flags: AT | UP | BE | BS
@@ -60,7 +60,7 @@ fn test_finish_passkey_registration_populates_be_and_bs() {
 
 #[test]
 fn test_finish_passkey_registration_be_without_bs() {
-    let passki = Passki::new("localhost", "http://localhost:3000", "Test App");
+    let passki = Passki::new("localhost", &["http://localhost:3000"], "Test App");
     let state = registration_state(&passki);
 
     // flags: AT | UP | BE (no BS)
@@ -83,7 +83,7 @@ fn test_finish_passkey_registration_be_without_bs() {
 
 #[test]
 fn test_finish_passkey_registration_no_backup_flags() {
-    let passki = Passki::new("localhost", "http://localhost:3000", "Test App");
+    let passki = Passki::new("localhost", &["http://localhost:3000"], "Test App");
     let state = registration_state(&passki);
 
     // flags: AT | UP (no BE, no BS)
@@ -106,7 +106,7 @@ fn test_finish_passkey_registration_no_backup_flags() {
 
 #[test]
 fn test_finish_passkey_registration_bs_without_be_rejected() {
-    let passki = Passki::new("localhost", "http://localhost:3000", "Test App");
+    let passki = Passki::new("localhost", &["http://localhost:3000"], "Test App");
     let state = registration_state(&passki);
 
     // flags: AT | UP | BS (BS without BE is spec-invalid)
@@ -129,7 +129,7 @@ fn test_finish_passkey_registration_bs_without_be_rejected() {
 
 #[test]
 fn test_finish_passkey_authentication_bs_without_be_rejected() {
-    let passki = Passki::new("localhost", "http://localhost:3000", "Test App");
+    let passki = Passki::new("localhost", &["http://localhost:3000"], "Test App");
 
     let stored_passkey = StoredPasskey {
         credential_id: vec![1u8; 16],

@@ -22,7 +22,7 @@ use aws_lc_rs::signature::{ECDSA_P256_SHA256_ASN1_SIGNING, EcdsaKeyPair, KeyPair
 use ciborium::Value;
 
 fn passki() -> Passki {
-    Passki::new("localhost", "http://localhost:3000", "Test")
+    Passki::new("localhost", &["http://localhost:3000"], "Test")
 }
 
 /// Builds a `packed` self-attestation object signed by a freshly generated ES256 key,

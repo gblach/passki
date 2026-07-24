@@ -160,14 +160,15 @@ impl ClientData {
     #[allow(rustdoc::bare_urls)]
     /// Verifies the client data against expected values.
     ///
-    /// Checks that the type, challenge, and origin match the expected values,
-    /// and that the request did not come from a cross-origin iframe.
+    /// Checks that the type and challenge match the expected values, that the
+    /// origin is one of the accepted origins, and that the request did not
+    /// come from a cross-origin iframe.
     ///
     /// # Arguments
     ///
     /// * `expected_type` - The expected type (Create or Get)
     /// * `expected_challenge` - The expected challenge bytes
-    /// * `expected_origin` - The expected origin (e.g., "https://example.com")
+    /// * `expected_origins` - The accepted origins (e.g., "https://example.com")
     ///
     /// # Errors
     ///
@@ -176,7 +177,7 @@ impl ClientData {
         &self,
         expected_type: ClientDataType,
         expected_challenge: &[u8],
-        expected_origin: &str,
+        expected_origins: &[impl AsRef<str>],
     ) -> Result<()> {
         if self.type_ != expected_type {
             return Err(PasskiError::ClientDataTypeMismatch {
@@ -190,9 +191,12 @@ impl ClientData {
             return Err(PasskiError::ChallengeMismatch);
         }
 
-        if self.origin != expected_origin {
+        if !expected_origins.iter().any(|o| o.as_ref() == self.origin) {
             return Err(PasskiError::OriginMismatch {
-                expected: expected_origin.to_string(),
+                expected: expected_origins
+                    .iter()
+                    .map(|o| o.as_ref().to_string())
+                    .collect(),
                 got: self.origin.clone(),
             });
         }

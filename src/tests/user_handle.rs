@@ -54,7 +54,7 @@ fn authenticate_with_user_handle(user_handle: Option<String>) -> AuthenticationR
     let pub_key: &[u8; 32] = key_pair.public_key().as_ref().try_into().unwrap();
     let cred_id = vec![1u8; 16];
 
-    let passki = Passki::new("localhost", "http://localhost:3000", "Test");
+    let passki = Passki::new("localhost", &["http://localhost:3000"], "Test");
     let stored = StoredPasskey {
         credential_id: cred_id.clone(),
         public_key: create_eddsa_cose_key(pub_key),
@@ -108,7 +108,7 @@ fn test_user_handle_invalid_base64_returns_error() {
     let pub_key: &[u8; 32] = key_pair.public_key().as_ref().try_into().unwrap();
     let cred_id = vec![1u8; 16];
 
-    let passki = Passki::new("localhost", "http://localhost:3000", "Test");
+    let passki = Passki::new("localhost", &["http://localhost:3000"], "Test");
     let stored = StoredPasskey {
         credential_id: cred_id.clone(),
         public_key: create_eddsa_cose_key(pub_key),

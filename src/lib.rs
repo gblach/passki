@@ -37,7 +37,7 @@
 //! // Initialize Passki with your relying party information
 //! let passki = Passki::new(
 //!     "example.com",              // Relying Party ID (domain)
-//!     "https://example.com",      // Relying Party Origin
+//!     &["https://example.com"],   // Accepted Relying Party Origins
 //!     "Example Corp"              // Relying Party Name
 //! );
 //!
@@ -132,8 +132,8 @@ pub struct Passki {
     /// The relying party identifier (typically the domain).
     pub rp_id: String,
 
-    /// The relying party origin (e.g., `https://example.com`).
-    pub rp_origin: String,
+    /// The accepted relying party origins (e.g., `https://example.com`).
+    pub rp_origins: Vec<String>,
 
     /// The human-readable relying party name.
     pub rp_name: String,
@@ -145,19 +145,23 @@ impl Passki {
     /// # Arguments
     ///
     /// * `rp_id` - The relying party identifier (typically the domain, e.g., "example.com")
-    /// * `rp_origin` - The relying party origin (e.g., `https://example.com`)
+    /// * `rp_origins` - The accepted relying party origins (e.g., `https://example.com`)
     /// * `rp_name` - The human-readable relying party name (e.g., "Example Corp")
     ///
     /// # Example
     ///
     /// ```
     /// # use passki::Passki;
-    /// let passki = Passki::new("example.com", "https://example.com", "Example Corp");
+    /// let passki = Passki::new(
+    ///     "example.com",
+    ///     &["https://example.com", "https://www.example.com"],
+    ///     "Example Corp",
+    /// );
     /// ```
-    pub fn new(rp_id: &str, rp_origin: &str, rp_name: &str) -> Self {
+    pub fn new(rp_id: &str, rp_origins: &[impl AsRef<str>], rp_name: &str) -> Self {
         Self {
             rp_id: rp_id.to_string(),
-            rp_origin: rp_origin.to_string(),
+            rp_origins: rp_origins.iter().map(|o| o.as_ref().to_string()).collect(),
             rp_name: rp_name.to_string(),
         }
     }
