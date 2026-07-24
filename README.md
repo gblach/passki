@@ -51,7 +51,7 @@ let (registration_challenge, registration_state) = passki.start_passkey_registra
     ResidentKeyRequirement::Preferred,              // Resident key
     UserVerificationRequirement::Preferred,         // User verification
     None,                                           // Exclude existing credentials
-    None,                                           // Extensions (None, or Some(RegistrationExtensions { ... }))
+    None,                                           // Extensions (None, or Some(RegistrationExtensions))
 ).expect("user_id must be at least 16 bytes");
 
 // Send registration_challenge to client (as JSON)
@@ -71,7 +71,7 @@ let (authentication_challenge, authentication_state) = passki.start_passkey_auth
     &user_passkeys,                            // User's stored passkeys
     60000,                                     // Timeout (ms)
     UserVerificationRequirement::Preferred,    // User verification
-    None,                                      // Extensions (None, or Some(AuthenticationExtensions { ... }))
+    None,                                      // Extensions (None, or Some(AuthenticationExtensions))
 );
 
 // Send authentication_challenge to client (as JSON)
@@ -108,13 +108,16 @@ The `credProps` extension reports whether the authenticator created a discoverab
 use passki::RegistrationExtensions;
 
 // Request credProps during registration
+let mut extensions = RegistrationExtensions::default();
+extensions.cred_props = Some(true);
+
 let (challenge, state) = passki.start_passkey_registration(
     user_id, username, display_name, 60000,
     AttestationConveyancePreference::None,
     ResidentKeyRequirement::Preferred,
     UserVerificationRequirement::Preferred,
     None,
-    Some(RegistrationExtensions { cred_props: Some(true), ..Default::default() }),
+    Some(extensions),
 )?;
 
 let passkey = passki.finish_passkey_registration(&credential, &state)?;
@@ -133,28 +136,34 @@ The server passes input salts; the browser computes `HMAC-SHA256("WebAuthn PRF" 
 use passki::{AuthenticationExtensions, PrfEval, PrfInput, RegistrationExtensions};
 
 // During registration, probe for PRF support
+let mut extensions = RegistrationExtensions::default();
+extensions.prf = Some(PrfInput { eval: None });
+
 let (challenge, state) = passki.start_passkey_registration(
     user_id, username, display_name, 60000,
     AttestationConveyancePreference::None,
     ResidentKeyRequirement::Preferred,
     UserVerificationRequirement::Preferred,
     None,
-    Some(RegistrationExtensions { prf: Some(PrfInput { eval: None }), ..Default::default() }),
+    Some(extensions),
 )?;
 // Check client_extension_results.prf.enabled in the credential before calling finish
 // to know whether the authenticator supports PRF
 
 // During authentication, request a PRF derivation for a given context
+let mut extensions = AuthenticationExtensions::default();
+extensions.prf = PrfInput {
+    eval: Some(PrfEval {
+        first: Passki::base64_encode(b"my-app-encryption-key-context"),
+        second: None,
+    }),
+};
+
 let (challenge, state) = passki.start_passkey_authentication(
     &user_passkeys,
     60000,
     UserVerificationRequirement::Preferred,
-    Some(AuthenticationExtensions {
-        prf: PrfInput { eval: Some(PrfEval {
-            first: Passki::base64_encode(b"my-app-encryption-key-context"),
-            second: None,
-        }) },
-    }),
+    Some(extensions),
 );
 
 // result.prf_first contains the derived key bytes (32 bytes)

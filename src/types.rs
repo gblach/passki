@@ -356,6 +356,7 @@ pub struct AllowCredential {
 
 /// Extensions included in a registration challenge.
 #[derive(Serialize, Debug, Default)]
+#[non_exhaustive]
 pub struct RegistrationExtensions {
     #[serde(rename = "credProps", skip_serializing_if = "Option::is_none")]
     pub cred_props: Option<bool>,
@@ -364,7 +365,8 @@ pub struct RegistrationExtensions {
 }
 
 /// Extensions included in an authentication challenge.
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Debug, Default)]
+#[non_exhaustive]
 pub struct AuthenticationExtensions {
     pub prf: PrfInput,
 }
@@ -393,6 +395,7 @@ pub struct PrfEval {
 /// directly to what `credential.getClientExtensionResults()` returns in JS.
 /// Adding support for a new extension means adding a field here.
 #[derive(Deserialize, Debug, Default)]
+#[non_exhaustive]
 pub struct ClientExtensionResults {
     /// Results for the credProps extension.
     #[serde(default, rename = "credProps")]

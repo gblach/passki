@@ -238,6 +238,11 @@ async fn register_start(
         .get(&req.username)
         .map(|u| u.passkeys.clone());
 
+    // Request credProps and probe PRF support
+    let mut extensions = RegistrationExtensions::default();
+    extensions.cred_props = Some(true);
+    extensions.prf = Some(PrfInput { eval: None });
+
     let (challenge, reg_state) = state.passki.start_passkey_registration(
         &user_id,
         &req.username, // User handle (displayed by authenticator)
@@ -247,10 +252,7 @@ async fn register_start(
         ResidentKeyRequirement::Preferred, // Request discoverable credential if possible
         UserVerificationRequirement::Preferred, // Request user verification if available
         existing.as_deref(), // Exclude existing credentials
-        Some(RegistrationExtensions {
-            cred_props: Some(true),
-            prf: Some(PrfInput { eval: None }),
-        }), // Probe PRF support
+        Some(extensions),
     )?;
 
     // Store state for verification in finish step, keyed by the challenge
@@ -362,13 +364,15 @@ async fn auth_start(
         vec![]
     };
 
-    let extensions = req.prf_salt.map(|salt| AuthenticationExtensions {
-        prf: PrfInput {
+    let extensions = req.prf_salt.map(|salt| {
+        let mut extensions = AuthenticationExtensions::default();
+        extensions.prf = PrfInput {
             eval: Some(PrfEval {
                 first: salt,
                 second: None,
             }),
-        },
+        };
+        extensions
     });
 
     let (challenge, auth_state) = state.passki.start_passkey_authentication(

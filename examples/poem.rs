@@ -219,6 +219,11 @@ async fn register_start(
     // Probe without eval: asks "do you support PRF?" without requesting a derivation.
     // This avoids false negatives on authenticators that support PRF during authentication
     // but not during registration (e.g. YubiKey 5 series).
+    // Request credProps and probe PRF support
+    let mut extensions = RegistrationExtensions::default();
+    extensions.cred_props = Some(true);
+    extensions.prf = Some(PrfInput { eval: None });
+
     let (challenge, state) = passki
         .start_passkey_registration(
             &user_id,
@@ -229,10 +234,7 @@ async fn register_start(
             ResidentKeyRequirement::Preferred, // Request discoverable credential if possible
             UserVerificationRequirement::Preferred, // Request user verification if available
             existing.as_deref(), // Exclude existing credentials
-            Some(RegistrationExtensions {
-                cred_props: Some(true),
-                prf: Some(PrfInput { eval: None }),
-            }), // Probe PRF support
+            Some(extensions),
         )
         .map_err(err)?;
 
@@ -345,13 +347,15 @@ async fn auth_start(
         vec![]
     };
 
-    let extensions = req.prf_salt.map(|salt| AuthenticationExtensions {
-        prf: PrfInput {
+    let extensions = req.prf_salt.map(|salt| {
+        let mut extensions = AuthenticationExtensions::default();
+        extensions.prf = PrfInput {
             eval: Some(PrfEval {
                 first: salt,
                 second: None,
             }),
-        },
+        };
+        extensions
     });
 
     let (challenge, state) = passki.start_passkey_authentication(

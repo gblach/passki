@@ -103,6 +103,7 @@ pub struct AuthenticationCredential {
 ///
 /// Contains the credential ID, updated counter, and any PRF outputs.
 #[derive(Debug)]
+#[non_exhaustive]
 pub struct AuthenticationResult {
     /// The credential ID that was used for authentication.
     pub credential_id: Vec<u8>,
