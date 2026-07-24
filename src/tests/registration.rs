@@ -37,12 +37,7 @@ fn test_start_passkey_registration_returns_challenge() {
             user_id,
             "testuser",
             "Test User",
-            60000,
-            AttestationConveyancePreference::None,
-            ResidentKeyRequirement::Preferred,
-            UserVerificationRequirement::Preferred,
-            None,
-            None,
+            RegistrationOptions::default(),
         )
         .unwrap();
 
@@ -77,12 +72,13 @@ fn test_start_passkey_registration_with_different_settings() {
             user_id,
             "adminuser",
             "Admin User",
-            30000,
-            AttestationConveyancePreference::Direct,
-            ResidentKeyRequirement::Required,
-            UserVerificationRequirement::Required,
-            None,
-            None,
+            RegistrationOptions {
+                timeout: 30000,
+                attestation: AttestationConveyancePreference::Direct,
+                resident_key: ResidentKeyRequirement::Required,
+                user_verification: UserVerificationRequirement::Required,
+                ..Default::default()
+            },
         )
         .unwrap();
 
@@ -97,32 +93,12 @@ fn test_start_passkey_registration_generates_unique_challenges() {
 
     let user_id1 = b"user1_identifier";
     let (challenge1, state1) = passki
-        .start_passkey_registration(
-            user_id1,
-            "user1",
-            "User 1",
-            60000,
-            AttestationConveyancePreference::None,
-            ResidentKeyRequirement::Preferred,
-            UserVerificationRequirement::Preferred,
-            None,
-            None,
-        )
+        .start_passkey_registration(user_id1, "user1", "User 1", RegistrationOptions::default())
         .unwrap();
 
     let user_id2 = b"user2_identifier";
     let (challenge2, state2) = passki
-        .start_passkey_registration(
-            user_id2,
-            "user2",
-            "User 2",
-            60000,
-            AttestationConveyancePreference::None,
-            ResidentKeyRequirement::Preferred,
-            UserVerificationRequirement::Preferred,
-            None,
-            None,
-        )
+        .start_passkey_registration(user_id2, "user2", "User 2", RegistrationOptions::default())
         .unwrap();
 
     // Challenges should be unique
@@ -140,12 +116,7 @@ fn test_start_passkey_registration_user_id_stored_as_bytes() {
             user_id,
             "testuser",
             "Test User",
-            60000,
-            AttestationConveyancePreference::None,
-            ResidentKeyRequirement::Preferred,
-            UserVerificationRequirement::Preferred,
-            None,
-            None,
+            RegistrationOptions::default(),
         )
         .unwrap();
 
@@ -178,12 +149,10 @@ fn test_start_passkey_registration_with_single_existing_credential() {
             user_id,
             "testuser",
             "Test User",
-            60000,
-            AttestationConveyancePreference::None,
-            ResidentKeyRequirement::Preferred,
-            UserVerificationRequirement::Preferred,
-            Some(std::slice::from_ref(&existing_passkey)),
-            None,
+            RegistrationOptions {
+                exclude_credentials: Some(std::slice::from_ref(&existing_passkey)),
+                ..Default::default()
+            },
         )
         .unwrap();
 
@@ -240,12 +209,10 @@ fn test_start_passkey_registration_with_multiple_existing_credentials() {
             user_id,
             "testuser",
             "Test User",
-            60000,
-            AttestationConveyancePreference::None,
-            ResidentKeyRequirement::Preferred,
-            UserVerificationRequirement::Preferred,
-            Some(&existing_passkeys),
-            None,
+            RegistrationOptions {
+                exclude_credentials: Some(&existing_passkeys),
+                ..Default::default()
+            },
         )
         .unwrap();
 
@@ -276,12 +243,7 @@ fn test_start_passkey_registration_none_vs_empty_slice() {
             user_id,
             "testuser",
             "Test User",
-            60000,
-            AttestationConveyancePreference::None,
-            ResidentKeyRequirement::Preferred,
-            UserVerificationRequirement::Preferred,
-            None,
-            None,
+            RegistrationOptions::default(),
         )
         .unwrap();
 
@@ -292,12 +254,10 @@ fn test_start_passkey_registration_none_vs_empty_slice() {
             user_id,
             "testuser",
             "Test User",
-            60000,
-            AttestationConveyancePreference::None,
-            ResidentKeyRequirement::Preferred,
-            UserVerificationRequirement::Preferred,
-            Some(&empty_slice),
-            None,
+            RegistrationOptions {
+                exclude_credentials: Some(&empty_slice),
+                ..Default::default()
+            },
         )
         .unwrap();
 
@@ -316,12 +276,7 @@ fn test_start_passkey_registration_user_id_validation_success() {
         user_id,
         "testuser",
         "Test User",
-        60000,
-        AttestationConveyancePreference::None,
-        ResidentKeyRequirement::Preferred,
-        UserVerificationRequirement::Preferred,
-        None,
-        None,
+        RegistrationOptions::default(),
     );
 
     assert!(result.is_ok(), "16-byte user_id should be valid");
@@ -336,12 +291,7 @@ fn test_start_passkey_registration_user_id_validation_fails_empty() {
         user_id,
         "testuser",
         "Test User",
-        60000,
-        AttestationConveyancePreference::None,
-        ResidentKeyRequirement::Preferred,
-        UserVerificationRequirement::Preferred,
-        None,
-        None,
+        RegistrationOptions::default(),
     );
 
     assert!(result.is_err(), "Empty user_id should fail");
@@ -363,12 +313,7 @@ fn test_start_passkey_registration_user_id_validation_fails_15_bytes() {
         user_id,
         "testuser",
         "Test User",
-        60000,
-        AttestationConveyancePreference::None,
-        ResidentKeyRequirement::Preferred,
-        UserVerificationRequirement::Preferred,
-        None,
-        None,
+        RegistrationOptions::default(),
     );
 
     assert!(result.is_err(), "15-byte user_id should fail");
@@ -390,12 +335,7 @@ fn test_finish_passkey_registration_success() {
             user_id,
             "testuser",
             "Test User",
-            60000,
-            AttestationConveyancePreference::None,
-            ResidentKeyRequirement::Preferred,
-            UserVerificationRequirement::Preferred,
-            None,
-            None,
+            RegistrationOptions::default(),
         )
         .unwrap();
 
@@ -429,12 +369,7 @@ fn test_finish_passkey_registration_stores_initial_counter() {
             user_id,
             "testuser",
             "Test User",
-            60000,
-            AttestationConveyancePreference::None,
-            ResidentKeyRequirement::Preferred,
-            UserVerificationRequirement::Preferred,
-            None,
-            None,
+            RegistrationOptions::default(),
         )
         .unwrap();
 
@@ -467,12 +402,7 @@ fn test_finish_passkey_registration_wrong_challenge() {
             user_id,
             "testuser",
             "Test User",
-            60000,
-            AttestationConveyancePreference::None,
-            ResidentKeyRequirement::Preferred,
-            UserVerificationRequirement::Preferred,
-            None,
-            None,
+            RegistrationOptions::default(),
         )
         .unwrap();
 
@@ -507,12 +437,7 @@ fn test_finish_passkey_registration_wrong_origin() {
             user_id,
             "testuser",
             "Test User",
-            60000,
-            AttestationConveyancePreference::None,
-            ResidentKeyRequirement::Preferred,
-            UserVerificationRequirement::Preferred,
-            None,
-            None,
+            RegistrationOptions::default(),
         )
         .unwrap();
 
@@ -541,12 +466,10 @@ fn test_finish_passkey_registration_uv_required_flag_set() {
             user_id,
             "testuser",
             "Test User",
-            60000,
-            AttestationConveyancePreference::None,
-            ResidentKeyRequirement::Preferred,
-            UserVerificationRequirement::Required,
-            None,
-            None,
+            RegistrationOptions {
+                user_verification: UserVerificationRequirement::Required,
+                ..Default::default()
+            },
         )
         .unwrap();
 
@@ -577,12 +500,10 @@ fn test_finish_passkey_registration_uv_required_flag_not_set() {
             user_id,
             "testuser",
             "Test User",
-            60000,
-            AttestationConveyancePreference::None,
-            ResidentKeyRequirement::Preferred,
-            UserVerificationRequirement::Required,
-            None,
-            None,
+            RegistrationOptions {
+                user_verification: UserVerificationRequirement::Required,
+                ..Default::default()
+            },
         )
         .unwrap();
 
@@ -611,12 +532,7 @@ fn test_finish_passkey_registration_uv_preferred_flag_not_set() {
             user_id,
             "testuser",
             "Test User",
-            60000,
-            AttestationConveyancePreference::None,
-            ResidentKeyRequirement::Preferred,
-            UserVerificationRequirement::Preferred,
-            None,
-            None,
+            RegistrationOptions::default(),
         )
         .unwrap();
 
@@ -647,12 +563,7 @@ fn test_finish_passkey_registration_up_flag_not_set() {
             user_id,
             "testuser",
             "Test User",
-            60000,
-            AttestationConveyancePreference::None,
-            ResidentKeyRequirement::Preferred,
-            UserVerificationRequirement::Preferred,
-            None,
-            None,
+            RegistrationOptions::default(),
         )
         .unwrap();
 
@@ -682,12 +593,7 @@ fn test_finish_passkey_registration_eddsa_algorithm() {
             user_id,
             "testuser",
             "Test User",
-            60000,
-            AttestationConveyancePreference::None,
-            ResidentKeyRequirement::Preferred,
-            UserVerificationRequirement::Preferred,
-            None,
-            None,
+            RegistrationOptions::default(),
         )
         .unwrap();
 
@@ -718,12 +624,7 @@ fn test_finish_passkey_registration_credential_id_mismatch() {
             user_id,
             "testuser",
             "Test User",
-            60000,
-            AttestationConveyancePreference::None,
-            ResidentKeyRequirement::Preferred,
-            UserVerificationRequirement::Preferred,
-            None,
-            None,
+            RegistrationOptions::default(),
         )
         .unwrap();
 

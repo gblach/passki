@@ -66,12 +66,7 @@ fn authenticate_with_user_handle(user_handle: Option<String>) -> AuthenticationR
     };
 
     // Usernameless flow: empty allowCredentials so the user is identified by the handle.
-    let (_, state) = passki.start_passkey_authentication(
-        &[],
-        60000,
-        UserVerificationRequirement::Preferred,
-        None,
-    );
+    let (_, state) = passki.start_passkey_authentication(&[], AuthenticationOptions::default());
 
     let credential = signed_auth_credential(
         &cred_id,
@@ -120,9 +115,7 @@ fn test_user_handle_invalid_base64_returns_error() {
     };
     let (_, state) = passki.start_passkey_authentication(
         std::slice::from_ref(&stored),
-        60000,
-        UserVerificationRequirement::Preferred,
-        None,
+        AuthenticationOptions::default(),
     );
 
     let credential = signed_auth_credential(

@@ -79,12 +79,7 @@ fn test_registration_challenge_omits_extensions_when_prf_none() {
             b"user123_16bytes_",
             "alice",
             "Alice",
-            60000,
-            AttestationConveyancePreference::None,
-            ResidentKeyRequirement::Preferred,
-            UserVerificationRequirement::Preferred,
-            None,
-            None,
+            RegistrationOptions::default(),
         )
         .unwrap();
 
@@ -112,12 +107,10 @@ fn test_registration_challenge_includes_extensions_when_prf_some() {
             b"user123_16bytes_",
             "alice",
             "Alice",
-            60000,
-            AttestationConveyancePreference::None,
-            ResidentKeyRequirement::Preferred,
-            UserVerificationRequirement::Preferred,
-            None,
-            extensions,
+            RegistrationOptions {
+                extensions,
+                ..Default::default()
+            },
         )
         .unwrap();
 
@@ -146,12 +139,10 @@ fn test_registration_challenge_extensions_json_shape() {
             b"user123_16bytes_",
             "alice",
             "Alice",
-            60000,
-            AttestationConveyancePreference::None,
-            ResidentKeyRequirement::Preferred,
-            UserVerificationRequirement::Preferred,
-            None,
-            extensions,
+            RegistrationOptions {
+                extensions,
+                ..Default::default()
+            },
         )
         .unwrap();
 
@@ -181,12 +172,10 @@ fn test_registration_challenge_extensions_includes_second_input() {
             b"user123_16bytes_",
             "alice",
             "Alice",
-            60000,
-            AttestationConveyancePreference::None,
-            ResidentKeyRequirement::Preferred,
-            UserVerificationRequirement::Preferred,
-            None,
-            extensions,
+            RegistrationOptions {
+                extensions,
+                ..Default::default()
+            },
         )
         .unwrap();
 
@@ -209,12 +198,10 @@ fn test_registration_challenge_probe_only_has_no_eval() {
             b"user123_16bytes_",
             "alice",
             "Alice",
-            60000,
-            AttestationConveyancePreference::None,
-            ResidentKeyRequirement::Preferred,
-            UserVerificationRequirement::Preferred,
-            None,
-            extensions,
+            RegistrationOptions {
+                extensions,
+                ..Default::default()
+            },
         )
         .unwrap();
 
@@ -232,12 +219,7 @@ fn test_registration_challenge_probe_only_has_no_eval() {
 #[test]
 fn test_authentication_challenge_omits_extensions_when_prf_none() {
     let passki = Passki::new("localhost", &["http://localhost:3000"], "Test");
-    let (challenge, _) = passki.start_passkey_authentication(
-        &[],
-        60000,
-        UserVerificationRequirement::Preferred,
-        None,
-    );
+    let (challenge, _) = passki.start_passkey_authentication(&[], AuthenticationOptions::default());
 
     let json = serde_json::to_value(&challenge).unwrap();
     assert!(
@@ -259,9 +241,10 @@ fn test_authentication_challenge_includes_extensions_when_prf_some() {
     });
     let (challenge, _) = passki.start_passkey_authentication(
         &[],
-        60000,
-        UserVerificationRequirement::Preferred,
-        extensions,
+        AuthenticationOptions {
+            extensions,
+            ..Default::default()
+        },
     );
 
     let json = serde_json::to_value(&challenge).unwrap();
@@ -285,9 +268,10 @@ fn test_authentication_challenge_extensions_json_shape() {
     });
     let (challenge, _) = passki.start_passkey_authentication(
         &[],
-        60000,
-        UserVerificationRequirement::Preferred,
-        extensions,
+        AuthenticationOptions {
+            extensions,
+            ..Default::default()
+        },
     );
 
     let json = serde_json::to_value(&challenge).unwrap();
@@ -312,9 +296,10 @@ fn test_authentication_challenge_extensions_includes_second_input() {
     });
     let (challenge, _) = passki.start_passkey_authentication(
         &[],
-        60000,
-        UserVerificationRequirement::Preferred,
-        extensions,
+        AuthenticationOptions {
+            extensions,
+            ..Default::default()
+        },
     );
 
     let json = serde_json::to_value(&challenge).unwrap();
@@ -336,9 +321,7 @@ fn test_prf_outputs_none_when_no_extension_results() {
     let stored = make_stored_passkey(&cred_id, pub_key, 0);
     let (_, state) = passki.start_passkey_authentication(
         std::slice::from_ref(&stored),
-        60000,
-        UserVerificationRequirement::Preferred,
-        None,
+        AuthenticationOptions::default(),
     );
 
     let credential = signed_auth_credential(
@@ -369,9 +352,7 @@ fn test_prf_outputs_none_when_results_absent_in_extension() {
     let stored = make_stored_passkey(&cred_id, pub_key, 0);
     let (_, state) = passki.start_passkey_authentication(
         std::slice::from_ref(&stored),
-        60000,
-        UserVerificationRequirement::Preferred,
-        None,
+        AuthenticationOptions::default(),
     );
 
     // enabled = true but no results (registration probe response shape)
@@ -407,9 +388,7 @@ fn test_prf_first_output_decoded() {
     let stored = make_stored_passkey(&cred_id, pub_key, 0);
     let (_, state) = passki.start_passkey_authentication(
         std::slice::from_ref(&stored),
-        60000,
-        UserVerificationRequirement::Preferred,
-        None,
+        AuthenticationOptions::default(),
     );
 
     let prf_bytes = vec![0xABu8; 32];
@@ -448,9 +427,7 @@ fn test_prf_both_outputs_decoded() {
     let stored = make_stored_passkey(&cred_id, pub_key, 0);
     let (_, state) = passki.start_passkey_authentication(
         std::slice::from_ref(&stored),
-        60000,
-        UserVerificationRequirement::Preferred,
-        None,
+        AuthenticationOptions::default(),
     );
 
     let first_bytes = vec![0x11u8; 32];
@@ -490,9 +467,7 @@ fn test_prf_invalid_base64_first_returns_error() {
     let stored = make_stored_passkey(&cred_id, pub_key, 0);
     let (_, state) = passki.start_passkey_authentication(
         std::slice::from_ref(&stored),
-        60000,
-        UserVerificationRequirement::Preferred,
-        None,
+        AuthenticationOptions::default(),
     );
 
     let ext = PrfExtensionResult {
@@ -533,9 +508,7 @@ fn test_prf_invalid_base64_second_returns_error() {
     let stored = make_stored_passkey(&cred_id, pub_key, 0);
     let (_, state) = passki.start_passkey_authentication(
         std::slice::from_ref(&stored),
-        60000,
-        UserVerificationRequirement::Preferred,
-        None,
+        AuthenticationOptions::default(),
     );
 
     let ext = PrfExtensionResult {

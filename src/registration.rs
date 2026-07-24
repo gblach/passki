@@ -95,6 +95,45 @@ pub struct RegistrationCredential {
     pub client_extension_results: Option<ClientExtensionResults>,
 }
 
+/// Options for starting a passkey registration ceremony.
+///
+/// The [`Default`] value uses a 60 second timeout, no attestation, and
+/// `Preferred` resident key and user verification requirements.
+#[derive(Debug)]
+#[non_exhaustive]
+pub struct RegistrationOptions<'a> {
+    /// Timeout for the operation in milliseconds.
+    pub timeout: u64,
+
+    /// Attestation conveyance preference.
+    pub attestation: AttestationConveyancePreference,
+
+    /// Resident key requirement.
+    pub resident_key: ResidentKeyRequirement,
+
+    /// User verification requirement.
+    pub user_verification: UserVerificationRequirement,
+
+    /// Existing credentials to exclude from registration.
+    pub exclude_credentials: Option<&'a [StoredPasskey]>,
+
+    /// WebAuthn extensions to request from the authenticator.
+    pub extensions: Option<RegistrationExtensions>,
+}
+
+impl Default for RegistrationOptions<'_> {
+    fn default() -> Self {
+        Self {
+            timeout: 60000,
+            attestation: AttestationConveyancePreference::None,
+            resident_key: ResidentKeyRequirement::Preferred,
+            user_verification: UserVerificationRequirement::Preferred,
+            exclude_credentials: None,
+            extensions: None,
+        }
+    }
+}
+
 /// Authenticator data parsed from a CBOR attestation object.
 #[derive(Debug)]
 pub(crate) struct ParsedAttestation {
@@ -128,14 +167,7 @@ impl Passki {
     /// * `user_id` - Unique identifier for the user (must be at least 16 bytes)
     /// * `username` - Username or account identifier
     /// * `display_name` - Human-readable display name for the user
-    /// * `timeout` - Timeout for the operation in milliseconds
-    /// * `attestation` - Attestation conveyance preference
-    /// * `resident_key` - Resident key requirement
-    /// * `user_verification` - User verification requirement
-    /// * `existing_credentials` - Optional list of existing credentials to exclude from registration
-    /// * `extensions` - Optional WebAuthn extensions. Use `Some(RegistrationExtensions { prf:
-    ///   PrfInput { eval: None } })` to probe PRF support, or include an `eval` to probe and
-    ///   evaluate in a single round trip.
+    /// * `options` - Ceremony options; see [`RegistrationOptions`]
     ///
     /// # Returns
     ///
@@ -146,18 +178,12 @@ impl Passki {
     /// # Errors
     ///
     /// Returns an error if `user_id` is less than 16 bytes.
-    #[allow(clippy::too_many_arguments)]
     pub fn start_passkey_registration(
         &self,
         user_id: &[u8],
         username: &str,
         display_name: &str,
-        timeout: u64,
-        attestation: AttestationConveyancePreference,
-        resident_key: ResidentKeyRequirement,
-        user_verification: UserVerificationRequirement,
-        existing_credentials: Option<&[StoredPasskey]>,
-        extensions: Option<RegistrationExtensions>,
+        options: RegistrationOptions<'_>,
     ) -> Result<(RegistrationChallenge, RegistrationState)> {
         if user_id.len() < 16 {
             return Err(PasskiError::UserIdTooShort);
@@ -166,7 +192,8 @@ impl Passki {
         let challenge = Self::generate_challenge();
         let user_id_bytes = user_id.to_vec();
 
-        let exclude_credentials = existing_credentials
+        let exclude_credentials = options
+            .exclude_credentials
             .unwrap_or(&[])
             .iter()
             .map(|pk| ExcludeCredential {
@@ -195,20 +222,20 @@ impl Passki {
                     type_: "public-key",
                 })
                 .collect(),
-            timeout,
-            attestation,
+            timeout: options.timeout,
+            attestation: options.attestation,
             authenticator_selection: AuthenticatorSelection {
-                resident_key,
-                user_verification,
+                resident_key: options.resident_key,
+                user_verification: options.user_verification,
             },
             exclude_credentials,
-            extensions,
+            extensions: options.extensions,
         };
 
         let state = RegistrationState {
             challenge: challenge.clone(),
             user,
-            user_verification,
+            user_verification: options.user_verification,
         };
 
         Ok((challenge_response, state))

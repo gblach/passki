@@ -29,12 +29,8 @@ fn test_start_passkey_authentication_returns_challenge() {
         bs: false,
     }];
 
-    let (challenge, state) = passki.start_passkey_authentication(
-        &passkeys,
-        60000,
-        UserVerificationRequirement::Preferred,
-        None,
-    );
+    let (challenge, state) =
+        passki.start_passkey_authentication(&passkeys, AuthenticationOptions::default());
 
     // Verify challenge structure
     assert_eq!(challenge.timeout, 60000);
@@ -85,9 +81,11 @@ fn test_start_passkey_authentication_multiple_credentials() {
 
     let (challenge, state) = passki.start_passkey_authentication(
         &passkeys,
-        30000,
-        UserVerificationRequirement::Required,
-        None,
+        AuthenticationOptions {
+            timeout: 30000,
+            user_verification: UserVerificationRequirement::Required,
+            ..Default::default()
+        },
     );
 
     // Verify all credentials are included
@@ -115,12 +113,8 @@ fn test_start_passkey_authentication_empty_credentials() {
 
     let passkeys: Vec<StoredPasskey> = vec![];
 
-    let (challenge, state) = passki.start_passkey_authentication(
-        &passkeys,
-        60000,
-        UserVerificationRequirement::Preferred,
-        None,
-    );
+    let (challenge, state) =
+        passki.start_passkey_authentication(&passkeys, AuthenticationOptions::default());
 
     // Should work with empty credentials
     assert_eq!(challenge.allow_credentials.len(), 0);
@@ -142,19 +136,11 @@ fn test_start_passkey_authentication_generates_unique_challenges() {
         bs: false,
     }];
 
-    let (challenge1, state1) = passki.start_passkey_authentication(
-        &passkeys,
-        60000,
-        UserVerificationRequirement::Preferred,
-        None,
-    );
+    let (challenge1, state1) =
+        passki.start_passkey_authentication(&passkeys, AuthenticationOptions::default());
 
-    let (challenge2, state2) = passki.start_passkey_authentication(
-        &passkeys,
-        60000,
-        UserVerificationRequirement::Preferred,
-        None,
-    );
+    let (challenge2, state2) =
+        passki.start_passkey_authentication(&passkeys, AuthenticationOptions::default());
 
     // Challenges should be unique
     assert_ne!(challenge1.challenge, challenge2.challenge);
@@ -177,9 +163,11 @@ fn test_start_passkey_authentication_with_different_settings() {
 
     let (challenge, _state) = passki.start_passkey_authentication(
         &passkeys,
-        120000,
-        UserVerificationRequirement::Discouraged,
-        None,
+        AuthenticationOptions {
+            timeout: 120000,
+            user_verification: UserVerificationRequirement::Discouraged,
+            ..Default::default()
+        },
     );
 
     assert_eq!(challenge.timeout, 120000);
@@ -201,12 +189,8 @@ fn test_finish_passkey_authentication_success() {
     };
 
     let passkeys = vec![stored_passkey.clone()];
-    let (_challenge, state) = passki.start_passkey_authentication(
-        &passkeys,
-        60000,
-        UserVerificationRequirement::Preferred,
-        None,
-    );
+    let (_challenge, state) =
+        passki.start_passkey_authentication(&passkeys, AuthenticationOptions::default());
 
     let authenticator_data = create_test_authenticator_data(6, 0x01);
     let client_data_json =
@@ -244,12 +228,8 @@ fn test_finish_passkey_authentication_wrong_credential_id() {
     };
 
     let passkeys = vec![stored_passkey.clone()];
-    let (_challenge, state) = passki.start_passkey_authentication(
-        &passkeys,
-        60000,
-        UserVerificationRequirement::Preferred,
-        None,
-    );
+    let (_challenge, state) =
+        passki.start_passkey_authentication(&passkeys, AuthenticationOptions::default());
 
     let authenticator_data = create_test_authenticator_data(6, 0x01);
     let client_data_json =
@@ -289,12 +269,8 @@ fn test_finish_passkey_authentication_wrong_challenge() {
     };
 
     let passkeys = vec![stored_passkey.clone()];
-    let (_challenge, state) = passki.start_passkey_authentication(
-        &passkeys,
-        60000,
-        UserVerificationRequirement::Preferred,
-        None,
-    );
+    let (_challenge, state) =
+        passki.start_passkey_authentication(&passkeys, AuthenticationOptions::default());
 
     let authenticator_data = create_test_authenticator_data(6, 0x01);
     let wrong_challenge = vec![88u8; 32];
@@ -335,12 +311,8 @@ fn test_finish_passkey_authentication_wrong_origin() {
     };
 
     let passkeys = vec![stored_passkey.clone()];
-    let (_challenge, state) = passki.start_passkey_authentication(
-        &passkeys,
-        60000,
-        UserVerificationRequirement::Preferred,
-        None,
-    );
+    let (_challenge, state) =
+        passki.start_passkey_authentication(&passkeys, AuthenticationOptions::default());
 
     let authenticator_data = create_test_authenticator_data(6, 0x01);
     let client_data_json = create_test_auth_client_data_json(&state.challenge, "https://evil.com");
@@ -374,12 +346,8 @@ fn test_finish_passkey_authentication_invalid_counter() {
     };
 
     let passkeys = vec![stored_passkey.clone()];
-    let (_challenge, state) = passki.start_passkey_authentication(
-        &passkeys,
-        60000,
-        UserVerificationRequirement::Preferred,
-        None,
-    );
+    let (_challenge, state) =
+        passki.start_passkey_authentication(&passkeys, AuthenticationOptions::default());
 
     let authenticator_data = create_test_authenticator_data(5, 0x01); // Counter 5 <= stored counter 10
     let client_data_json =
@@ -414,12 +382,8 @@ fn test_finish_passkey_authentication_too_short_authenticator_data() {
     };
 
     let passkeys = vec![stored_passkey.clone()];
-    let (_challenge, state) = passki.start_passkey_authentication(
-        &passkeys,
-        60000,
-        UserVerificationRequirement::Preferred,
-        None,
-    );
+    let (_challenge, state) =
+        passki.start_passkey_authentication(&passkeys, AuthenticationOptions::default());
 
     let authenticator_data = vec![0u8; 36]; // Too short (< 37 bytes)
     let client_data_json =
@@ -461,9 +425,10 @@ fn test_finish_passkey_authentication_uv_required_flag_set() {
     let passkeys = vec![stored_passkey.clone()];
     let (_challenge, state) = passki.start_passkey_authentication(
         &passkeys,
-        60000,
-        UserVerificationRequirement::Required,
-        None,
+        AuthenticationOptions {
+            user_verification: UserVerificationRequirement::Required,
+            ..Default::default()
+        },
     );
 
     // flags: UP=1, UV=1 (0x05)
@@ -507,9 +472,10 @@ fn test_finish_passkey_authentication_uv_required_flag_not_set() {
     let passkeys = vec![stored_passkey.clone()];
     let (_challenge, state) = passki.start_passkey_authentication(
         &passkeys,
-        60000,
-        UserVerificationRequirement::Required,
-        None,
+        AuthenticationOptions {
+            user_verification: UserVerificationRequirement::Required,
+            ..Default::default()
+        },
     );
 
     // flags: UP=1, UV=0 (0x01)
@@ -545,12 +511,8 @@ fn test_finish_passkey_authentication_uv_preferred_flag_not_set() {
     };
 
     let passkeys = vec![stored_passkey.clone()];
-    let (_challenge, state) = passki.start_passkey_authentication(
-        &passkeys,
-        60000,
-        UserVerificationRequirement::Preferred,
-        None,
-    );
+    let (_challenge, state) =
+        passki.start_passkey_authentication(&passkeys, AuthenticationOptions::default());
 
     // flags: UP=1, UV=0 (0x01) - UV not set is fine when not Required
     let authenticator_data = create_test_authenticator_data(6, 0x01);
@@ -591,12 +553,8 @@ fn test_finish_passkey_authentication_up_flag_not_set() {
     };
 
     let passkeys = vec![stored_passkey.clone()];
-    let (_challenge, state) = passki.start_passkey_authentication(
-        &passkeys,
-        60000,
-        UserVerificationRequirement::Preferred,
-        None,
-    );
+    let (_challenge, state) =
+        passki.start_passkey_authentication(&passkeys, AuthenticationOptions::default());
 
     // flags: UP=0 (0x00)
     let authenticator_data = create_test_authenticator_data(6, 0x00);
@@ -634,12 +592,8 @@ fn test_finish_passkey_authentication_usernameless() {
 
     // Start authentication with EMPTY credentials list (usernameless flow)
     let passkeys: Vec<StoredPasskey> = vec![];
-    let (_challenge, state) = passki.start_passkey_authentication(
-        &passkeys,
-        60000,
-        UserVerificationRequirement::Preferred,
-        None,
-    );
+    let (_challenge, state) =
+        passki.start_passkey_authentication(&passkeys, AuthenticationOptions::default());
 
     // Verify state has empty allowed_credentials
     assert!(state.allowed_credentials.is_empty());

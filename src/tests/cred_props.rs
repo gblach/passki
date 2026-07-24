@@ -25,15 +25,13 @@ fn test_cred_props_in_challenge_when_requested() {
             b"user123_16bytes_",
             "alice",
             "Alice",
-            60000,
-            AttestationConveyancePreference::None,
-            ResidentKeyRequirement::Preferred,
-            UserVerificationRequirement::Preferred,
-            None,
-            Some(RegistrationExtensions {
-                cred_props: Some(true),
+            RegistrationOptions {
+                extensions: Some(RegistrationExtensions {
+                    cred_props: Some(true),
+                    ..Default::default()
+                }),
                 ..Default::default()
-            }),
+            },
         )
         .unwrap();
 
@@ -49,12 +47,7 @@ fn test_cred_props_absent_from_challenge_when_not_requested() {
             b"user123_16bytes_",
             "alice",
             "Alice",
-            60000,
-            AttestationConveyancePreference::None,
-            ResidentKeyRequirement::Preferred,
-            UserVerificationRequirement::Preferred,
-            None,
-            None,
+            RegistrationOptions::default(),
         )
         .unwrap();
 
@@ -70,15 +63,13 @@ fn test_cred_props_and_prf_can_be_requested_together() {
             b"user123_16bytes_",
             "alice",
             "Alice",
-            60000,
-            AttestationConveyancePreference::None,
-            ResidentKeyRequirement::Preferred,
-            UserVerificationRequirement::Preferred,
-            None,
-            Some(RegistrationExtensions {
-                cred_props: Some(true),
-                prf: Some(PrfInput { eval: None }),
-            }),
+            RegistrationOptions {
+                extensions: Some(RegistrationExtensions {
+                    cred_props: Some(true),
+                    prf: Some(PrfInput { eval: None }),
+                }),
+                ..Default::default()
+            },
         )
         .unwrap();
 
@@ -114,15 +105,13 @@ fn test_cred_props_rk_true_surfaced_in_result() {
             b"user123_16bytes_",
             "testuser",
             "Test User",
-            60000,
-            AttestationConveyancePreference::None,
-            ResidentKeyRequirement::Preferred,
-            UserVerificationRequirement::Preferred,
-            None,
-            Some(RegistrationExtensions {
-                cred_props: Some(true),
+            RegistrationOptions {
+                extensions: Some(RegistrationExtensions {
+                    cred_props: Some(true),
+                    ..Default::default()
+                }),
                 ..Default::default()
-            }),
+            },
         )
         .unwrap();
 
@@ -141,15 +130,13 @@ fn test_cred_props_rk_false_surfaced_in_result() {
             b"user123_16bytes_",
             "testuser",
             "Test User",
-            60000,
-            AttestationConveyancePreference::None,
-            ResidentKeyRequirement::Preferred,
-            UserVerificationRequirement::Preferred,
-            None,
-            Some(RegistrationExtensions {
-                cred_props: Some(true),
+            RegistrationOptions {
+                extensions: Some(RegistrationExtensions {
+                    cred_props: Some(true),
+                    ..Default::default()
+                }),
                 ..Default::default()
-            }),
+            },
         )
         .unwrap();
 
@@ -168,12 +155,7 @@ fn test_cred_props_rk_none_when_no_extension_results() {
             b"user123_16bytes_",
             "testuser",
             "Test User",
-            60000,
-            AttestationConveyancePreference::None,
-            ResidentKeyRequirement::Preferred,
-            UserVerificationRequirement::Preferred,
-            None,
-            None,
+            RegistrationOptions::default(),
         )
         .unwrap();
 
@@ -200,15 +182,13 @@ fn test_cred_props_rk_none_when_rk_not_reported() {
             b"user123_16bytes_",
             "testuser",
             "Test User",
-            60000,
-            AttestationConveyancePreference::None,
-            ResidentKeyRequirement::Preferred,
-            UserVerificationRequirement::Preferred,
-            None,
-            Some(RegistrationExtensions {
-                cred_props: Some(true),
+            RegistrationOptions {
+                extensions: Some(RegistrationExtensions {
+                    cred_props: Some(true),
+                    ..Default::default()
+                }),
                 ..Default::default()
-            }),
+            },
         )
         .unwrap();
 

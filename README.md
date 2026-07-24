@@ -27,10 +27,7 @@ passki = "0.2"
 ## Quick Start
 
 ```rust
-use passki::{
-    Passki, AttestationConveyancePreference, ResidentKeyRequirement,
-    UserVerificationRequirement, StoredPasskey,
-};
+use passki::{AuthenticationOptions, Passki, RegistrationOptions, StoredPasskey};
 
 // Initialize Passki with your relying party information
 let passki = Passki::new(
@@ -43,15 +40,10 @@ let passki = Passki::new(
 // Step 1: Start registration and send challenge to client
 let user_id = b"unique_user_identifier_12345"; // At least 16 bytes
 let (registration_challenge, registration_state) = passki.start_passkey_registration(
-    user_id,                                        // User ID (bytes)
-    "alice@example.com",                            // Username
-    "Alice Smith",                                  // Display name
-    60000,                                          // Timeout (ms)
-    AttestationConveyancePreference::None,          // Attestation
-    ResidentKeyRequirement::Preferred,              // Resident key
-    UserVerificationRequirement::Preferred,         // User verification
-    None,                                           // Exclude existing credentials
-    None,                                           // Extensions (None, or Some(RegistrationExtensions))
+    user_id,                        // User ID (bytes)
+    "alice@example.com",            // Username
+    "Alice Smith",                  // Display name
+    RegistrationOptions::default(), // Timeout, attestation, resident key, UV, exclusions, extensions
 ).expect("user_id must be at least 16 bytes");
 
 // Send registration_challenge to client (as JSON)
@@ -68,10 +60,8 @@ let mut stored_passkey = passki.finish_passkey_registration(
 // Authentication flow
 // Step 1: Start authentication and send challenge to client
 let (authentication_challenge, authentication_state) = passki.start_passkey_authentication(
-    &user_passkeys,                            // User's stored passkeys
-    60000,                                     // Timeout (ms)
-    UserVerificationRequirement::Preferred,    // User verification
-    None,                                      // Extensions (None, or Some(AuthenticationExtensions))
+    &user_passkeys,                   // User's stored passkeys
+    AuthenticationOptions::default(), // Timeout, user verification, extensions
 );
 
 // Send authentication_challenge to client (as JSON)
@@ -105,19 +95,17 @@ Passki supports the following COSE algorithms:
 The `credProps` extension reports whether the authenticator created a discoverable (resident) credential - one stored on the device and usable in passwordless flows. Request it during registration; the result is stored in `StoredPasskey::rk`.
 
 ```rust
-use passki::RegistrationExtensions;
+use passki::{RegistrationExtensions, RegistrationOptions};
 
 // Request credProps during registration
 let mut extensions = RegistrationExtensions::default();
 extensions.cred_props = Some(true);
 
+let mut options = RegistrationOptions::default();
+options.extensions = Some(extensions);
+
 let (challenge, state) = passki.start_passkey_registration(
-    user_id, username, display_name, 60000,
-    AttestationConveyancePreference::None,
-    ResidentKeyRequirement::Preferred,
-    UserVerificationRequirement::Preferred,
-    None,
-    Some(extensions),
+    user_id, username, display_name, options,
 )?;
 
 let passkey = passki.finish_passkey_registration(&credential, &state)?;
@@ -133,19 +121,20 @@ The [WebAuthn PRF extension](https://www.w3.org/TR/webauthn-3/#prf-extension) le
 The server passes input salts; the browser computes `HMAC-SHA256("WebAuthn PRF" || 0x00 || input)` and feeds the result into the authenticator. Passki passes the outputs through without processing them.
 
 ```rust
-use passki::{AuthenticationExtensions, PrfEval, PrfInput, RegistrationExtensions};
+use passki::{
+    AuthenticationExtensions, AuthenticationOptions, PrfEval, PrfInput, RegistrationExtensions,
+    RegistrationOptions,
+};
 
 // During registration, probe for PRF support
 let mut extensions = RegistrationExtensions::default();
 extensions.prf = Some(PrfInput { eval: None });
 
+let mut options = RegistrationOptions::default();
+options.extensions = Some(extensions);
+
 let (challenge, state) = passki.start_passkey_registration(
-    user_id, username, display_name, 60000,
-    AttestationConveyancePreference::None,
-    ResidentKeyRequirement::Preferred,
-    UserVerificationRequirement::Preferred,
-    None,
-    Some(extensions),
+    user_id, username, display_name, options,
 )?;
 // Check client_extension_results.prf.enabled in the credential before calling finish
 // to know whether the authenticator supports PRF
@@ -159,12 +148,10 @@ extensions.prf = PrfInput {
     }),
 };
 
-let (challenge, state) = passki.start_passkey_authentication(
-    &user_passkeys,
-    60000,
-    UserVerificationRequirement::Preferred,
-    Some(extensions),
-);
+let mut options = AuthenticationOptions::default();
+options.extensions = Some(extensions);
+
+let (challenge, state) = passki.start_passkey_authentication(&user_passkeys, options);
 
 // result.prf_first contains the derived key bytes (32 bytes)
 // The same passkey + same context always yields the same bytes

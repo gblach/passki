@@ -52,10 +52,10 @@
 //! Then open http://localhost:3000 in your browser.
 
 use passki::{
-    AttestationConveyancePreference, AuthenticationChallenge, AuthenticationCredential,
-    AuthenticationExtensions, AuthenticationState, ClientData, ClientExtensionResults, Passki,
+    AuthenticationChallenge, AuthenticationCredential, AuthenticationExtensions,
+    AuthenticationOptions, AuthenticationState, ClientData, ClientExtensionResults, Passki,
     PrfEval, PrfInput, RegistrationChallenge, RegistrationCredential, RegistrationExtensions,
-    RegistrationState, ResidentKeyRequirement, StoredPasskey, UserVerificationRequirement,
+    RegistrationOptions, RegistrationState, StoredPasskey,
 };
 use poem::{
     EndpointExt, Route, Server, get, handler,
@@ -224,17 +224,16 @@ async fn register_start(
     extensions.cred_props = Some(true);
     extensions.prf = Some(PrfInput { eval: None });
 
+    let mut options = RegistrationOptions::default();
+    options.exclude_credentials = existing.as_deref();
+    options.extensions = Some(extensions);
+
     let (challenge, state) = passki
         .start_passkey_registration(
             &user_id,
             &req.username, // User handle (displayed by authenticator)
             &req.username, // Display name
-            60000,         // Timeout in milliseconds
-            AttestationConveyancePreference::None, // Don't request attestation
-            ResidentKeyRequirement::Preferred, // Request discoverable credential if possible
-            UserVerificationRequirement::Preferred, // Request user verification if available
-            existing.as_deref(), // Exclude existing credentials
-            Some(extensions),
+            options,
         )
         .map_err(err)?;
 
@@ -358,12 +357,10 @@ async fn auth_start(
         extensions
     });
 
-    let (challenge, state) = passki.start_passkey_authentication(
-        &passkeys,
-        60000,                                  // Timeout in milliseconds
-        UserVerificationRequirement::Preferred, // Request user verification if available
-        extensions,
-    );
+    let mut options = AuthenticationOptions::default();
+    options.extensions = extensions;
+
+    let (challenge, state) = passki.start_passkey_authentication(&passkeys, options);
 
     // Store state for verification in finish step, keyed by the challenge
     store

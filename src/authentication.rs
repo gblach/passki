@@ -122,6 +122,33 @@ pub struct AuthenticationResult {
     pub prf_second: Option<Vec<u8>>,
 }
 
+/// Options for starting a passkey authentication ceremony.
+///
+/// The [`Default`] value uses a 60 second timeout and a `Preferred` user
+/// verification requirement.
+#[derive(Debug)]
+#[non_exhaustive]
+pub struct AuthenticationOptions {
+    /// Timeout for the operation in milliseconds.
+    pub timeout: u64,
+
+    /// User verification requirement.
+    pub user_verification: UserVerificationRequirement,
+
+    /// WebAuthn extensions to request from the authenticator.
+    pub extensions: Option<AuthenticationExtensions>,
+}
+
+impl Default for AuthenticationOptions {
+    fn default() -> Self {
+        Self {
+            timeout: 60000,
+            user_verification: UserVerificationRequirement::Preferred,
+            extensions: None,
+        }
+    }
+}
+
 impl Passki {
     /// Starts a passkey authentication ceremony.
     ///
@@ -131,11 +158,7 @@ impl Passki {
     /// # Arguments
     ///
     /// * `passkeys` - List of stored passkeys that are allowed for this authentication
-    /// * `timeout` - Timeout for the operation in milliseconds
-    /// * `user_verification` - User verification requirement
-    /// * `extensions` - Optional WebAuthn extensions, e.g. `Some(AuthenticationExtensions { prf:
-    ///   PrfInput { eval: Some(PrfEval { first: ..., second: None }) } })` to request a PRF
-    ///   derivation.
+    /// * `options` - Ceremony options; see [`AuthenticationOptions`]
     ///
     /// # Returns
     ///
@@ -145,15 +168,13 @@ impl Passki {
     pub fn start_passkey_authentication(
         &self,
         passkeys: &[StoredPasskey],
-        timeout: u64,
-        user_verification: UserVerificationRequirement,
-        extensions: Option<AuthenticationExtensions>,
+        options: AuthenticationOptions,
     ) -> (AuthenticationChallenge, AuthenticationState) {
         let challenge = Self::generate_challenge();
 
         let challenge_response = AuthenticationChallenge {
             challenge: Self::base64_encode(&challenge),
-            timeout,
+            timeout: options.timeout,
             rp_id: self.rp_id.clone(),
             allow_credentials: passkeys
                 .iter()
@@ -162,14 +183,14 @@ impl Passki {
                     type_: "public-key",
                 })
                 .collect(),
-            user_verification,
-            extensions,
+            user_verification: options.user_verification,
+            extensions: options.extensions,
         };
 
         let state = AuthenticationState {
             challenge: challenge.clone(),
             allowed_credentials: passkeys.iter().map(|pk| pk.credential_id.clone()).collect(),
-            user_verification,
+            user_verification: options.user_verification,
         };
 
         (challenge_response, state)
