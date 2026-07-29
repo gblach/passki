@@ -14,6 +14,7 @@
 
 mod helpers;
 
+mod aaguid;
 mod attestation;
 mod authentication;
 mod backup_flags;

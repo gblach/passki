@@ -63,6 +63,7 @@ fn make_stored_passkey(
         public_key: create_eddsa_cose_key(public_key_bytes),
         counter,
         algorithm: -8,
+        aaguid: [0u8; 16],
         rk: None,
         be: false,
         bs: false,

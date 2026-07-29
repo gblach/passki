@@ -217,9 +217,9 @@ The initial recommendation. Defined the core protocol:
 - [x] rpId hash verification in authenticator data - the hash in bytes 0-31 is compared against `sha256(rp_id)`
 - [x] UP (user present) flag enforcement
 - [x] UV (user verified) flag enforcement
+- [x] AAGUID exposure - the authenticator model identifier is surfaced on `StoredPasskey`; needed for Metadata Service lookups
 - [ ] `authenticatorAttachment` (`platform` / `cross-platform`) - restrict registration to platform or roaming authenticators
 - [ ] Attestation trust path validation - chain the attestation certificate to a trusted root; today only the statement signature and certificate requirements are checked
-- [ ] AAGUID exposure - parsed internally for certificate checks, but not surfaced on `StoredPasskey`; needed for Metadata Service lookups
 
 ### Level 2 (2021)
 

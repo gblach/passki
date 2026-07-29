@@ -304,6 +304,7 @@ impl Passki {
             public_key: parsed.public_key,
             counter: parsed.counter,
             algorithm: parsed.algorithm,
+            aaguid: parsed.aaguid,
             rk,
             be: (parsed.flags & FLAG_BE) != 0,
             bs: (parsed.flags & FLAG_BS) != 0,

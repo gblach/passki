@@ -263,6 +263,13 @@ pub struct StoredPasskey {
     /// The COSE algorithm identifier (e.g., -7 for ES256, -8 for EdDSA, -257 for RS256).
     pub algorithm: i32,
 
+    /// The AAGUID identifying the authenticator model, as reported in the attested credential
+    /// data. All-zero when the authenticator stayed anonymous, which is what
+    /// [`AttestationConveyancePreference::None`] asks for, and for passkeys stored before this
+    /// field was introduced.
+    #[serde(default)]
+    pub aaguid: [u8; 16],
+
     /// Whether this is a discoverable (resident) credential, as reported by the `credProps`
     /// extension during registration. `None` if `credProps` was not requested or not reported.
     #[serde(default, skip_serializing_if = "Option::is_none")]
