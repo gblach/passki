@@ -320,6 +320,7 @@ pub struct PubKeyCredParam {
 
 /// Authenticator selection criteria for passkey registration.
 #[derive(Serialize, Debug)]
+#[non_exhaustive]
 pub struct AuthenticatorSelection {
     /// Resident key requirement.
     #[serde(rename = "residentKey")]
@@ -334,6 +335,7 @@ pub struct AuthenticatorSelection {
 ///
 /// Used to prevent re-registration of existing credentials.
 #[derive(Serialize, Debug)]
+#[non_exhaustive]
 pub struct ExcludeCredential {
     /// The credential ID (base64url-encoded).
     pub id: String,
@@ -345,6 +347,7 @@ pub struct ExcludeCredential {
 
 /// A credential that is allowed for authentication.
 #[derive(Serialize, Debug)]
+#[non_exhaustive]
 pub struct AllowCredential {
     /// The credential ID (base64url-encoded).
     pub id: String,
