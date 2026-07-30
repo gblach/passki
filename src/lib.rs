@@ -100,12 +100,14 @@ mod attestation;
 mod authentication;
 mod client_data;
 mod registration;
+mod trust;
 mod types;
 
 #[cfg(test)]
 mod tests;
 
 use aws_lc_rs::rand::{SecureRandom, SystemRandom};
+use x509_cert::Certificate;
 
 pub use authentication::{
     AuthenticationChallenge, AuthenticationCredential, AuthenticationOptions, AuthenticationResult,
@@ -130,6 +132,14 @@ pub struct Passki {
 
     /// The human-readable relying party name.
     pub rp_name: String,
+
+    /// Root certificates that attestation chains are validated against. Kept
+    /// private so that later additions to the trust configuration do not break
+    /// callers; install them with [`Passki::with_attestation_trust`].
+    pub(crate) attestation_anchors: Vec<Certificate>,
+
+    /// What to do about the trust path of an attestation certificate chain.
+    pub(crate) attestation_policy: AttestationTrustPolicy,
 }
 
 impl Passki {
@@ -156,7 +166,59 @@ impl Passki {
             rp_id: rp_id.to_string(),
             rp_origins: rp_origins.iter().map(|o| o.as_ref().to_string()).collect(),
             rp_name: rp_name.to_string(),
+            attestation_anchors: Vec::new(),
+            attestation_policy: AttestationTrustPolicy::Ignore,
         }
+    }
+
+    /// Installs the trust anchors that attestation certificate chains are
+    /// validated against, together with the policy that decides what happens
+    /// when a chain does not reach one.
+    ///
+    /// Without this, and by default, attestation statements are only checked for
+    /// internal consistency: the signature is verified against the certificate
+    /// the statement itself supplies, which a malicious client can mint while
+    /// claiming any AAGUID it likes. Trust anchors are what turn
+    /// [`StoredPasskey::aaguid`] from a self-asserted value into an attested
+    /// one, so a relying party that wants a usable AAGUID sets
+    /// [`AttestationConveyancePreference::Direct`] on the registration *and*
+    /// installs anchors here. One without the other buys nothing.
+    ///
+    /// The anchors are the vendor root CA certificates for the authenticators
+    /// being accepted, in DER form. passki does not bundle them and does not
+    /// fetch the FIDO Metadata Service: that means a network round trip and JWT
+    /// verification on a schedule the relying party controls, not this crate.
+    ///
+    /// # Arguments
+    ///
+    /// * `roots` - DER-encoded root certificates
+    /// * `policy` - How strictly the trust path is enforced
+    ///
+    /// # Errors
+    ///
+    /// Returns [`PasskiError::InvalidCertificate`] if a root cannot be parsed.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use passki::{AttestationTrustPolicy, Passki, PasskiError};
+    /// # fn build(yubico_root_der: &[u8]) -> Result<Passki, PasskiError> {
+    /// let passki = Passki::new("example.com", &["https://example.com"], "Example Corp")
+    ///     .with_attestation_trust(&[yubico_root_der], AttestationTrustPolicy::VerifyWhenPresent)?;
+    /// # Ok(passki)
+    /// # }
+    /// ```
+    pub fn with_attestation_trust(
+        mut self,
+        roots: &[impl AsRef<[u8]>],
+        policy: AttestationTrustPolicy,
+    ) -> types::Result<Self> {
+        self.attestation_anchors = roots
+            .iter()
+            .map(|root| attestation::parse_cert(root.as_ref()))
+            .collect::<types::Result<Vec<_>>>()?;
+        self.attestation_policy = policy;
+        Ok(self)
     }
 
     /// Generates a cryptographically secure random challenge.

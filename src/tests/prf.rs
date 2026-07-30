@@ -65,6 +65,7 @@ fn make_stored_passkey(
         counter,
         algorithm: -8,
         aaguid: [0u8; 16],
+        attestation_type: AttestationType::None,
         rk: None,
         be: false,
         bs: false,

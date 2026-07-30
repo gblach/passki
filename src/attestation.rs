@@ -16,9 +16,9 @@
 //!
 //! Verifies the `attStmt` of an attestation object for the `packed`, `fido-u2f`,
 //! `android-key`, and `tpm` formats. This covers the statement's signature and the
-//! structural requirements on the attestation certificate. It does not assess
-//! attestation trustworthiness by chaining the certificate up to a trusted root,
-//! which is a relying party policy decision.
+//! structural requirements on the attestation certificate. Whether the certificate
+//! chains up to a trusted root is a relying party policy decision, handled by
+//! [`crate::trust`] once the checks here have passed.
 
 use aws_lc_rs::digest::{self, SHA256, SHA384};
 use aws_lc_rs::signature::{
@@ -35,6 +35,7 @@ use x509_cert::ext::pkix::{BasicConstraints, ExtendedKeyUsage};
 
 use crate::Passki;
 use crate::registration::ParsedAttestation;
+use crate::trust::validate_trust_path;
 use crate::types::*;
 
 /// id-fido-gen-ce-aaguid: the AAGUID extension carried by attestation certificates.
@@ -53,7 +54,44 @@ enum PublicKey {
     Rsa { n: Vec<u8>, e: Vec<u8> },
 }
 
+/// What an attestation statement offered once its format-specific checks passed.
+enum Evidence {
+    /// The statement carried no certificate, so there is nothing to anchor.
+    Unchained(AttestationType),
+
+    /// The statement carried an `x5c` chain, leaf first. `anchored` is the type
+    /// to report if that chain reaches a trust anchor, which the format decides:
+    /// `tpm` mints a certificate per device, so it is an attestation CA. The
+    /// specification lets `packed` be either, and a chain cannot tell the two
+    /// apart on its own, so it is reported as the far more common batch case.
+    Chained {
+        chain: Vec<Vec<u8>>,
+        anchored: AttestationType,
+    },
+}
+
 impl Passki {
+    /// Applies the trust policy to what an attestation statement offered, and
+    /// returns the attestation type to record on the credential.
+    fn resolve_attestation_type(&self, evidence: Evidence) -> Result<AttestationType> {
+        let (chain, anchored) = match evidence {
+            Evidence::Unchained(attestation_type) => {
+                if self.attestation_policy == AttestationTrustPolicy::Required {
+                    return Err(PasskiError::MissingAttestationChain);
+                }
+                return Ok(attestation_type);
+            }
+            Evidence::Chained { chain, anchored } => (chain, anchored),
+        };
+
+        if self.attestation_policy == AttestationTrustPolicy::Ignore {
+            return Ok(AttestationType::Unverified);
+        }
+
+        validate_trust_path(&chain, &self.attestation_anchors)?;
+        Ok(anchored)
+    }
+
     /// Parses an attestation object, extracts the attested credential data, and
     /// verifies the attestation statement according to its format.
     pub(crate) fn verify_attestation(
@@ -62,12 +100,12 @@ impl Passki {
         client_data_hash: &[u8],
     ) -> Result<ParsedAttestation> {
         let (fmt, auth_data, att_stmt) = Self::split_attestation_object(attestation_bytes)?;
-        let parsed = self.parse_auth_data(&auth_data)?;
+        let mut parsed = self.parse_auth_data(&auth_data)?;
         let fmt =
             fmt.ok_or_else(|| PasskiError::InvalidAttestationObject("Missing fmt".to_string()))?;
 
-        match fmt.as_str() {
-            "none" => {}
+        let evidence = match fmt.as_str() {
+            "none" => Evidence::Unchained(AttestationType::None),
             "packed" => verify_packed(&att_stmt, &auth_data, &parsed, client_data_hash)?,
             "fido-u2f" => verify_fido_u2f(&att_stmt, &auth_data, &parsed, client_data_hash)?,
             "android-key" => verify_android_key(&att_stmt, &auth_data, &parsed, client_data_hash)?,
@@ -75,7 +113,9 @@ impl Passki {
             other => {
                 return Err(PasskiError::UnsupportedAttestationFormat(other.to_string()));
             }
-        }
+        };
+
+        parsed.attestation_type = self.resolve_attestation_type(evidence)?;
 
         Ok(parsed)
     }
@@ -87,7 +127,7 @@ fn verify_packed(
     auth_data: &[u8],
     parsed: &ParsedAttestation,
     client_data_hash: &[u8],
-) -> Result<()> {
+) -> Result<Evidence> {
     let map = att_map(att_stmt)?;
     let alg = att_int(map, "alg")? as i32;
     let sig = att_bytes(map, "sig")?;
@@ -102,6 +142,10 @@ fn verify_packed(
             check_cert_version_3(&cert)?;
             check_not_ca(&cert)?;
             check_aaguid_extension(&cert, &parsed.aaguid)?;
+            Ok(Evidence::Chained {
+                chain: x5c,
+                anchored: AttestationType::Basic,
+            })
         }
         None => {
             // Self attestation: the credential key signs, and the statement's alg
@@ -112,10 +156,9 @@ fn verify_packed(
                 ));
             }
             Passki::verify_signature(&parsed.public_key, alg, &signed_data, sig)?;
+            Ok(Evidence::Unchained(AttestationType::SelfAttested))
         }
     }
-
-    Ok(())
 }
 
 /// Verifies a `fido-u2f` attestation statement.
@@ -124,7 +167,7 @@ fn verify_fido_u2f(
     auth_data: &[u8],
     parsed: &ParsedAttestation,
     client_data_hash: &[u8],
-) -> Result<()> {
+) -> Result<Evidence> {
     let map = att_map(att_stmt)?;
     let sig = att_bytes(map, "sig")?;
     let x5c = att_x5c(map)?.ok_or_else(|| {
@@ -166,7 +209,12 @@ fn verify_fido_u2f(
     verification_data.extend_from_slice(&public_key_u2f);
 
     // fido-u2f signatures are always ES256.
-    verify_cert_signature(&cert, ALG_ES256, &verification_data, sig)
+    verify_cert_signature(&cert, ALG_ES256, &verification_data, sig)?;
+
+    Ok(Evidence::Chained {
+        chain: x5c,
+        anchored: AttestationType::Basic,
+    })
 }
 
 /// Verifies an `android-key` attestation statement.
@@ -175,7 +223,7 @@ fn verify_android_key(
     auth_data: &[u8],
     parsed: &ParsedAttestation,
     client_data_hash: &[u8],
-) -> Result<()> {
+) -> Result<Evidence> {
     let map = att_map(att_stmt)?;
     let alg = att_int(map, "alg")? as i32;
     let sig = att_bytes(map, "sig")?;
@@ -201,7 +249,12 @@ fn verify_android_key(
                 .to_string(),
         )
     })?;
-    verify_android_key_description(extension, client_data_hash)
+    verify_android_key_description(extension, client_data_hash)?;
+
+    Ok(Evidence::Chained {
+        chain: x5c,
+        anchored: AttestationType::Basic,
+    })
 }
 
 /// Verifies a `tpm` attestation statement.
@@ -210,7 +263,7 @@ fn verify_tpm(
     auth_data: &[u8],
     parsed: &ParsedAttestation,
     client_data_hash: &[u8],
-) -> Result<()> {
+) -> Result<Evidence> {
     let map = att_map(att_stmt)?;
     if att_text(map, "ver")? != "2.0" {
         return Err(PasskiError::InvalidAttestation(
@@ -279,7 +332,10 @@ fn verify_tpm(
     check_not_ca(&cert)?;
     check_aaguid_extension(&cert, &parsed.aaguid)?;
 
-    Ok(())
+    Ok(Evidence::Chained {
+        chain: x5c,
+        anchored: AttestationType::AttCa,
+    })
 }
 
 // attStmt accessors
@@ -345,13 +401,28 @@ fn att_x5c(map: &[(Value, Value)]) -> Result<Option<Vec<Vec<u8>>>> {
 // Certificate helpers
 
 /// Parses a DER-encoded X.509 certificate.
-fn parse_cert(der: &[u8]) -> Result<Certificate> {
+pub(crate) fn parse_cert(der: &[u8]) -> Result<Certificate> {
     Certificate::from_der(der)
         .map_err(|e| PasskiError::InvalidCertificate(format!("Failed to parse: {}", e)))
 }
 
+/// Returns the raw `tbsCertificate` bytes of a DER-encoded certificate.
+///
+/// The issuer's signature covers these bytes exactly as they were emitted, so
+/// they are sliced out of the original encoding rather than re-encoded from the
+/// parsed structure, which would only match for input that is already canonical.
+pub(crate) fn tbs_der(der: &[u8]) -> Result<&[u8]> {
+    DerReader::new(der)
+        .read_sequence()
+        .and_then(|mut certificate| certificate.read_element())
+        .map_err(|_| PasskiError::InvalidCertificate("Missing tbsCertificate".to_string()))
+}
+
 /// Returns the value bytes of the extension with the given OID, if present.
-fn cert_extension<'a>(cert: &'a Certificate, oid: &ObjectIdentifier) -> Option<&'a [u8]> {
+pub(crate) fn cert_extension<'a>(
+    cert: &'a Certificate,
+    oid: &ObjectIdentifier,
+) -> Option<&'a [u8]> {
     cert.tbs_certificate
         .extensions
         .as_ref()?
@@ -380,7 +451,12 @@ fn verify_cert_signature(
 }
 
 /// Verifies a signature given a raw public key as encoded in a `SubjectPublicKeyInfo`.
-fn verify_with_key(alg: i32, key: &[u8], signed_data: &[u8], signature: &[u8]) -> Result<()> {
+pub(crate) fn verify_with_key(
+    alg: i32,
+    key: &[u8],
+    signed_data: &[u8],
+    signature: &[u8],
+) -> Result<()> {
     match alg {
         ALG_ES256 => UnparsedPublicKey::new(&ECDSA_P256_SHA256_ASN1, key)
             .verify(signed_data, signature)
@@ -823,6 +899,14 @@ impl<'a> DerReader<'a> {
         let content = &self.bytes[self.pos..end];
         self.pos = end;
         Ok((class, constructed, tag_number, content))
+    }
+
+    /// Reads one TLV element and returns its complete encoding, tag and length
+    /// header included.
+    fn read_element(&mut self) -> Result<&'a [u8]> {
+        let start = self.pos;
+        self.read_tlv()?;
+        Ok(&self.bytes[start..self.pos])
     }
 
     /// Reads a `SEQUENCE` and returns a reader over its content.

@@ -149,6 +149,22 @@ pub enum PasskiError {
     /// WebAuthn attestation certificate requirements.
     #[error("Invalid attestation certificate: {0}")]
     InvalidCertificate(String),
+
+    /// A trust path could not be built from the certificates the attestation
+    /// statement carried: a link was not signed by the next certificate, a
+    /// certificate was outside its validity period, or an issuer was not a CA.
+    #[error("Invalid attestation certificate chain: {0}")]
+    InvalidCertificateChain(String),
+
+    /// The certificate chain was well formed but did not reach any of the trust
+    /// anchors installed with [`crate::Passki::with_attestation_trust`].
+    #[error("Attestation certificate chain does not reach a trust anchor")]
+    UntrustedAttestation,
+
+    /// [`AttestationTrustPolicy::Required`] is in effect but the authenticator
+    /// sent no attestation certificate to validate.
+    #[error("Attestation is required but the statement carried no certificate chain")]
+    MissingAttestationChain,
 }
 
 /// Convenience type alias for Results returned by Passki operations.
@@ -213,6 +229,69 @@ pub enum AttestationConveyancePreference {
     Direct,
     /// Enterprise attestation is requested (for managed devices).
     Enterprise,
+}
+
+/// What the crate concluded about an attestation statement.
+///
+/// The variants follow the attestation types the WebAuthn specification defines,
+/// with one addition: [`AttestationType::Unverified`] covers a certificate chain
+/// that was never checked against a trust anchor. [`AttestationType::Basic`] and
+/// [`AttestationType::AttCa`] are only ever reported after a chain reached an
+/// anchor installed with [`crate::Passki::with_attestation_trust`], so seeing
+/// either one means the authenticator model, and with it the AAGUID, is
+/// attested rather than self-asserted.
+#[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Debug, Default)]
+#[serde(rename_all = "kebab-case")]
+pub enum AttestationType {
+    /// The authenticator sent no attestation statement (`fmt` was `none`), which
+    /// is what [`AttestationConveyancePreference::None`] asks for. Nothing is
+    /// known about the authenticator model.
+    #[default]
+    None,
+
+    /// Self attestation: the credential key signed its own statement. This
+    /// proves the authenticator holds the matching private key and nothing more.
+    SelfAttested,
+
+    /// The statement carried a certificate chain that was not validated, because
+    /// [`AttestationTrustPolicy::Ignore`] is in effect. The AAGUID is
+    /// self-asserted: a malicious client can mint a certificate claiming any
+    /// model and still pass every check performed under this policy.
+    Unverified,
+
+    /// Basic attestation: a certificate shared by a batch of authenticators of
+    /// the same model, validated up to a trust anchor.
+    Basic,
+
+    /// Attestation CA: a per-device certificate issued by the authenticator
+    /// vendor's CA, validated up to a trust anchor.
+    AttCa,
+}
+
+/// What to do about the trust path of an attestation certificate chain.
+///
+/// Installed together with the trust anchors themselves, by
+/// [`crate::Passki::with_attestation_trust`].
+#[derive(Clone, Copy, PartialEq, Debug, Default)]
+pub enum AttestationTrustPolicy {
+    /// Do not build a trust path. Attestation statements are still checked for
+    /// internal consistency, and a statement carrying certificates is reported
+    /// as [`AttestationType::Unverified`]. This is the default, and it is what
+    /// releases before 0.3.0 did unconditionally.
+    #[default]
+    Ignore,
+
+    /// Validate the trust path whenever the statement carries certificates, and
+    /// reject the registration when it does not reach an anchor. Statements
+    /// without certificates, meaning `fmt` `none` and self attestation, are
+    /// still accepted and reported as such.
+    VerifyWhenPresent,
+
+    /// As [`AttestationTrustPolicy::VerifyWhenPresent`], and additionally reject
+    /// registrations whose statement carries no certificate chain at all. Most
+    /// synced passkeys return no attestation whatever the relying party asks
+    /// for, so this policy suits deployments limited to security keys.
+    Required,
 }
 
 /// Authenticator attachment modality.
@@ -285,6 +364,14 @@ pub struct StoredPasskey {
     /// field was introduced.
     #[serde(default)]
     pub aaguid: [u8; 16],
+
+    /// What the attestation statement turned out to be worth. Only
+    /// [`AttestationType::Basic`] and [`AttestationType::AttCa`] mean the
+    /// `aaguid` above was attested by a trusted root; every other value leaves
+    /// it self-asserted. [`AttestationType::None`] for passkeys stored before
+    /// this field was introduced.
+    #[serde(default)]
+    pub attestation_type: AttestationType,
 
     /// Whether this is a discoverable (resident) credential, as reported by the `credProps`
     /// extension during registration. `None` if `credProps` was not requested or not reported.

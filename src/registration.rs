@@ -163,6 +163,11 @@ pub(crate) struct ParsedAttestation {
 
     /// The AAGUID of the authenticator that created the credential.
     pub aaguid: [u8; 16],
+
+    /// What the attestation statement turned out to be worth. Left at
+    /// [`AttestationType::None`] by authenticator data parsing, which sees no
+    /// statement; `verify_attestation` fills it in.
+    pub attestation_type: AttestationType,
 }
 
 impl Passki {
@@ -315,6 +320,7 @@ impl Passki {
             counter: parsed.counter,
             algorithm: parsed.algorithm,
             aaguid: parsed.aaguid,
+            attestation_type: parsed.attestation_type,
             rk,
             be: (parsed.flags & FLAG_BE) != 0,
             bs: (parsed.flags & FLAG_BS) != 0,
@@ -437,6 +443,7 @@ impl Passki {
             flags,
             counter,
             aaguid,
+            attestation_type: AttestationType::None,
         })
     }
 }
