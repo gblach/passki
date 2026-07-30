@@ -44,6 +44,7 @@ fn test_finish_passkey_registration_populates_be_and_bs() {
         public_key: Passki::base64_encode(&attestation_obj),
         client_data_json: Passki::base64_encode(&client_data_json),
         client_extension_results: None,
+        authenticator_attachment: None,
     };
 
     let passkey = passki
@@ -67,6 +68,7 @@ fn test_finish_passkey_registration_be_without_bs() {
         public_key: Passki::base64_encode(&attestation_obj),
         client_data_json: Passki::base64_encode(&client_data_json),
         client_extension_results: None,
+        authenticator_attachment: None,
     };
 
     let passkey = passki
@@ -90,6 +92,7 @@ fn test_finish_passkey_registration_no_backup_flags() {
         public_key: Passki::base64_encode(&attestation_obj),
         client_data_json: Passki::base64_encode(&client_data_json),
         client_extension_results: None,
+        authenticator_attachment: None,
     };
 
     let passkey = passki
@@ -113,6 +116,7 @@ fn test_finish_passkey_registration_bs_without_be_rejected() {
         public_key: Passki::base64_encode(&attestation_obj),
         client_data_json: Passki::base64_encode(&client_data_json),
         client_extension_results: None,
+        authenticator_attachment: None,
     };
 
     let result = passki.finish_passkey_registration(&credential, &state);
@@ -153,6 +157,7 @@ fn test_finish_passkey_authentication_bs_without_be_rejected() {
         signature: Passki::base64_encode(&[9u8; 64]),
         user_handle: None,
         client_extension_results: None,
+        authenticator_attachment: None,
     };
 
     let result = passki.finish_passkey_authentication(&credential, &state, &stored_passkey);

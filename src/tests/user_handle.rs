@@ -44,6 +44,7 @@ fn signed_auth_credential(
         signature: Passki::base64_encode(signature.as_ref()),
         user_handle,
         client_extension_results: None,
+        authenticator_attachment: None,
     }
 }
 

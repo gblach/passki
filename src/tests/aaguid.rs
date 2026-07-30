@@ -39,6 +39,7 @@ fn register(passki: &Passki, aaguid: [u8; 16]) -> StoredPasskey {
         public_key: Passki::base64_encode(&attestation_obj),
         client_data_json: Passki::base64_encode(&client_data_json),
         client_extension_results: None,
+        authenticator_attachment: None,
     };
 
     passki

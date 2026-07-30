@@ -43,7 +43,7 @@ let (registration_challenge, registration_state) = passki.start_passkey_registra
     user_id,                        // User ID (bytes)
     "alice@example.com",            // Username
     "Alice Smith",                  // Display name
-    RegistrationOptions::default(), // Timeout, attestation, resident key, UV, exclusions, extensions
+    RegistrationOptions::default(), // Timeout, attestation, resident key, UV, attachment, exclusions, extensions
 ).expect("user_id must be at least 16 bytes");
 
 // Send registration_challenge to client (as JSON)
@@ -122,8 +122,8 @@ The server passes input salts; the browser computes `SHA-256("WebAuthn PRF" || 0
 
 ```rust
 use passki::{
-    AuthenticationExtensions, AuthenticationOptions, PrfEval, PrfInput, RegistrationExtensions,
-    RegistrationOptions,
+    AuthenticationExtensions, AuthenticationOptions, Passki, PrfEval, PrfInput,
+    RegistrationExtensions, RegistrationOptions,
 };
 
 // During registration, probe for PRF support
@@ -218,7 +218,7 @@ The initial recommendation. Defined the core protocol:
 - [x] UP (user present) flag enforcement
 - [x] UV (user verified) flag enforcement
 - [x] AAGUID exposure - the authenticator model identifier is surfaced on `StoredPasskey`; needed for Metadata Service lookups
-- [ ] `authenticatorAttachment` (`platform` / `cross-platform`) - restrict registration to platform or roaming authenticators
+- [x] `authenticatorAttachment` (`platform` / `cross-platform`) - restrict registration to platform or roaming authenticators, and capture the modality the client reports back
 - [ ] Attestation trust path validation - chain the attestation certificate to a trusted root; today only the statement signature and certificate requirements are checked
 
 ### Level 2 (2021)

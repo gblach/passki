@@ -345,6 +345,8 @@
                                 credential.response.clientDataJSON,
                             ),
                             client_extension_results: clientExtensionResults,
+                            authenticator_attachment:
+                                credential.authenticatorAttachment,
                         }),
                     });
 
@@ -459,6 +461,8 @@
                             ? bufferToBase64url(credential.response.userHandle)
                             : null,
                         client_extension_results: clientExtensionResults,
+                        authenticator_attachment:
+                            credential.authenticatorAttachment,
                     }),
                 });
 
@@ -509,6 +513,8 @@
                                 ? bufferToBase64url(credential.response.userHandle)
                                 : null,
                             client_extension_results: clientExtensionResults,
+                            authenticator_attachment:
+                                credential.authenticatorAttachment,
                         }),
                     });
 

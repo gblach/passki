@@ -93,6 +93,10 @@ pub struct RegistrationCredential {
 
     /// Extension results from the client (e.g., PRF support flag).
     pub client_extension_results: Option<ClientExtensionResults>,
+
+    /// The attachment modality the client reports for the new credential.
+    /// `None` when the client did not report one.
+    pub authenticator_attachment: Option<AuthenticatorAttachment>,
 }
 
 /// Options for starting a passkey registration ceremony.
@@ -114,6 +118,10 @@ pub struct RegistrationOptions<'a> {
     /// User verification requirement.
     pub user_verification: UserVerificationRequirement,
 
+    /// Restricts registration to platform or roaming authenticators. `None`
+    /// lets the client offer both.
+    pub authenticator_attachment: Option<AuthenticatorAttachment>,
+
     /// Existing credentials to exclude from registration.
     pub exclude_credentials: Option<&'a [StoredPasskey]>,
 
@@ -128,6 +136,7 @@ impl Default for RegistrationOptions<'_> {
             attestation: AttestationConveyancePreference::None,
             resident_key: ResidentKeyRequirement::Preferred,
             user_verification: UserVerificationRequirement::Preferred,
+            authenticator_attachment: None,
             exclude_credentials: None,
             extensions: None,
         }
@@ -225,6 +234,7 @@ impl Passki {
             timeout: options.timeout,
             attestation: options.attestation,
             authenticator_selection: AuthenticatorSelection {
+                authenticator_attachment: options.authenticator_attachment,
                 resident_key: options.resident_key,
                 user_verification: options.user_verification,
             },

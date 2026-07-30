@@ -351,6 +351,7 @@ fn test_finish_passkey_registration_success() {
         public_key: Passki::base64_encode(&attestation_obj),
         client_data_json: Passki::base64_encode(&client_data_json),
         client_extension_results: None,
+        authenticator_attachment: None,
     };
 
     let result = passki.finish_passkey_registration(&credential, &state);
@@ -385,6 +386,7 @@ fn test_finish_passkey_registration_stores_initial_counter() {
         public_key: Passki::base64_encode(&attestation_obj),
         client_data_json: Passki::base64_encode(&client_data_json),
         client_extension_results: None,
+        authenticator_attachment: None,
     };
 
     let passkey = passki
@@ -419,6 +421,7 @@ fn test_finish_passkey_registration_wrong_challenge() {
         public_key: Passki::base64_encode(&attestation_obj),
         client_data_json: Passki::base64_encode(&client_data_json),
         client_extension_results: None,
+        authenticator_attachment: None,
     };
 
     let result = passki.finish_passkey_registration(&credential, &state);
@@ -453,6 +456,7 @@ fn test_finish_passkey_registration_wrong_origin() {
         public_key: Passki::base64_encode(&attestation_obj),
         client_data_json: Passki::base64_encode(&client_data_json),
         client_extension_results: None,
+        authenticator_attachment: None,
     };
 
     let result = passki.finish_passkey_registration(&credential, &state);
@@ -485,6 +489,7 @@ fn test_finish_passkey_registration_uv_required_flag_set() {
         public_key: Passki::base64_encode(&attestation_obj),
         client_data_json: Passki::base64_encode(&client_data_json),
         client_extension_results: None,
+        authenticator_attachment: None,
     };
 
     assert!(
@@ -519,6 +524,7 @@ fn test_finish_passkey_registration_uv_required_flag_not_set() {
         public_key: Passki::base64_encode(&attestation_obj),
         client_data_json: Passki::base64_encode(&client_data_json),
         client_extension_results: None,
+        authenticator_attachment: None,
     };
 
     let result = passki.finish_passkey_registration(&credential, &state);
@@ -548,6 +554,7 @@ fn test_finish_passkey_registration_uv_preferred_flag_not_set() {
         public_key: Passki::base64_encode(&attestation_obj),
         client_data_json: Passki::base64_encode(&client_data_json),
         client_extension_results: None,
+        authenticator_attachment: None,
     };
 
     assert!(
@@ -580,6 +587,7 @@ fn test_finish_passkey_registration_up_flag_not_set() {
         public_key: Passki::base64_encode(&attestation_obj),
         client_data_json: Passki::base64_encode(&client_data_json),
         client_extension_results: None,
+        authenticator_attachment: None,
     };
 
     let result = passki.finish_passkey_registration(&credential, &state);
@@ -609,6 +617,7 @@ fn test_finish_passkey_registration_eddsa_algorithm() {
         public_key: Passki::base64_encode(&attestation_obj),
         client_data_json: Passki::base64_encode(&client_data_json),
         client_extension_results: None,
+        authenticator_attachment: None,
     };
 
     let result = passki.finish_passkey_registration(&credential, &state);
@@ -641,6 +650,7 @@ fn test_finish_passkey_registration_credential_id_mismatch() {
         public_key: Passki::base64_encode(&attestation_obj),
         client_data_json: Passki::base64_encode(&client_data_json),
         client_extension_results: None,
+        authenticator_attachment: None,
     };
 
     let result = passki.finish_passkey_registration(&credential, &state);

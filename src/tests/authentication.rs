@@ -210,6 +210,7 @@ fn test_finish_passkey_authentication_success() {
         signature: Passki::base64_encode(&[9u8; 64]),
         user_handle: None,
         client_extension_results: None,
+        authenticator_attachment: None,
     };
 
     let result = passki.finish_passkey_authentication(&credential, &state, &stored_passkey);
@@ -250,6 +251,7 @@ fn test_finish_passkey_authentication_wrong_credential_id() {
         signature: Passki::base64_encode(&[9u8; 64]),
         user_handle: None,
         client_extension_results: None,
+        authenticator_attachment: None,
     };
 
     let result = passki.finish_passkey_authentication(&credential, &state, &stored_passkey);
@@ -293,6 +295,7 @@ fn test_finish_passkey_authentication_wrong_challenge() {
         signature: Passki::base64_encode(&[9u8; 64]),
         user_handle: None,
         client_extension_results: None,
+        authenticator_attachment: None,
     };
 
     let result = passki.finish_passkey_authentication(&credential, &state, &stored_passkey);
@@ -334,6 +337,7 @@ fn test_finish_passkey_authentication_wrong_origin() {
         signature: Passki::base64_encode(&[9u8; 64]),
         user_handle: None,
         client_extension_results: None,
+        authenticator_attachment: None,
     };
 
     let result = passki.finish_passkey_authentication(&credential, &state, &stored_passkey);
@@ -371,6 +375,7 @@ fn test_finish_passkey_authentication_invalid_counter() {
         signature: Passki::base64_encode(&[9u8; 64]),
         user_handle: None,
         client_extension_results: None,
+        authenticator_attachment: None,
     };
 
     let result = passki.finish_passkey_authentication(&credential, &state, &stored_passkey);
@@ -408,6 +413,7 @@ fn test_finish_passkey_authentication_too_short_authenticator_data() {
         signature: Passki::base64_encode(&[9u8; 64]),
         user_handle: None,
         client_extension_results: None,
+        authenticator_attachment: None,
     };
 
     let result = passki.finish_passkey_authentication(&credential, &state, &stored_passkey);
@@ -455,6 +461,7 @@ fn test_finish_passkey_authentication_uv_required_flag_set() {
         signature: Passki::base64_encode(&[9u8; 64]),
         user_handle: None,
         client_extension_results: None,
+        authenticator_attachment: None,
     };
 
     // Fails at signature verification (dummy key), not at UV check
@@ -503,6 +510,7 @@ fn test_finish_passkey_authentication_uv_required_flag_not_set() {
         signature: Passki::base64_encode(&[9u8; 64]),
         user_handle: None,
         client_extension_results: None,
+        authenticator_attachment: None,
     };
 
     let result = passki.finish_passkey_authentication(&credential, &state, &stored_passkey);
@@ -540,6 +548,7 @@ fn test_finish_passkey_authentication_uv_preferred_flag_not_set() {
         signature: Passki::base64_encode(&[9u8; 64]),
         user_handle: None,
         client_extension_results: None,
+        authenticator_attachment: None,
     };
 
     // Fails at signature verification (dummy key), not at UV check
@@ -584,6 +593,7 @@ fn test_finish_passkey_authentication_up_flag_not_set() {
         signature: Passki::base64_encode(&[9u8; 64]),
         user_handle: None,
         client_extension_results: None,
+        authenticator_attachment: None,
     };
 
     let result = passki.finish_passkey_authentication(&credential, &state, &stored_passkey);
@@ -627,6 +637,7 @@ fn test_finish_passkey_authentication_usernameless() {
         signature: Passki::base64_encode(&[9u8; 64]),
         user_handle: None,
         client_extension_results: None,
+        authenticator_attachment: None,
     };
 
     let result = passki.finish_passkey_authentication(&credential, &state, &stored_passkey);

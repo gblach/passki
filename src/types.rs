@@ -215,6 +215,22 @@ pub enum AttestationConveyancePreference {
     Enterprise,
 }
 
+/// Authenticator attachment modality.
+///
+/// As a registration option it restricts which authenticators the client offers.
+/// As a value reported back on a credential it tells the relying party which
+/// kind of authenticator the client actually used. The reported value is
+/// asserted by the client and not covered by the authenticator's signature, so
+/// treat it as a hint rather than an authorization decision.
+#[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Debug)]
+#[serde(rename_all = "kebab-case")]
+pub enum AuthenticatorAttachment {
+    /// An authenticator built into the client device (e.g. Touch ID, Windows Hello).
+    Platform,
+    /// A roaming authenticator, such as a security key or a phone used over hybrid transport.
+    CrossPlatform,
+}
+
 /// Resident key requirement for passkey registration.
 ///
 /// Specifies whether the authenticator should store the credential locally
@@ -329,6 +345,14 @@ pub struct PubKeyCredParam {
 #[derive(Serialize, Debug)]
 #[non_exhaustive]
 pub struct AuthenticatorSelection {
+    /// Restricts registration to platform or roaming authenticators. Omitted
+    /// from the challenge when `None`, which lets the client offer both.
+    #[serde(
+        rename = "authenticatorAttachment",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub authenticator_attachment: Option<AuthenticatorAttachment>,
+
     /// Resident key requirement.
     #[serde(rename = "residentKey")]
     pub resident_key: ResidentKeyRequirement,

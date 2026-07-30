@@ -94,6 +94,7 @@ fn make_credential(
             cred_props,
             prf: None,
         }),
+        authenticator_attachment: None,
     }
 }
 
@@ -166,6 +167,7 @@ fn test_cred_props_rk_none_when_no_extension_results() {
         public_key: Passki::base64_encode(&attestation_obj),
         client_data_json: Passki::base64_encode(&client_data_json),
         client_extension_results: None,
+        authenticator_attachment: None,
     };
 
     let result = passki

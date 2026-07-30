@@ -17,6 +17,7 @@ mod helpers;
 mod aaguid;
 mod attestation;
 mod authentication;
+mod authenticator_attachment;
 mod backup_flags;
 mod base64;
 mod client_data;

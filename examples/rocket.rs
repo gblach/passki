@@ -55,9 +55,10 @@ extern crate rocket;
 
 use passki::{
     AuthenticationChallenge, AuthenticationCredential, AuthenticationExtensions,
-    AuthenticationOptions, AuthenticationState, ClientData, ClientExtensionResults, Passki,
-    PasskiError, PrfEval, PrfInput, RegistrationChallenge, RegistrationCredential,
-    RegistrationExtensions, RegistrationOptions, RegistrationState, StoredPasskey,
+    AuthenticationOptions, AuthenticationState, AuthenticatorAttachment, ClientData,
+    ClientExtensionResults, Passki, PasskiError, PrfEval, PrfInput, RegistrationChallenge,
+    RegistrationCredential, RegistrationExtensions, RegistrationOptions, RegistrationState,
+    StoredPasskey,
 };
 use rocket::http::Status;
 use rocket::response::content::RawHtml;
@@ -156,6 +157,8 @@ struct RegisterFinishRequest {
     client_data_json: String,
     /// Extension results from the browser (e.g., PRF support flag)
     client_extension_results: Option<ClientExtensionResults>,
+    /// Attachment modality the browser reports (`platform` / `cross-platform`)
+    authenticator_attachment: Option<AuthenticatorAttachment>,
 }
 
 /// Request to start authentication. Username and PRF salt are both optional.
@@ -186,6 +189,8 @@ struct AuthFinishRequest {
     user_handle: Option<String>,
     /// Extension results from the browser (e.g., PRF outputs)
     client_extension_results: Option<ClientExtensionResults>,
+    /// Attachment modality the browser reports (`platform` / `cross-platform`)
+    authenticator_attachment: Option<AuthenticatorAttachment>,
 }
 
 #[derive(Serialize)]
@@ -300,6 +305,7 @@ fn register_finish(
         public_key: req.public_key,
         client_data_json: req.client_data_json,
         client_extension_results: req.client_extension_results,
+        authenticator_attachment: req.authenticator_attachment,
     };
 
     // Verify the credential (checks origin, challenge, parses public key)
@@ -450,6 +456,7 @@ fn auth_finish(
         signature: req.signature,
         user_handle: req.user_handle,
         client_extension_results: req.client_extension_results,
+        authenticator_attachment: req.authenticator_attachment,
     };
 
     // Verify the signature (checks origin, challenge, signature, counter)

@@ -97,6 +97,12 @@ pub struct AuthenticationCredential {
 
     /// Extension results from the client (e.g., PRF outputs).
     pub client_extension_results: Option<ClientExtensionResults>,
+
+    /// The attachment modality the client reports for this ceremony. A
+    /// credential registered as `Platform` that authenticates as `CrossPlatform`
+    /// has been used from another device. `None` when the client did not report
+    /// one.
+    pub authenticator_attachment: Option<AuthenticatorAttachment>,
 }
 
 /// Result of a successful authentication.
