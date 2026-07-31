@@ -126,6 +126,15 @@ pub struct AuthenticationResult {
 
     /// Decoded second PRF output, if a second input was requested and supported.
     pub prf_second: Option<Vec<u8>>,
+
+    /// The decoded blob read from the credential, if
+    /// [`LargeBlobAuthenticationInput::Read`] was requested and the
+    /// authenticator returned one.
+    pub large_blob: Option<Vec<u8>>,
+
+    /// Whether the blob of [`LargeBlobAuthenticationInput::Write`] was stored.
+    /// `None` when no write was requested or the client did not report.
+    pub large_blob_written: Option<bool>,
 }
 
 /// Options for starting a passkey authentication ceremony.
@@ -315,6 +324,17 @@ impl Passki {
             .map(Self::base64_decode)
             .transpose()?;
 
+        let large_blob_result = credential
+            .client_extension_results
+            .as_ref()
+            .and_then(|ext| ext.large_blob.as_ref());
+
+        let large_blob = large_blob_result
+            .and_then(|lb| lb.blob.as_deref())
+            .map(Self::base64_decode)
+            .transpose()?;
+        let large_blob_written = large_blob_result.and_then(|lb| lb.written);
+
         let user_handle = credential
             .user_handle
             .as_deref()
@@ -327,6 +347,8 @@ impl Passki {
             user_handle,
             prf_first,
             prf_second,
+            large_blob,
+            large_blob_written,
         })
     }
 

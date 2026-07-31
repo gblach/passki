@@ -76,6 +76,7 @@ fn test_stored_passkey_zero_aaguid_roundtrip() {
         attestation_type: AttestationType::None,
         transports: Vec::new(),
         rk: None,
+        large_blob_supported: None,
         be: false,
         bs: false,
     };
@@ -96,6 +97,7 @@ fn test_stored_passkey_aaguid_roundtrip() {
         attestation_type: AttestationType::None,
         transports: Vec::new(),
         rk: None,
+        large_blob_supported: None,
         be: false,
         bs: false,
     };
@@ -116,6 +118,7 @@ fn test_stored_passkey_zero_aaguid_is_serialized() {
         attestation_type: AttestationType::None,
         transports: Vec::new(),
         rk: None,
+        large_blob_supported: None,
         be: false,
         bs: false,
     };

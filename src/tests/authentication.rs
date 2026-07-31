@@ -28,6 +28,7 @@ fn test_start_passkey_authentication_returns_challenge() {
         attestation_type: AttestationType::None,
         transports: Vec::new(),
         rk: None,
+        large_blob_supported: None,
         be: false,
         bs: false,
     }];
@@ -62,6 +63,7 @@ fn test_start_passkey_authentication_multiple_credentials() {
             attestation_type: AttestationType::None,
             transports: Vec::new(),
             rk: None,
+            large_blob_supported: None,
             be: false,
             bs: false,
         },
@@ -74,6 +76,7 @@ fn test_start_passkey_authentication_multiple_credentials() {
             attestation_type: AttestationType::None,
             transports: Vec::new(),
             rk: None,
+            large_blob_supported: None,
             be: false,
             bs: false,
         },
@@ -86,6 +89,7 @@ fn test_start_passkey_authentication_multiple_credentials() {
             attestation_type: AttestationType::None,
             transports: Vec::new(),
             rk: None,
+            large_blob_supported: None,
             be: false,
             bs: false,
         },
@@ -147,6 +151,7 @@ fn test_start_passkey_authentication_generates_unique_challenges() {
         attestation_type: AttestationType::None,
         transports: Vec::new(),
         rk: None,
+        large_blob_supported: None,
         be: false,
         bs: false,
     }];
@@ -175,6 +180,7 @@ fn test_start_passkey_authentication_with_different_settings() {
         attestation_type: AttestationType::None,
         transports: Vec::new(),
         rk: None,
+        large_blob_supported: None,
         be: false,
         bs: false,
     }];
@@ -205,6 +211,7 @@ fn test_finish_passkey_authentication_success() {
         attestation_type: AttestationType::None,
         transports: Vec::new(),
         rk: None,
+        large_blob_supported: None,
         be: false,
         bs: false,
     };
@@ -248,6 +255,7 @@ fn test_finish_passkey_authentication_wrong_credential_id() {
         attestation_type: AttestationType::None,
         transports: Vec::new(),
         rk: None,
+        large_blob_supported: None,
         be: false,
         bs: false,
     };
@@ -293,6 +301,7 @@ fn test_finish_passkey_authentication_wrong_challenge() {
         attestation_type: AttestationType::None,
         transports: Vec::new(),
         rk: None,
+        large_blob_supported: None,
         be: false,
         bs: false,
     };
@@ -339,6 +348,7 @@ fn test_finish_passkey_authentication_wrong_origin() {
         attestation_type: AttestationType::None,
         transports: Vec::new(),
         rk: None,
+        large_blob_supported: None,
         be: false,
         bs: false,
     };
@@ -378,6 +388,7 @@ fn test_finish_passkey_authentication_invalid_counter() {
         attestation_type: AttestationType::None,
         transports: Vec::new(),
         rk: None,
+        large_blob_supported: None,
         be: false,
         bs: false,
     };
@@ -418,6 +429,7 @@ fn test_finish_passkey_authentication_too_short_authenticator_data() {
         attestation_type: AttestationType::None,
         transports: Vec::new(),
         rk: None,
+        large_blob_supported: None,
         be: false,
         bs: false,
     };
@@ -463,6 +475,7 @@ fn test_finish_passkey_authentication_uv_required_flag_set() {
         attestation_type: AttestationType::None,
         transports: Vec::new(),
         rk: None,
+        large_blob_supported: None,
         be: false,
         bs: false,
     };
@@ -514,6 +527,7 @@ fn test_finish_passkey_authentication_uv_required_flag_not_set() {
         attestation_type: AttestationType::None,
         transports: Vec::new(),
         rk: None,
+        large_blob_supported: None,
         be: false,
         bs: false,
     };
@@ -559,6 +573,7 @@ fn test_finish_passkey_authentication_uv_preferred_flag_not_set() {
         attestation_type: AttestationType::None,
         transports: Vec::new(),
         rk: None,
+        large_blob_supported: None,
         be: false,
         bs: false,
     };
@@ -605,6 +620,7 @@ fn test_finish_passkey_authentication_up_flag_not_set() {
         attestation_type: AttestationType::None,
         transports: Vec::new(),
         rk: None,
+        large_blob_supported: None,
         be: false,
         bs: false,
     };
@@ -647,6 +663,7 @@ fn test_finish_passkey_authentication_usernameless() {
         attestation_type: AttestationType::None,
         transports: Vec::new(),
         rk: None,
+        large_blob_supported: None,
         be: false,
         bs: false,
     };

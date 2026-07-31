@@ -12,7 +12,7 @@ A simple, secure, and easy-to-use WebAuthn/Passkey implementation for Rust.
 - 🔐 **Multiple Algorithms** - Support for EdDSA (Ed25519), ES256/ES384 (P-256/P-384), and RS256/RS384 (RSA)
 - 🛡️ **Security First** - Built-in replay attack protection via signature counters
 - 📦 **Framework Agnostic** - No web framework lock-in, works with any HTTP server
-- 🔑 **Extensions** - Support for `credProps` (discoverable credential reporting) and PRF (key derivation / E2E encryption)
+- 🔑 **Extensions** - Support for `credProps` (discoverable credential reporting), PRF (key derivation / E2E encryption) and `largeBlob` (blob storage on the authenticator)
 - 📜 **Attestation** - Statement verification for `packed`, `tpm`, `android-key` and `fido-u2f`, with opt-in trust path validation against your own roots
 - 🦀 **Pure Rust** - Memory-safe implementation with no unsafe code
 
@@ -157,6 +157,56 @@ let (challenge, state) = passki.start_passkey_authentication(&user_passkeys, opt
 // result.prf_first contains the derived key bytes (32 bytes)
 // The same passkey + same context always yields the same bytes
 ```
+
+### largeBlob
+
+The [`largeBlob` extension](https://www.w3.org/TR/webauthn-3/#sctn-large-blob-extension) stores a small opaque blob on the authenticator itself, such as an SSH key or a certificate. Registration only probes whether the credential can hold one; reads and writes happen in later authentication ceremonies, one per ceremony, and a write replaces whatever the credential held.
+
+The blob is base64url in both directions, like the PRF inputs and outputs: encode what you write, and `AuthenticationResult::large_blob` hands back the decoded bytes.
+
+```rust
+use passki::{
+    AuthenticationExtensions, AuthenticationOptions, LargeBlobAuthenticationInput,
+    LargeBlobRegistrationInput, LargeBlobSupport, Passki, RegistrationExtensions,
+    RegistrationOptions,
+};
+
+// During registration, ask for a credential that can store a blob
+let mut extensions = RegistrationExtensions::default();
+extensions.large_blob = Some(LargeBlobRegistrationInput {
+    support: LargeBlobSupport::Preferred,
+});
+
+let mut options = RegistrationOptions::default();
+options.extensions = Some(extensions);
+
+let (challenge, state) = passki.start_passkey_registration(
+    user_id, username, display_name, options,
+)?;
+
+let passkey = passki.finish_passkey_registration(&credential, &state)?;
+// passkey.large_blob_supported == Some(true) → the credential can hold a blob
+// Store it: the authenticator only reports this at registration
+
+// During authentication, write a blob
+let mut extensions = AuthenticationExtensions::default();
+extensions.large_blob = Some(LargeBlobAuthenticationInput::Write(
+    Passki::base64_encode(b"ssh-ed25519 AAAA..."),
+));
+
+let mut options = AuthenticationOptions::default();
+options.extensions = Some(extensions);
+
+let (challenge, state) = passki.start_passkey_authentication(&user_passkeys, options);
+// result.large_blob_written == Some(true) → the blob was stored
+
+// A later ceremony reads it back
+let mut extensions = AuthenticationExtensions::default();
+extensions.large_blob = Some(LargeBlobAuthenticationInput::Read);
+// result.large_blob contains the decoded bytes
+```
+
+`LargeBlobSupport::Required` fails the registration when the authenticator cannot store a blob; `Preferred` creates the credential either way and reports what it got.
 
 ## Attestation
 
@@ -317,7 +367,7 @@ A substantial expansion, still the most widely implemented level today:
 - [x] `enterprise` attestation conveyance preference
 - [x] Zero-counter authenticator support (explicitly allowed per spec)
 - [x] `credProps` extension - reports whether a discoverable credential was created
-- [ ] `largeBlob` extension - store small blobs on the authenticator (e.g. SSH keys)
+- [x] `largeBlob` extension - store small blobs on the authenticator (e.g. SSH keys)
 - [x] `userHandle` in authentication response - needed to identify the user in usernameless flows
 - [x] `transports` on credential descriptors - report what `getTransports()` returned so the browser can show the right USB / NFC / BLE / internal prompt
 

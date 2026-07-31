@@ -323,6 +323,12 @@ impl Passki {
             .and_then(|ext| ext.cred_props.as_ref())
             .and_then(|cp| cp.rk);
 
+        let large_blob_supported = credential
+            .client_extension_results
+            .as_ref()
+            .and_then(|ext| ext.large_blob.as_ref())
+            .and_then(|lb| lb.supported);
+
         Ok(StoredPasskey {
             credential_id: parsed.credential_id,
             public_key: parsed.public_key,
@@ -332,6 +338,7 @@ impl Passki {
             attestation_type: parsed.attestation_type,
             transports: credential.transports.clone(),
             rk,
+            large_blob_supported,
             be: (parsed.flags & FLAG_BE) != 0,
             bs: (parsed.flags & FLAG_BS) != 0,
         })

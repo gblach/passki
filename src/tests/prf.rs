@@ -34,6 +34,7 @@ fn signed_auth_credential(
     let client_extension_results = prf.map(|p| ClientExtensionResults {
         prf: Some(p),
         cred_props: None,
+        large_blob: None,
     });
     let auth_data = create_test_authenticator_data(counter, 0x01);
     let client_data_json = create_test_auth_client_data_json(challenge, origin);
@@ -68,6 +69,7 @@ fn make_stored_passkey(
         attestation_type: AttestationType::None,
         transports: Vec::new(),
         rk: None,
+        large_blob_supported: None,
         be: false,
         bs: false,
     }
@@ -242,6 +244,7 @@ fn test_authentication_challenge_includes_extensions_when_prf_some() {
                 second: None,
             }),
         },
+        large_blob: None,
     });
     let (challenge, _) = passki.start_passkey_authentication(
         &[],
@@ -269,6 +272,7 @@ fn test_authentication_challenge_extensions_json_shape() {
                 second: None,
             }),
         },
+        large_blob: None,
     });
     let (challenge, _) = passki.start_passkey_authentication(
         &[],
@@ -297,6 +301,7 @@ fn test_authentication_challenge_extensions_includes_second_input() {
                 second: Some(Passki::base64_encode(b"second")),
             }),
         },
+        large_blob: None,
     });
     let (challenge, _) = passki.start_passkey_authentication(
         &[],

@@ -65,6 +65,7 @@ fn authenticate_with_user_handle(user_handle: Option<String>) -> AuthenticationR
         attestation_type: AttestationType::None,
         transports: Vec::new(),
         rk: None,
+        large_blob_supported: None,
         be: false,
         bs: false,
     };
@@ -117,6 +118,7 @@ fn test_user_handle_invalid_base64_returns_error() {
         attestation_type: AttestationType::None,
         transports: Vec::new(),
         rk: None,
+        large_blob_supported: None,
         be: false,
         bs: false,
     };

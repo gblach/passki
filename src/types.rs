@@ -454,6 +454,15 @@ pub struct StoredPasskey {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rk: Option<bool>,
 
+    /// Whether this credential can store a blob, as reported by the `largeBlob`
+    /// extension during registration. `None` if `largeBlob` was not requested or
+    /// not reported, which is also what passkeys stored before this field was
+    /// introduced deserialize to. The authenticator only reports it at
+    /// registration, so a caller that does not store it cannot learn later
+    /// whether a read or a write is worth asking for.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub large_blob_supported: Option<bool>,
+
     /// Whether the authenticator reported this credential as eligible for backup
     /// (BE flag), e.g. a credential synced across devices. `false` for passkeys
     /// stored before this field was introduced.
@@ -571,6 +580,8 @@ pub struct RegistrationExtensions {
     pub cred_props: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub prf: Option<PrfInput>,
+    #[serde(rename = "largeBlob", skip_serializing_if = "Option::is_none")]
+    pub large_blob: Option<LargeBlobRegistrationInput>,
 }
 
 /// Extensions included in an authentication challenge.
@@ -578,6 +589,8 @@ pub struct RegistrationExtensions {
 #[non_exhaustive]
 pub struct AuthenticationExtensions {
     pub prf: PrfInput,
+    #[serde(rename = "largeBlob", skip_serializing_if = "Option::is_none")]
+    pub large_blob: Option<LargeBlobAuthenticationInput>,
 }
 
 /// PRF extension input included in challenges.
@@ -597,6 +610,60 @@ pub struct PrfEval {
     pub second: Option<String>,
 }
 
+/// `largeBlob` extension input included in registration challenges.
+///
+/// Asks the client to create a credential that can hold a blob. The blob itself
+/// is written and read in later authentication ceremonies, with
+/// [`LargeBlobAuthenticationInput`].
+#[derive(Serialize, Debug)]
+pub struct LargeBlobRegistrationInput {
+    /// How badly the relying party wants blob storage.
+    pub support: LargeBlobSupport,
+}
+
+/// How badly a relying party wants the new credential to support blob storage.
+#[derive(Serialize, Debug)]
+#[serde(rename_all = "lowercase")]
+pub enum LargeBlobSupport {
+    /// Fail the registration when the authenticator cannot store a blob.
+    Required,
+    /// Create the credential either way, and report what the authenticator
+    /// could do in [`StoredPasskey::large_blob_supported`].
+    Preferred,
+}
+
+/// `largeBlob` extension input included in authentication challenges.
+///
+/// The specification allows exactly one of `read` and `write` per ceremony, so
+/// this is an enum rather than a struct with two optional members. A write
+/// replaces whatever the credential held; there is no way to append.
+#[derive(Debug)]
+pub enum LargeBlobAuthenticationInput {
+    /// Ask the authenticator for the blob stored on the credential. The result
+    /// arrives decoded in [`crate::AuthenticationResult::large_blob`].
+    Read,
+    /// Store these base64url-encoded bytes on the credential, replacing what it
+    /// held. Encode with [`crate::Passki::base64_encode`], as with
+    /// [`PrfEval::first`].
+    Write(String),
+}
+
+impl Serialize for LargeBlobAuthenticationInput {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeMap;
+
+        let mut map = serializer.serialize_map(Some(1))?;
+        match self {
+            Self::Read => map.serialize_entry("read", &true)?,
+            Self::Write(blob) => map.serialize_entry("write", blob)?,
+        }
+        map.end()
+    }
+}
+
 /// The full `clientExtensionResults` object returned by the browser.
 ///
 /// Each field corresponds to one WebAuthn extension. This struct is used in
@@ -612,6 +679,9 @@ pub struct ClientExtensionResults {
     /// Results for the PRF extension.
     #[serde(default)]
     pub prf: Option<PrfExtensionResult>,
+    /// Results for the largeBlob extension.
+    #[serde(default, rename = "largeBlob")]
+    pub large_blob: Option<LargeBlobResult>,
 }
 
 /// Credential properties returned by the browser after registration.
@@ -637,4 +707,19 @@ pub struct PrfResults {
     pub first: Option<String>,
     /// Base64url-encoded second PRF output.
     pub second: Option<String>,
+}
+
+/// `largeBlob` extension result returned by the client.
+///
+/// Which member is set depends on what was asked for: `supported` answers a
+/// registration input, `blob` answers a read and `written` answers a write.
+#[derive(Deserialize, Debug)]
+pub struct LargeBlobResult {
+    /// Set during registration to indicate whether the new credential can store
+    /// a blob.
+    pub supported: Option<bool>,
+    /// Base64url-encoded blob read from the credential.
+    pub blob: Option<String>,
+    /// Set after a write to indicate whether the blob was stored.
+    pub written: Option<bool>,
 }

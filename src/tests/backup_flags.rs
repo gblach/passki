@@ -143,6 +143,7 @@ fn test_finish_passkey_authentication_bs_without_be_rejected() {
         attestation_type: AttestationType::None,
         transports: Vec::new(),
         rk: None,
+        large_blob_supported: None,
         be: false,
         bs: false,
     };
@@ -199,6 +200,7 @@ fn test_stored_passkey_be_bs_roundtrip() {
         attestation_type: AttestationType::None,
         transports: Vec::new(),
         rk: None,
+        large_blob_supported: None,
         be: true,
         bs: true,
     };

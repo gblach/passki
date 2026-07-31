@@ -67,6 +67,7 @@ fn test_cred_props_and_prf_can_be_requested_together() {
                 extensions: Some(RegistrationExtensions {
                     cred_props: Some(true),
                     prf: Some(PrfInput { eval: None }),
+                    large_blob: None,
                 }),
                 ..Default::default()
             },
@@ -93,6 +94,7 @@ fn make_credential(
         client_extension_results: Some(ClientExtensionResults {
             cred_props,
             prf: None,
+            large_blob: None,
         }),
         authenticator_attachment: None,
         transports: Vec::new(),
