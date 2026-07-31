@@ -310,6 +310,75 @@ pub enum AuthenticatorAttachment {
     CrossPlatform,
 }
 
+/// A transport an authenticator can be reached over.
+///
+/// Reported by `getTransports()` on the registration response and echoed back in
+/// the credential descriptors of later ceremonies, which lets the client prompt
+/// for the modality the credential actually lives on instead of offering every
+/// one it supports.
+#[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Debug)]
+#[serde(rename_all = "kebab-case")]
+pub enum AuthenticatorTransport {
+    /// Removable USB.
+    Usb,
+    /// Near Field Communication.
+    Nfc,
+    /// Bluetooth Low Energy.
+    Ble,
+    /// ISO/IEC 7816 smart card.
+    SmartCard,
+    /// A combination of transports, such as a phone acting as an authenticator
+    /// for a nearby computer. Called `cable` before the specification renamed it.
+    Hybrid,
+    /// An authenticator built into the client device and not removable from it.
+    Internal,
+}
+
+impl AuthenticatorTransport {
+    /// Maps a transport string to its variant, reading the legacy `cable` value
+    /// as [`AuthenticatorTransport::Hybrid`]. Returns `None` for anything else.
+    fn parse(value: &str) -> Option<Self> {
+        match value {
+            "usb" => Some(Self::Usb),
+            "nfc" => Some(Self::Nfc),
+            "ble" => Some(Self::Ble),
+            "smart-card" => Some(Self::SmartCard),
+            "hybrid" | "cable" => Some(Self::Hybrid),
+            "internal" => Some(Self::Internal),
+            _ => None,
+        }
+    }
+}
+
+/// Deserializes a `transports` list, skipping values that are not WebAuthn
+/// transports and normalizing the legacy `cable` value to `hybrid`.
+///
+/// The specification tells relying parties not to fail on a transport they do
+/// not recognize, and clients do send values from later levels than the one a
+/// server was built against, so an unknown entry drops out instead of rejecting
+/// the whole credential. Dropping rather than keeping it is what a typed list
+/// costs: the value is a hint for the client, not something the crate acts on.
+/// A missing or `null` list reads as an empty one.
+pub(crate) fn deserialize_transports<'de, D>(
+    deserializer: D,
+) -> std::result::Result<Vec<AuthenticatorTransport>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let raw = Option::<Vec<String>>::deserialize(deserializer)?.unwrap_or_default();
+    let mut transports = Vec::with_capacity(raw.len());
+
+    for value in raw {
+        if let Some(transport) = AuthenticatorTransport::parse(&value)
+            && !transports.contains(&transport)
+        {
+            transports.push(transport);
+        }
+    }
+
+    Ok(transports)
+}
+
 /// Resident key requirement for passkey registration.
 ///
 /// Specifies whether the authenticator should store the credential locally
@@ -372,6 +441,13 @@ pub struct StoredPasskey {
     /// this field was introduced.
     #[serde(default)]
     pub attestation_type: AttestationType,
+
+    /// The transports the client reported for this credential at registration.
+    /// Emitted in the credential descriptors of later ceremonies so the client
+    /// can prompt for the right modality. Empty when the client reported none,
+    /// and for passkeys stored before this field was introduced.
+    #[serde(default, deserialize_with = "deserialize_transports")]
+    pub transports: Vec<AuthenticatorTransport>,
 
     /// Whether this is a discoverable (resident) credential, as reported by the `credProps`
     /// extension during registration. `None` if `credProps` was not requested or not reported.
@@ -461,6 +537,12 @@ pub struct ExcludeCredential {
     /// Credential type (always "public-key" for passkeys).
     #[serde(rename = "type")]
     pub type_: &'static str,
+
+    /// The transports reported for the credential at registration. Omitted from
+    /// the challenge when empty, which leaves the client free to probe every
+    /// modality it supports.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub transports: Vec<AuthenticatorTransport>,
 }
 
 /// A credential that is allowed for authentication.
@@ -473,6 +555,12 @@ pub struct AllowCredential {
     /// Credential type (always "public-key" for passkeys).
     #[serde(rename = "type")]
     pub type_: &'static str,
+
+    /// The transports reported for the credential at registration. Omitted from
+    /// the challenge when empty, which leaves the client free to probe every
+    /// modality it supports.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub transports: Vec<AuthenticatorTransport>,
 }
 
 /// Extensions included in a registration challenge.

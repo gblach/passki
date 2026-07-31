@@ -187,6 +187,7 @@ impl Passki {
                 .map(|pk| AllowCredential {
                     id: Self::base64_encode(&pk.credential_id),
                     type_: "public-key",
+                    transports: pk.transports.clone(),
                 })
                 .collect(),
             user_verification: options.user_verification,

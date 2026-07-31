@@ -611,6 +611,7 @@ fn test_registration_stores_the_attestation_type() {
         client_data_json: Passki::base64_encode(&client_data_json),
         client_extension_results: None,
         authenticator_attachment: None,
+        transports: Vec::new(),
     };
 
     let stored = passki
@@ -630,6 +631,7 @@ fn test_attestation_type_round_trips_through_json() {
         algorithm: -7,
         aaguid: [7u8; 16],
         attestation_type: AttestationType::AttCa,
+        transports: Vec::new(),
         rk: None,
         be: false,
         bs: false,

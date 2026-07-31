@@ -45,6 +45,7 @@ fn test_finish_passkey_registration_populates_be_and_bs() {
         client_data_json: Passki::base64_encode(&client_data_json),
         client_extension_results: None,
         authenticator_attachment: None,
+        transports: Vec::new(),
     };
 
     let passkey = passki
@@ -69,6 +70,7 @@ fn test_finish_passkey_registration_be_without_bs() {
         client_data_json: Passki::base64_encode(&client_data_json),
         client_extension_results: None,
         authenticator_attachment: None,
+        transports: Vec::new(),
     };
 
     let passkey = passki
@@ -93,6 +95,7 @@ fn test_finish_passkey_registration_no_backup_flags() {
         client_data_json: Passki::base64_encode(&client_data_json),
         client_extension_results: None,
         authenticator_attachment: None,
+        transports: Vec::new(),
     };
 
     let passkey = passki
@@ -117,6 +120,7 @@ fn test_finish_passkey_registration_bs_without_be_rejected() {
         client_data_json: Passki::base64_encode(&client_data_json),
         client_extension_results: None,
         authenticator_attachment: None,
+        transports: Vec::new(),
     };
 
     let result = passki.finish_passkey_registration(&credential, &state);
@@ -137,6 +141,7 @@ fn test_finish_passkey_authentication_bs_without_be_rejected() {
         algorithm: -7,
         aaguid: [0u8; 16],
         attestation_type: AttestationType::None,
+        transports: Vec::new(),
         rk: None,
         be: false,
         bs: false,
@@ -192,6 +197,7 @@ fn test_stored_passkey_be_bs_roundtrip() {
         algorithm: -7,
         aaguid: [0u8; 16],
         attestation_type: AttestationType::None,
+        transports: Vec::new(),
         rk: None,
         be: true,
         bs: true,

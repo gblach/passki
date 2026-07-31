@@ -347,6 +347,8 @@
                             client_extension_results: clientExtensionResults,
                             authenticator_attachment:
                                 credential.authenticatorAttachment,
+                            transports:
+                                credential.response.getTransports?.() ?? [],
                         }),
                     });
 

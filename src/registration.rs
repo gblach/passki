@@ -97,6 +97,14 @@ pub struct RegistrationCredential {
     /// The attachment modality the client reports for the new credential.
     /// `None` when the client did not report one.
     pub authenticator_attachment: Option<AuthenticatorAttachment>,
+
+    /// What `getTransports()` reported for the new credential. Unknown values
+    /// are dropped and the legacy `cable` value reads as
+    /// [`AuthenticatorTransport::Hybrid`]. Empty when the client sent nothing,
+    /// which is also what a front end that does not forward the list yet leaves
+    /// behind.
+    #[serde(default, deserialize_with = "deserialize_transports")]
+    pub transports: Vec<AuthenticatorTransport>,
 }
 
 /// Options for starting a passkey registration ceremony.
@@ -213,6 +221,7 @@ impl Passki {
             .map(|pk| ExcludeCredential {
                 id: Self::base64_encode(&pk.credential_id),
                 type_: "public-key",
+                transports: pk.transports.clone(),
             })
             .collect();
 
@@ -321,6 +330,7 @@ impl Passki {
             algorithm: parsed.algorithm,
             aaguid: parsed.aaguid,
             attestation_type: parsed.attestation_type,
+            transports: credential.transports.clone(),
             rk,
             be: (parsed.flags & FLAG_BE) != 0,
             bs: (parsed.flags & FLAG_BS) != 0,

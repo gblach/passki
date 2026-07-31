@@ -26,5 +26,6 @@ mod prf;
 mod registration;
 mod serde;
 mod signature;
+mod transports;
 mod trust_path;
 mod user_handle;

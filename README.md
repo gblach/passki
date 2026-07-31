@@ -319,7 +319,7 @@ A substantial expansion, still the most widely implemented level today:
 - [x] `credProps` extension - reports whether a discoverable credential was created
 - [ ] `largeBlob` extension - store small blobs on the authenticator (e.g. SSH keys)
 - [x] `userHandle` in authentication response - needed to identify the user in usernameless flows
-- [ ] `transports` on credential descriptors - report what `getTransports()` returned so the browser can show the right USB / NFC / BLE / internal prompt
+- [x] `transports` on credential descriptors - report what `getTransports()` returned so the browser can show the right USB / NFC / BLE / internal prompt
 
 ### Level 3 (Candidate Recommendation, not yet a W3C Recommendation)
 

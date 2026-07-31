@@ -140,6 +140,7 @@ fn test_start_passkey_registration_with_single_existing_credential() {
         algorithm: -7,
         aaguid: [0u8; 16],
         attestation_type: AttestationType::None,
+        transports: Vec::new(),
         rk: None,
         be: false,
         bs: false,
@@ -183,6 +184,7 @@ fn test_start_passkey_registration_with_multiple_existing_credentials() {
             algorithm: -7,
             aaguid: [0u8; 16],
             attestation_type: AttestationType::None,
+            transports: Vec::new(),
             rk: None,
             be: false,
             bs: false,
@@ -194,6 +196,7 @@ fn test_start_passkey_registration_with_multiple_existing_credentials() {
             algorithm: -8,
             aaguid: [0u8; 16],
             attestation_type: AttestationType::None,
+            transports: Vec::new(),
             rk: None,
             be: false,
             bs: false,
@@ -205,6 +208,7 @@ fn test_start_passkey_registration_with_multiple_existing_credentials() {
             algorithm: -257,
             aaguid: [0u8; 16],
             attestation_type: AttestationType::None,
+            transports: Vec::new(),
             rk: None,
             be: false,
             bs: false,
@@ -356,6 +360,7 @@ fn test_finish_passkey_registration_success() {
         client_data_json: Passki::base64_encode(&client_data_json),
         client_extension_results: None,
         authenticator_attachment: None,
+        transports: Vec::new(),
     };
 
     let result = passki.finish_passkey_registration(&credential, &state);
@@ -391,6 +396,7 @@ fn test_finish_passkey_registration_stores_initial_counter() {
         client_data_json: Passki::base64_encode(&client_data_json),
         client_extension_results: None,
         authenticator_attachment: None,
+        transports: Vec::new(),
     };
 
     let passkey = passki
@@ -426,6 +432,7 @@ fn test_finish_passkey_registration_wrong_challenge() {
         client_data_json: Passki::base64_encode(&client_data_json),
         client_extension_results: None,
         authenticator_attachment: None,
+        transports: Vec::new(),
     };
 
     let result = passki.finish_passkey_registration(&credential, &state);
@@ -461,6 +468,7 @@ fn test_finish_passkey_registration_wrong_origin() {
         client_data_json: Passki::base64_encode(&client_data_json),
         client_extension_results: None,
         authenticator_attachment: None,
+        transports: Vec::new(),
     };
 
     let result = passki.finish_passkey_registration(&credential, &state);
@@ -494,6 +502,7 @@ fn test_finish_passkey_registration_uv_required_flag_set() {
         client_data_json: Passki::base64_encode(&client_data_json),
         client_extension_results: None,
         authenticator_attachment: None,
+        transports: Vec::new(),
     };
 
     assert!(
@@ -529,6 +538,7 @@ fn test_finish_passkey_registration_uv_required_flag_not_set() {
         client_data_json: Passki::base64_encode(&client_data_json),
         client_extension_results: None,
         authenticator_attachment: None,
+        transports: Vec::new(),
     };
 
     let result = passki.finish_passkey_registration(&credential, &state);
@@ -559,6 +569,7 @@ fn test_finish_passkey_registration_uv_preferred_flag_not_set() {
         client_data_json: Passki::base64_encode(&client_data_json),
         client_extension_results: None,
         authenticator_attachment: None,
+        transports: Vec::new(),
     };
 
     assert!(
@@ -592,6 +603,7 @@ fn test_finish_passkey_registration_up_flag_not_set() {
         client_data_json: Passki::base64_encode(&client_data_json),
         client_extension_results: None,
         authenticator_attachment: None,
+        transports: Vec::new(),
     };
 
     let result = passki.finish_passkey_registration(&credential, &state);
@@ -622,6 +634,7 @@ fn test_finish_passkey_registration_eddsa_algorithm() {
         client_data_json: Passki::base64_encode(&client_data_json),
         client_extension_results: None,
         authenticator_attachment: None,
+        transports: Vec::new(),
     };
 
     let result = passki.finish_passkey_registration(&credential, &state);
@@ -655,6 +668,7 @@ fn test_finish_passkey_registration_credential_id_mismatch() {
         client_data_json: Passki::base64_encode(&client_data_json),
         client_extension_results: None,
         authenticator_attachment: None,
+        transports: Vec::new(),
     };
 
     let result = passki.finish_passkey_registration(&credential, &state);

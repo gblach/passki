@@ -95,6 +95,7 @@ fn make_credential(
             prf: None,
         }),
         authenticator_attachment: None,
+        transports: Vec::new(),
     }
 }
 
@@ -168,6 +169,7 @@ fn test_cred_props_rk_none_when_no_extension_results() {
         client_data_json: Passki::base64_encode(&client_data_json),
         client_extension_results: None,
         authenticator_attachment: None,
+        transports: Vec::new(),
     };
 
     let result = passki

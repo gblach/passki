@@ -40,6 +40,7 @@ fn register(passki: &Passki, aaguid: [u8; 16]) -> StoredPasskey {
         client_data_json: Passki::base64_encode(&client_data_json),
         client_extension_results: None,
         authenticator_attachment: None,
+        transports: Vec::new(),
     };
 
     passki
@@ -73,6 +74,7 @@ fn test_stored_passkey_zero_aaguid_roundtrip() {
         algorithm: -7,
         aaguid: [0u8; 16],
         attestation_type: AttestationType::None,
+        transports: Vec::new(),
         rk: None,
         be: false,
         bs: false,
@@ -92,6 +94,7 @@ fn test_stored_passkey_aaguid_roundtrip() {
         algorithm: -7,
         aaguid: TEST_AAGUID,
         attestation_type: AttestationType::None,
+        transports: Vec::new(),
         rk: None,
         be: false,
         bs: false,
@@ -111,6 +114,7 @@ fn test_stored_passkey_zero_aaguid_is_serialized() {
         algorithm: -7,
         aaguid: [0u8; 16],
         attestation_type: AttestationType::None,
+        transports: Vec::new(),
         rk: None,
         be: false,
         bs: false,

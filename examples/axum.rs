@@ -59,8 +59,8 @@ use axum::{
 };
 use passki::{
     AuthenticationChallenge, AuthenticationCredential, AuthenticationExtensions,
-    AuthenticationOptions, AuthenticationState, AuthenticatorAttachment, ClientData,
-    ClientExtensionResults, Passki, PrfEval, PrfInput, RegistrationChallenge,
+    AuthenticationOptions, AuthenticationState, AuthenticatorAttachment, AuthenticatorTransport,
+    ClientData, ClientExtensionResults, Passki, PrfEval, PrfInput, RegistrationChallenge,
     RegistrationCredential, RegistrationExtensions, RegistrationOptions, RegistrationState,
     StoredPasskey,
 };
@@ -152,6 +152,10 @@ struct RegisterFinishRequest {
     client_extension_results: Option<ClientExtensionResults>,
     /// Attachment modality the browser reports (`platform` / `cross-platform`)
     authenticator_attachment: Option<AuthenticatorAttachment>,
+    /// Transports `getTransports()` reported, stored so later ceremonies can
+    /// tell the browser which modality this credential lives on
+    #[serde(default)]
+    transports: Vec<AuthenticatorTransport>,
 }
 
 /// Request to start authentication. Username and PRF salt are both optional.
@@ -305,6 +309,7 @@ async fn register_finish(
         client_data_json: req.client_data_json,
         client_extension_results: req.client_extension_results,
         authenticator_attachment: req.authenticator_attachment,
+        transports: req.transports,
     };
 
     // Verify the credential (checks origin, challenge, parses public key)
