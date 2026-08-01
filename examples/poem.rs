@@ -14,36 +14,30 @@
 
 //! # Passkeys Demo Server
 //!
-//! This example demonstrates WebAuthn/Passkey authentication using the Passki library
-//! with the Poem web framework, including optional PRF extension support for key derivation.
+//! Passkey registration and login with Passki on the Poem web framework, plus
+//! optional PRF key derivation.
 //!
-//! ## Authentication Flows
+//! ## Registration
+//! 1. Client posts a username to `/register/start`
+//! 2. Server returns a challenge and the options for the browser
+//! 3. Browser calls `navigator.credentials.create()` and prompts the user
+//! 4. Client posts the new credential to `/register/finish`
+//! 5. Server verifies it and stores the passkey
 //!
-//! ### Registration (creating a new passkey)
-//! 1. Client sends username to `/register/start`
-//! 2. Server generates a challenge and returns WebAuthn options (with PRF probe)
-//! 3. Client calls `navigator.credentials.create()` with these options
-//! 4. User authenticates with their device (fingerprint, face, PIN, etc.)
-//! 5. Client sends the credential to `/register/finish`
-//! 6. Server verifies, stores the passkey, and reports PRF support
+//! ## Authentication
+//! **With a username**: the challenge names that user's credentials, so the
+//! browser offers only those.
 //!
-//! ### Authentication (using an existing passkey)
-//! Two modes are supported:
+//! **Without one**: the challenge names none, the browser offers every passkey
+//! it holds for this site, and the server works out who is logging in from the
+//! user handle the authenticator returns.
 //!
-//! **Passwordless** (username provided):
-//! - Server returns only the credentials registered to that user
-//! - Browser shows only matching passkeys
-//!
-//! **Usernameless** (no username):
-//! - Server returns empty credential list
-//! - Browser shows all available passkeys (discoverable credentials)
-//! - Server identifies the user by the returned userHandle (user.id)
-//!
-//! ### PRF key derivation (optional)
-//! If the client sends a `prf_salt` with the authentication request, the server
-//! includes it as `extensions.prf.eval.first` in the challenge. The authenticator
-//! computes a deterministic 32-byte key and the server returns it hex-encoded in
-//! `prf_output`. The same passkey + same salt always yields the same bytes.
+//! ## PRF key derivation (optional)
+//! When the client sends a `prf_salt` with its authentication request, the
+//! server passes it to the authenticator as `extensions.prf.eval.first`. The
+//! authenticator derives 32 bytes from it, returned hex-encoded in
+//! `prf_output`. The same passkey and salt always yield the same bytes, which
+//! makes them usable as an encryption key.
 //!
 //! ## Running
 //! ```sh
@@ -77,29 +71,25 @@ fn err(msg: impl std::fmt::Display) -> poem::Error {
     poem::Error::from_string(msg.to_string(), StatusCode::BAD_REQUEST)
 }
 
-// =============================================================================
 // Storage
-// =============================================================================
 
-/// In-memory storage for users and pending WebAuthn ceremonies.
+/// In-memory storage for users and ceremonies in progress.
 ///
-/// In production, you would use a database for users and a cache (e.g., Redis)
-/// for pending states with appropriate expiration.
+/// A real server would use a database for the users and an expiring cache for
+/// the pending states.
 #[derive(Clone, Default)]
 struct Store {
-    /// Maps username -> User data
+    /// Keyed by username.
     users: Arc<Mutex<HashMap<String, User>>>,
 
-    /// Pending registration ceremonies, keyed by challenge.
-    /// The state must be kept between start and finish calls.
+    /// Registrations waiting for their finish call, keyed by challenge.
     pending_registrations: Arc<Mutex<HashMap<String, RegistrationState>>>,
 
-    /// Pending authentication ceremonies, keyed by challenge.
-    /// The state must be kept between start and finish calls.
+    /// Authentications waiting for their finish call, keyed by challenge.
     pending_authentications: Arc<Mutex<HashMap<String, AuthenticationState>>>,
 }
 
-/// User record containing their profile and registered passkeys.
+/// A registered user and their passkeys.
 #[derive(Clone)]
 #[allow(unused)]
 struct User {
@@ -109,62 +99,59 @@ struct User {
     username: String,
     /// Human-readable display name.
     display_name: String,
-    /// All passkeys registered by this user. A user can have multiple passkeys
-    /// (e.g., one on their phone, one on their laptop, one security key).
+    /// One user can register several: a phone, a laptop, a security key.
     passkeys: Vec<StoredPasskey>,
-    /// Whether any of this user's passkeys reported PRF support during registration.
+    /// Whether any of their passkeys reported PRF support.
     prf_supported: bool,
 }
 
-// =============================================================================
 // Request/Response types
-// =============================================================================
 
 #[derive(Deserialize)]
 struct RegisterStartRequest {
     username: String,
-    /// Ask the authenticator for an attestation statement, which is what turns
-    /// the AAGUID into a real model identifier instead of zeros
+    /// Ask for an attestation statement, so the AAGUID names a real
+    /// authenticator model instead of staying all zeros
     #[serde(default)]
     attestation: bool,
 }
 
-/// Data sent by the client after WebAuthn credential creation.
+/// What the client posts back after `navigator.credentials.create()`.
 #[derive(Deserialize)]
 struct RegisterFinishRequest {
     /// Base64url-encoded credential ID from the authenticator
     credential_id: String,
-    /// Base64url-encoded attestation object containing the public key
+    /// Base64url-encoded attestation object, which carries the public key
     public_key: String,
     /// Base64url-encoded client data JSON
     client_data_json: String,
     /// Extension results from the browser (e.g., PRF support flag)
     client_extension_results: Option<ClientExtensionResults>,
-    /// Attachment modality the browser reports (`platform` / `cross-platform`)
+    /// Whether the browser used a built-in or a separate authenticator
     authenticator_attachment: Option<AuthenticatorAttachment>,
-    /// Transports `getTransports()` reported, stored so later ceremonies can
-    /// tell the browser which modality this credential lives on
+    /// What `getTransports()` reported, stored so later ceremonies can tell
+    /// the browser where this credential lives
     #[serde(default)]
     transports: Vec<AuthenticatorTransport>,
 }
 
-/// Request to start authentication. Username and PRF salt are both optional.
+/// Both fields are optional.
 #[derive(Deserialize, Default)]
 struct AuthStartRequest {
-    /// If provided: passwordless flow (server specifies allowed credentials).
-    /// If omitted: usernameless flow (browser shows all available passkeys).
+    /// When given, the server names the allowed credentials; when omitted, the
+    /// browser offers every passkey it holds for this site.
     #[serde(default)]
     username: Option<String>,
-    /// Base64url-encoded PRF context string (e.g. "notes-encryption-v1").
-    /// When present, the server requests a PRF derivation for this salt.
+    /// Base64url-encoded PRF input (e.g. "notes-encryption-v1"). When present,
+    /// the server asks the authenticator to derive a key from it.
     #[serde(default)]
     prf_salt: Option<String>,
 }
 
-/// Data sent by the client after WebAuthn authentication.
+/// What the client posts back after `navigator.credentials.get()`.
 #[derive(Deserialize)]
 struct AuthFinishRequest {
-    /// Base64url-encoded credential ID identifying which passkey was used
+    /// Base64url-encoded ID of the passkey that was used
     credential_id: String,
     /// Base64url-encoded authenticator data (contains flags and counter)
     authenticator_data: String,
@@ -172,11 +159,11 @@ struct AuthFinishRequest {
     client_data_json: String,
     /// Base64url-encoded signature over authenticator_data + hash(client_data_json)
     signature: String,
-    /// Base64url-encoded user handle (user.id), returned for discoverable credentials
+    /// Base64url-encoded user handle, returned only for discoverable credentials
     user_handle: Option<String>,
     /// Extension results from the browser (e.g., PRF outputs)
     client_extension_results: Option<ClientExtensionResults>,
-    /// Attachment modality the browser reports (`platform` / `cross-platform`)
+    /// Whether the browser used a built-in or a separate authenticator
     authenticator_attachment: Option<AuthenticatorAttachment>,
 }
 
@@ -184,7 +171,7 @@ struct AuthFinishRequest {
 struct ApiResponse {
     success: bool,
     message: String,
-    /// In usernameless flow, returns the identified username
+    /// Who the server decided was logging in, when no username was given
     #[serde(skip_serializing_if = "Option::is_none")]
     username: Option<String>,
     /// Registration only: whether a resident key was created
@@ -207,9 +194,7 @@ struct ApiResponse {
     prf_output: Option<String>,
 }
 
-// =============================================================================
 // Handlers
-// =============================================================================
 
 #[handler]
 fn index() -> poem::web::Html<&'static str> {
@@ -218,19 +203,20 @@ fn index() -> poem::web::Html<&'static str> {
 
 /// POST /register/start - Begin passkey registration
 ///
-/// Generates a challenge and WebAuthn options for the client to create a credential.
-/// Includes a PRF probe so the authenticator reports whether it supports PRF.
+/// Returns the random challenge the authenticator will have to sign, plus the
+/// options the browser needs to create a credential.
 #[handler]
 async fn register_start(
     Json(req): Json<RegisterStartRequest>,
     passki: Data<&Arc<Passki>>,
     store: Data<&Store>,
 ) -> AppResult<RegistrationChallenge> {
-    // Generate a unique user ID. This should be random and opaque (not the username)
-    // to prevent tracking users across sites.
+    // Random and opaque rather than the username, so it cannot be used to
+    // track the user across sites.
     let user_id = Uuid::new_v4().as_bytes().to_vec();
 
-    // If user exists, get their existing passkeys to exclude them from re-registration
+    // Passkeys the user already has, which the authenticator must refuse to
+    // register a second time.
     let existing = store
         .users
         .lock()
@@ -238,10 +224,9 @@ async fn register_start(
         .get(&req.username)
         .map(|u| u.passkeys.clone());
 
-    // Probe without eval: asks "do you support PRF?" without requesting a derivation.
-    // This avoids false negatives on authenticators that support PRF during authentication
-    // but not during registration (e.g. YubiKey 5 series).
-    // Request credProps and probe PRF support
+    // An eval-less PRF input just asks whether PRF is supported. Requesting a
+    // derivation here instead would report a false negative on authenticators
+    // that only support PRF at authentication time (e.g. YubiKey 5 series).
     let mut extensions = RegistrationExtensions::default();
     extensions.cred_props = Some(true);
     extensions.prf = Some(PrfInput { eval: None });
@@ -258,37 +243,35 @@ async fn register_start(
     let (challenge, state) = passki
         .start_passkey_registration(
             &user_id,
-            &req.username, // User handle (displayed by authenticator)
-            &req.username, // Display name
+            &req.username, // username, shown by the authenticator
+            &req.username, // display name
             options,
         )
         .map_err(err)?;
 
-    // Store state for verification in finish step, keyed by the challenge
+    // Keyed by the challenge, which is what the finish call brings back.
     store
         .pending_registrations
         .lock()
         .unwrap()
         .insert(challenge.challenge.clone(), state);
 
-    // Return challenge to client (will be passed to navigator.credentials.create())
     Ok(Json(challenge))
 }
 
 /// POST /register/finish - Complete passkey registration
 ///
-/// Verifies the credential created by the authenticator, stores it, and reports
-/// whether this passkey supports the PRF extension.
+/// Verifies the new credential, stores it, and reports whether the passkey
+/// supports the PRF extension.
 #[handler]
 async fn register_finish(
     Json(req): Json<RegisterFinishRequest>,
     passki: Data<&Arc<Passki>>,
     store: Data<&Store>,
 ) -> AppResult<ApiResponse> {
-    // Parse client data to extract challenge
+    // The challenge says which pending ceremony this belongs to.
     let client_data = ClientData::from_base64(&req.client_data_json).map_err(err)?;
 
-    // Retrieve and remove the pending registration state
     let state = store
         .pending_registrations
         .lock()
@@ -303,7 +286,6 @@ async fn register_finish(
         .and_then(|prf| prf.enabled)
         .unwrap_or(false);
 
-    // Package the credential data from the client
     let credential = RegistrationCredential {
         credential_id: req.credential_id,
         public_key: req.public_key,
@@ -313,31 +295,28 @@ async fn register_finish(
         transports: req.transports,
     };
 
-    // Verify the credential (checks origin, challenge, parses public key)
+    // Checks origin, challenge and attestation, and extracts the public key.
     let passkey = passki
         .finish_passkey_registration(&credential, &state)
         .map_err(err)?;
     let resident_key = passkey.rk;
     let backup_eligible = passkey.be;
     let backed_up = passkey.bs;
-    // All-zero unless attestation was requested, which this demo does not do
+    // All-zero unless attestation was both requested and supplied.
     let aaguid =
         (passkey.aaguid != [0u8; 16]).then(|| Uuid::from_bytes(passkey.aaguid).to_string());
 
-    // Decode user ID from base64url to UUID
     let user_id_bytes = Passki::base64_decode(&state.user.id).map_err(err)?;
     let user_id = Uuid::from_slice(&user_id_bytes).map_err(err)?;
 
-    // Store the passkey for future authentication.
+    // Store the passkey so it can be used to log in.
     let mut users = store.users.lock().unwrap();
     users
         .entry(state.user.name.clone())
-        // If user exists, add passkey to their list.
         .and_modify(|user| {
             user.passkeys.push(passkey.clone());
             user.prf_supported |= prf_supported;
         })
-        // If new user, create user record with their info.
         .or_insert(User {
             id: user_id,
             username: state.user.name,
@@ -361,12 +340,11 @@ async fn register_finish(
 
 /// POST /auth/start - Begin passkey authentication
 ///
-/// Two modes based on whether username is provided:
-/// - Passwordless: returns challenge with user's credential IDs (browser filters to these)
-/// - Usernameless: returns challenge with empty credential list (browser shows all passkeys)
+/// With a username the challenge names that user's credentials, so the browser
+/// offers only those; without one it names none and the browser offers every
+/// passkey it holds for this site.
 ///
-/// If prf_salt is provided, the challenge includes a PRF eval so the authenticator
-/// will derive a key for that salt.
+/// A `prf_salt` is passed on to the authenticator, which derives a key from it.
 #[handler]
 async fn auth_start(
     Json(req): Json<AuthStartRequest>,
@@ -374,12 +352,12 @@ async fn auth_start(
     store: Data<&Store>,
 ) -> AppResult<AuthenticationChallenge> {
     let passkeys = if let Some(ref username) = req.username {
-        // Passwordless flow: get user's passkeys to include in allowCredentials
+        // Named user: offer only their credentials.
         let users = store.users.lock().unwrap();
         let user = users.get(username).ok_or_else(|| err("User not found"))?;
         user.passkeys.clone()
     } else {
-        // Usernameless flow: empty allowCredentials lets browser show all passkeys
+        // No username: an empty list lets the browser offer any passkey.
         vec![]
     };
 
@@ -399,31 +377,29 @@ async fn auth_start(
 
     let (challenge, state) = passki.start_passkey_authentication(&passkeys, options);
 
-    // Store state for verification in finish step, keyed by the challenge
+    // Keyed by the challenge, which is what the finish call brings back.
     store
         .pending_authentications
         .lock()
         .unwrap()
         .insert(challenge.challenge.clone(), state);
 
-    // Return challenge to client
     Ok(Json(challenge))
 }
 
 /// POST /auth/finish - Complete passkey authentication
 ///
-/// Verifies the signature from the authenticator and, if a PRF salt was provided,
-/// returns the derived key hex-encoded in prf_output.
+/// Verifies the signature and, when a PRF salt was sent, returns the derived
+/// key hex-encoded in `prf_output`.
 #[handler]
 async fn auth_finish(
     Json(req): Json<AuthFinishRequest>,
     passki: Data<&Arc<Passki>>,
     store: Data<&Store>,
 ) -> AppResult<ApiResponse> {
-    // Parse client data to extract challenge
+    // The challenge says which pending ceremony this belongs to.
     let client_data = ClientData::from_base64(&req.client_data_json).map_err(err)?;
 
-    // Retrieve pending state using challenge
     let state = store
         .pending_authentications
         .lock()
@@ -431,11 +407,10 @@ async fn auth_finish(
         .remove(&client_data.challenge)
         .ok_or_else(|| err("No pending authentication"))?;
 
-    // Decode credential ID to find the matching passkey
     let credential_id = Passki::base64_decode(&req.credential_id).map_err(err)?;
 
-    // Prefer the userHandle (user.id) for a direct lookup in usernameless flows,
-    // falling back to a scan by credential ID when the authenticator omits it.
+    // The user handle gives a direct lookup; without it, scan every user for a
+    // matching credential ID.
     let mut users = store.users.lock().unwrap();
     let (username, passkey) = match req.user_handle.as_deref() {
         Some(handle) => {
@@ -460,7 +435,6 @@ async fn auth_finish(
     }
     .ok_or_else(|| err("Unknown credential"))?;
 
-    // Package the authentication response from the client
     let credential = AuthenticationCredential {
         credential_id: req.credential_id,
         authenticator_data: req.authenticator_data,
@@ -471,13 +445,13 @@ async fn auth_finish(
         authenticator_attachment: req.authenticator_attachment,
     };
 
-    // Verify the signature (checks origin, challenge, signature, counter)
+    // Checks origin, challenge, signature and counter.
     let result = passki
         .finish_passkey_authentication(&credential, &state, passkey)
         .map_err(err)?;
 
-    // Update the counter to detect cloned authenticators.
-    // If counter goes backwards, it may indicate the credential was cloned.
+    // Must be stored: if the next login reports a counter that did not grow,
+    // the credential has been cloned.
     passkey.counter = result.counter;
 
     let prf_output = result
@@ -497,18 +471,14 @@ async fn auth_finish(
     }))
 }
 
-// =============================================================================
 // Main
-// =============================================================================
 
 #[tokio::main]
 async fn main() -> Result<(), std::io::Error> {
     tracing_subscriber::fmt().with_target(false).init();
 
-    // Initialize Passki with relying party information.
-    // - rp_id: The domain name (no protocol or port). Credentials are bound to this.
-    // - origins: The accepted origin URLs. Must match what the browser sends.
-    // - rp_name: Human-readable name shown by authenticators.
+    // The domain the passkeys are bound to, the origins allowed to use them,
+    // and the name authenticators show in their prompt.
     let passki = Arc::new(Passki::new(
         "localhost",
         &["http://localhost:3000"],

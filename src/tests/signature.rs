@@ -24,7 +24,7 @@ use aws_lc_rs::signature::{
     KeyPair, RSA_PKCS1_SHA256, RSA_PKCS1_SHA384,
 };
 
-// ===== EdDSA signature tests =====
+// EdDSA signature tests
 
 #[test]
 fn test_verify_eddsa_valid_signature() {
@@ -58,7 +58,7 @@ fn test_verify_eddsa_invalid_signature() {
     let pub_key: &[u8; 32] = key_pair.public_key().as_ref().try_into().unwrap();
     let cose_key_bytes = create_eddsa_cose_key(pub_key);
 
-    // Try to verify with different message
+    // A different message must not verify.
     let wrong_message = b"different message";
     let result = Passki::verify_eddsa(&cose_key_bytes, wrong_message, signature.as_ref());
 
@@ -84,7 +84,6 @@ fn test_verify_eddsa_corrupted_signature() {
     let sig = key_pair.sign(message);
     let mut signature = sig.as_ref().to_vec();
 
-    // Corrupt the signature
     signature[0] ^= 0xFF;
 
     let pub_key: &[u8; 32] = key_pair.public_key().as_ref().try_into().unwrap();
@@ -109,7 +108,7 @@ fn test_verify_eddsa_invalid_public_key() {
     let result = Passki::verify_eddsa(&cose_key_bytes, message, &signature);
 
     assert!(result.is_err(), "Invalid public key should fail");
-    // The error could be about invalid key or signature verification failure
+    // Either a key or a signature error will do.
     let error = result.unwrap_err().to_string();
     assert!(
         error.contains("Invalid Ed25519 public key")
@@ -123,7 +122,7 @@ fn test_verify_eddsa_invalid_public_key() {
 fn test_verify_eddsa_wrong_key_length() {
     use ciborium::Value;
 
-    // Create COSE key with wrong x coordinate length
+    // x is the wrong length.
     let cose_key = vec![
         (Value::Integer(1.into()), Value::Integer(1.into())),
         (Value::Integer(3.into()), Value::Integer((-8).into())),
@@ -152,7 +151,7 @@ fn test_verify_eddsa_wrong_key_length() {
 fn test_verify_eddsa_missing_x_coordinate() {
     use ciborium::Value;
 
-    // Create COSE key without x coordinate (label -2)
+    // No x coordinate.
     let cose_key = vec![
         (Value::Integer(1.into()), Value::Integer(1.into())),
         (Value::Integer(3.into()), Value::Integer((-8).into())),
@@ -194,7 +193,7 @@ fn test_verify_eddsa_invalid_cbor() {
 fn test_verify_eddsa_cose_key_not_map() {
     use ciborium::Value;
 
-    // Create COSE key that's not a map (it's an array)
+    // An array where a map is required.
     let cose_key = Value::Array(vec![Value::Integer(1.into())]);
     let mut cose_key_bytes = Vec::new();
     ciborium::into_writer(&cose_key, &mut cose_key_bytes).unwrap();
@@ -207,7 +206,7 @@ fn test_verify_eddsa_cose_key_not_map() {
     assert!(result.unwrap_err().to_string().contains("not a map"));
 }
 
-// ===== ES256 signature tests =====
+// ES256 signature tests
 
 #[test]
 fn test_verify_es256_valid_signature() {
@@ -219,7 +218,7 @@ fn test_verify_es256_valid_signature() {
     let message = b"test message for ES256";
     let signature = key_pair.sign(&rng, message).unwrap();
 
-    // Extract x and y coordinates from public key (uncompressed SEC1 format: 0x04 || x || y)
+    // The public key is an uncompressed point: 0x04 || x || y.
     let public_key_bytes = key_pair.public_key().as_ref();
     let x = &public_key_bytes[1..33];
     let y = &public_key_bytes[33..65];
@@ -250,7 +249,7 @@ fn test_verify_es256_invalid_signature() {
 
     let cose_key_bytes = create_es256_cose_key(x, y);
 
-    // Try to verify with different message
+    // A different message must not verify.
     let wrong_message = b"different message";
     let result = Passki::verify_signature(
         &cose_key_bytes,
@@ -287,7 +286,6 @@ fn test_verify_es256_corrupted_signature() {
 
     let cose_key_bytes = create_es256_cose_key(x, y);
 
-    // Corrupt the signature
     let mut corrupted_sig = signature.as_ref().to_vec();
     corrupted_sig[8] ^= 0xFF; // Corrupt a byte in the DER-encoded signature
 
@@ -303,7 +301,7 @@ fn test_verify_es256_corrupted_signature() {
 fn test_verify_es256_missing_x_coordinate() {
     use ciborium::Value;
 
-    // Create COSE key without x coordinate
+    // No x coordinate.
     let cose_key = vec![
         (Value::Integer(1.into()), Value::Integer(2.into())),
         (Value::Integer(3.into()), Value::Integer((-7).into())),
@@ -332,7 +330,7 @@ fn test_verify_es256_missing_x_coordinate() {
 fn test_verify_es256_missing_y_coordinate() {
     use ciborium::Value;
 
-    // Create COSE key without y coordinate
+    // No y coordinate.
     let cose_key = vec![
         (Value::Integer(1.into()), Value::Integer(2.into())),
         (Value::Integer(3.into()), Value::Integer((-7).into())),
@@ -359,7 +357,7 @@ fn test_verify_es256_missing_y_coordinate() {
 
 #[test]
 fn test_verify_es256_invalid_public_key() {
-    // Use invalid coordinates that don't form a valid point on the curve
+    // Coordinates that are not a point on the curve.
     let invalid_x = vec![0xFF; 32];
     let invalid_y = vec![0xFF; 32];
 
@@ -370,11 +368,11 @@ fn test_verify_es256_invalid_public_key() {
 
     let result = Passki::verify_signature(&cose_key_bytes, ALG_ES256, message, &signature);
 
-    // Invalid public key or signature format causes verification to fail
+    // Either a key or a signature error will do.
     assert!(result.is_err());
 }
 
-// ===== ES384 signature tests =====
+// ES384 signature tests
 
 #[test]
 fn test_verify_es384_valid_signature() {
@@ -386,7 +384,7 @@ fn test_verify_es384_valid_signature() {
     let message = b"test message for ES384";
     let signature = key_pair.sign(&rng, message).unwrap();
 
-    // Extract x and y coordinates from public key (uncompressed SEC1 format: 0x04 || x || y)
+    // The public key is an uncompressed point: 0x04 || x || y.
     let public_key_bytes = key_pair.public_key().as_ref();
     let x = &public_key_bytes[1..49];
     let y = &public_key_bytes[49..97];
@@ -461,7 +459,7 @@ fn test_verify_es384_dispatch() {
     );
 }
 
-// ===== RS256 signature tests =====
+// RS256 signature tests
 
 #[test]
 fn test_verify_rs256_valid_signature() {
@@ -500,7 +498,7 @@ fn test_verify_rs256_invalid_signature() {
 
     let cose_key_bytes = create_rs256_cose_key(&n, &e);
 
-    // Try to verify with different message
+    // A different message must not verify.
     let wrong_message = b"different message";
     let result = Passki::verify_signature(&cose_key_bytes, ALG_RS256, wrong_message, &signature);
 
@@ -528,7 +526,6 @@ fn test_verify_rs256_corrupted_signature() {
         .sign(&RSA_PKCS1_SHA256, &rng, message, &mut signature)
         .unwrap();
 
-    // Corrupt the signature
     signature[0] ^= 0xFF;
 
     let cose_key_bytes = create_rs256_cose_key(&n, &e);
@@ -545,7 +542,7 @@ fn test_verify_rs256_corrupted_signature() {
 fn test_verify_rs256_missing_modulus() {
     use ciborium::Value;
 
-    // Create COSE key without n (modulus)
+    // No modulus.
     let cose_key = vec![
         (Value::Integer(1.into()), Value::Integer(3.into())),
         (Value::Integer(3.into()), Value::Integer((-257).into())),
@@ -573,7 +570,7 @@ fn test_verify_rs256_missing_modulus() {
 fn test_verify_rs256_missing_exponent() {
     use ciborium::Value;
 
-    // Create COSE key without e (exponent)
+    // No exponent.
     let cose_key = vec![
         (Value::Integer(1.into()), Value::Integer(3.into())),
         (Value::Integer(3.into()), Value::Integer((-257).into())),
@@ -599,7 +596,7 @@ fn test_verify_rs256_missing_exponent() {
 
 #[test]
 fn test_verify_rs256_invalid_public_key() {
-    // Create invalid RSA key (modulus too small)
+    // The modulus is far too small.
     let n = vec![1u8; 32]; // Too small for RSA
     let e = vec![1, 0, 1]; // Standard exponent 65537
 
@@ -611,7 +608,7 @@ fn test_verify_rs256_invalid_public_key() {
     let result = Passki::verify_signature(&cose_key_bytes, ALG_RS256, message, &signature);
 
     assert!(result.is_err(), "Invalid public key should fail");
-    // The error could be about invalid key or signature verification failure
+    // Either a key or a signature error will do.
     let error = result.unwrap_err().to_string();
     assert!(
         error.contains("Invalid RSA public key") || error.contains("Signature verification failed"),
@@ -620,7 +617,7 @@ fn test_verify_rs256_invalid_public_key() {
     );
 }
 
-// ===== RS384 signature tests =====
+// RS384 signature tests
 
 #[test]
 fn test_verify_rs384_valid_signature() {
@@ -697,13 +694,13 @@ fn test_verify_rs384_dispatch() {
     );
 }
 
-// ===== COSE key type and curve validation tests =====
+// COSE key type and curve validation tests
 
 #[test]
 fn test_verify_eddsa_wrong_kty() {
     use ciborium::Value;
 
-    // COSE key with kty EC2 instead of OKP
+    // kty EC2 where OKP is required.
     let cose_key = vec![
         (Value::Integer(1.into()), Value::Integer(2.into())), // kty: EC2 (wrong)
         (Value::Integer(3.into()), Value::Integer((-8).into())), // alg: EdDSA
@@ -723,7 +720,7 @@ fn test_verify_eddsa_wrong_kty() {
 fn test_verify_eddsa_wrong_crv() {
     use ciborium::Value;
 
-    // COSE key with crv P-256 instead of Ed25519
+    // crv P-256 where Ed25519 is required.
     let cose_key = vec![
         (Value::Integer(1.into()), Value::Integer(1.into())), // kty: OKP
         (Value::Integer(3.into()), Value::Integer((-8).into())), // alg: EdDSA
@@ -743,7 +740,7 @@ fn test_verify_eddsa_wrong_crv() {
 fn test_verify_eddsa_missing_kty() {
     use ciborium::Value;
 
-    // COSE key without kty (label 1)
+    // No kty.
     let cose_key = vec![
         (Value::Integer(3.into()), Value::Integer((-8).into())), // alg: EdDSA
         (Value::Integer((-1).into()), Value::Integer(6.into())), // crv: Ed25519
@@ -762,7 +759,7 @@ fn test_verify_eddsa_missing_kty() {
 fn test_verify_es256_wrong_crv() {
     use ciborium::Value;
 
-    // COSE key with crv P-384 but verified as ES256 (P-256)
+    // crv P-384, verified as ES256.
     let cose_key = vec![
         (Value::Integer(1.into()), Value::Integer(2.into())), // kty: EC2
         (Value::Integer(3.into()), Value::Integer((-7).into())), // alg: ES256
@@ -783,7 +780,7 @@ fn test_verify_es256_wrong_crv() {
 fn test_verify_es384_wrong_crv() {
     use ciborium::Value;
 
-    // COSE key with crv P-256 but verified as ES384 (P-384)
+    // crv P-256, verified as ES384.
     let cose_key = vec![
         (Value::Integer(1.into()), Value::Integer(2.into())), // kty: EC2
         (Value::Integer(3.into()), Value::Integer((-35).into())), // alg: ES384
@@ -804,7 +801,7 @@ fn test_verify_es384_wrong_crv() {
 fn test_verify_rs256_wrong_kty() {
     use ciborium::Value;
 
-    // COSE key with kty OKP instead of RSA
+    // kty OKP where RSA is required.
     let cose_key = vec![
         (Value::Integer(1.into()), Value::Integer(1.into())), // kty: OKP (wrong)
         (Value::Integer(3.into()), Value::Integer((-257).into())), // alg: RS256
@@ -820,7 +817,7 @@ fn test_verify_rs256_wrong_kty() {
     assert!(result.unwrap_err().to_string().contains("Invalid kty"));
 }
 
-// ===== verify_signature dispatch tests =====
+// verify_signature dispatch tests
 
 #[test]
 fn test_verify_signature_eddsa_dispatch() {
@@ -937,7 +934,7 @@ fn test_verify_signature_all_supported_algorithms() {
 
         let result = Passki::verify_signature(&cose_key_bytes, alg, message, &signature);
 
-        // Should not return "Unsupported algorithm" error
+        // Anything but "unsupported algorithm".
         if let Err(e) = result {
             assert!(
                 !e.to_string().contains("Unsupported algorithm"),

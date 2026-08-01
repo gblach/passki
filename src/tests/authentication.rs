@@ -36,14 +36,12 @@ fn test_start_passkey_authentication_returns_challenge() {
     let (challenge, state) =
         passki.start_passkey_authentication(&passkeys, AuthenticationOptions::default());
 
-    // Verify challenge structure
     assert_eq!(challenge.timeout, 60000);
     assert_eq!(challenge.rp_id, "localhost");
     assert!(!challenge.challenge.is_empty());
     assert_eq!(challenge.allow_credentials.len(), 1);
     assert_eq!(challenge.allow_credentials[0].type_, "public-key");
 
-    // Verify state
     assert_eq!(state.challenge.len(), 32);
     assert_eq!(state.allowed_credentials.len(), 1);
     assert_eq!(state.allowed_credentials[0], vec![1u8; 16]);
@@ -104,11 +102,9 @@ fn test_start_passkey_authentication_multiple_credentials() {
         },
     );
 
-    // Verify all credentials are included
     assert_eq!(challenge.allow_credentials.len(), 3);
     assert_eq!(state.allowed_credentials.len(), 3);
 
-    // Verify credentials are properly encoded
     assert_eq!(
         Passki::base64_decode(&challenge.allow_credentials[0].id).unwrap(),
         vec![1u8; 16]
@@ -132,7 +128,6 @@ fn test_start_passkey_authentication_empty_credentials() {
     let (challenge, state) =
         passki.start_passkey_authentication(&passkeys, AuthenticationOptions::default());
 
-    // Should work with empty credentials
     assert_eq!(challenge.allow_credentials.len(), 0);
     assert_eq!(state.allowed_credentials.len(), 0);
     assert!(!challenge.challenge.is_empty());
@@ -162,7 +157,7 @@ fn test_start_passkey_authentication_generates_unique_challenges() {
     let (challenge2, state2) =
         passki.start_passkey_authentication(&passkeys, AuthenticationOptions::default());
 
-    // Challenges should be unique
+    // Every challenge must differ.
     assert_ne!(challenge1.challenge, challenge2.challenge);
     assert_ne!(state1.challenge, state2.challenge);
 }
@@ -236,10 +231,9 @@ fn test_finish_passkey_authentication_success() {
 
     let result = passki.finish_passkey_authentication(&credential, &state, &stored_passkey);
 
-    // Note: This will fail because we're using dummy public key data
-    // The test verifies that validation checks pass before hitting signature verification
+    // The dummy public key makes signature verification fail; what matters is
+    // that everything checked before it passed.
     assert!(result.is_err());
-    // Just verify it returns an error - the exact error depends on implementation details
 }
 
 #[test]
@@ -653,7 +647,7 @@ fn test_finish_passkey_authentication_up_flag_not_set() {
 fn test_finish_passkey_authentication_usernameless() {
     let passki = Passki::new("localhost", &["http://localhost:3000"], "Test App");
 
-    // Stored passkey that would be looked up by credential_id after authenticator responds
+    // The passkey the server would look up by credential ID.
     let stored_passkey = StoredPasskey {
         credential_id: vec![1u8; 16],
         public_key: vec![2u8; 64],
@@ -668,19 +662,17 @@ fn test_finish_passkey_authentication_usernameless() {
         bs: false,
     };
 
-    // Start authentication with EMPTY credentials list (usernameless flow)
+    // An empty list lets the browser offer any passkey it holds.
     let passkeys: Vec<StoredPasskey> = vec![];
     let (_challenge, state) =
         passki.start_passkey_authentication(&passkeys, AuthenticationOptions::default());
 
-    // Verify state has empty allowed_credentials
     assert!(state.allowed_credentials.is_empty());
 
     let authenticator_data = create_test_authenticator_data(6, 0x01);
     let client_data_json =
         create_test_auth_client_data_json(&state.challenge, "http://localhost:3000");
 
-    // Use the credential_id from stored_passkey (simulating lookup after authenticator response)
     let credential = AuthenticationCredential {
         credential_id: Passki::base64_encode(&stored_passkey.credential_id),
         authenticator_data: Passki::base64_encode(&authenticator_data),
@@ -693,8 +685,8 @@ fn test_finish_passkey_authentication_usernameless() {
 
     let result = passki.finish_passkey_authentication(&credential, &state, &stored_passkey);
 
-    // Should NOT fail with "Credential not allowed" - usernameless flow skips that check
-    // Will fail at signature verification due to dummy data, which is expected
+    // Must not fail as "Credential not allowed": with no allow list that check
+    // is skipped, so the dummy signature is what fails instead.
     assert!(result.is_err());
     assert!(
         !result

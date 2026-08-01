@@ -41,7 +41,6 @@ fn test_start_passkey_registration_returns_challenge() {
         )
         .unwrap();
 
-    // Verify challenge structure
     assert_eq!(challenge.rp.id, "localhost");
     assert_eq!(challenge.rp.name, "Test App");
     assert_eq!(challenge.user.name, "testuser");
@@ -49,7 +48,6 @@ fn test_start_passkey_registration_returns_challenge() {
     assert_eq!(challenge.timeout, 60000);
     assert!(!challenge.challenge.is_empty());
 
-    // Verify algorithm support
     assert_eq!(challenge.pub_key_cred_params.len(), 5);
     assert_eq!(challenge.pub_key_cred_params[0].alg, -8); // EdDSA
     assert_eq!(challenge.pub_key_cred_params[1].alg, -7); // ES256
@@ -57,7 +55,6 @@ fn test_start_passkey_registration_returns_challenge() {
     assert_eq!(challenge.pub_key_cred_params[3].alg, -257); // RS256
     assert_eq!(challenge.pub_key_cred_params[4].alg, -258); // RS384
 
-    // Verify state
     assert_eq!(state.challenge.len(), 32);
     assert!(!state.user.id.is_empty());
 }
@@ -101,7 +98,7 @@ fn test_start_passkey_registration_generates_unique_challenges() {
         .start_passkey_registration(user_id2, "user2", "User 2", RegistrationOptions::default())
         .unwrap();
 
-    // Challenges should be unique
+    // Every challenge must differ.
     assert_ne!(challenge1.challenge, challenge2.challenge);
     assert_ne!(state1.challenge, state2.challenge);
 }
@@ -120,11 +117,9 @@ fn test_start_passkey_registration_user_id_stored_as_bytes() {
         )
         .unwrap();
 
-    // User info should be stored in state
     assert_eq!(state.user.id, challenge.user.id);
     assert_eq!(state.user.name, "testuser");
 
-    // Decode the base64url user ID from state
     let decoded_user_id = Passki::base64_decode(&state.user.id).unwrap();
     assert_eq!(decoded_user_id, user_id);
 }
@@ -160,15 +155,12 @@ fn test_start_passkey_registration_with_single_existing_credential() {
         )
         .unwrap();
 
-    // Verify exclude_credentials contains the existing credential
     assert_eq!(challenge.exclude_credentials.len(), 1);
     assert_eq!(challenge.exclude_credentials[0].type_, "public-key");
 
-    // Verify the credential ID is properly encoded
     let decoded_id = Passki::base64_decode(&challenge.exclude_credentials[0].id).unwrap();
     assert_eq!(decoded_id, existing_passkey.credential_id);
 
-    // Verify state is still correct
     assert_eq!(state.challenge.len(), 32);
     assert!(!state.user.id.is_empty());
 }
@@ -232,17 +224,14 @@ fn test_start_passkey_registration_with_multiple_existing_credentials() {
         )
         .unwrap();
 
-    // Verify all credentials are excluded
     assert_eq!(challenge.exclude_credentials.len(), 3);
 
-    // Verify each credential is properly encoded
     for (i, excluded) in challenge.exclude_credentials.iter().enumerate() {
         assert_eq!(excluded.type_, "public-key");
         let decoded_id = Passki::base64_decode(&excluded.id).unwrap();
         assert_eq!(decoded_id, existing_passkeys[i].credential_id);
     }
 
-    // Verify state
     assert_eq!(state.challenge.len(), 32);
     assert!(!state.user.id.is_empty());
 }
@@ -253,7 +242,7 @@ fn test_start_passkey_registration_none_vs_empty_slice() {
 
     let user_id = b"user123_16bytes_";
 
-    // Test with None
+    // No exclusion list at all.
     let (challenge_none, _state_none) = passki
         .start_passkey_registration(
             user_id,
@@ -263,7 +252,7 @@ fn test_start_passkey_registration_none_vs_empty_slice() {
         )
         .unwrap();
 
-    // Test with empty slice
+    // An empty one.
     let empty_slice: Vec<StoredPasskey> = vec![];
     let (challenge_empty, _state_empty) = passki
         .start_passkey_registration(
@@ -277,7 +266,6 @@ fn test_start_passkey_registration_none_vs_empty_slice() {
         )
         .unwrap();
 
-    // Both should result in no excluded credentials
     assert_eq!(challenge_none.exclude_credentials.len(), 0);
     assert_eq!(challenge_empty.exclude_credentials.len(), 0);
 }
@@ -286,7 +274,7 @@ fn test_start_passkey_registration_none_vs_empty_slice() {
 fn test_start_passkey_registration_user_id_validation_success() {
     let passki = Passki::new("localhost", &["http://localhost:3000"], "Test App");
 
-    // Exactly 16 bytes
+    // The minimum accepted length.
     let user_id = b"1234567890123456";
     let result = passki.start_passkey_registration(
         user_id,
@@ -323,7 +311,7 @@ fn test_start_passkey_registration_user_id_validation_fails_empty() {
 fn test_start_passkey_registration_user_id_validation_fails_15_bytes() {
     let passki = Passki::new("localhost", &["http://localhost:3000"], "Test App");
 
-    // 15 bytes - one less than minimum
+    // One byte short of the minimum.
     let user_id = b"123456789012345";
     let result = passki.start_passkey_registration(
         user_id,
@@ -662,7 +650,8 @@ fn test_finish_passkey_registration_credential_id_mismatch() {
         )
         .unwrap();
 
-    // The attestation object carries credId = [1u8; 16]; the client claims a different one
+    // The attestation object carries credId = [1u8; 16]; the client claims
+    // something else.
     let attestation_obj = create_test_attestation_object(-7, 0x45);
     let client_data_json = create_test_client_data_json(&state.challenge, "http://localhost:3000");
 

@@ -23,8 +23,7 @@ use crate::types::*;
 
 /// Challenge sent to the client to begin passkey registration.
 ///
-/// This structure contains all the parameters needed by the WebAuthn client
-/// to create a new credential.
+/// Serialize this to JSON and hand it to `navigator.credentials.create()`.
 #[derive(Serialize, Debug)]
 pub struct RegistrationChallenge {
     /// Information about the relying party.
@@ -50,10 +49,8 @@ pub struct RegistrationChallenge {
     #[serde(rename = "authenticatorSelection")]
     pub authenticator_selection: AuthenticatorSelection,
 
-    /// List of credentials to exclude from registration.
-    ///
-    /// These credentials will not be allowed to be registered again,
-    /// preventing duplicate registrations.
+    /// Credentials the user already has, which the authenticator must refuse to
+    /// register a second time.
     #[serde(rename = "excludeCredentials")]
     pub exclude_credentials: Vec<ExcludeCredential>,
 
@@ -62,9 +59,10 @@ pub struct RegistrationChallenge {
     pub extensions: Option<RegistrationExtensions>,
 }
 
-/// Server-side state for a passkey registration in progress.
+/// Server-side half of a registration in progress.
 ///
-/// This state must be stored temporarily and provided when completing the registration.
+/// Keep it in a session or cache between the two steps; without it the response
+/// cannot be verified.
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct RegistrationState {
     /// The challenge that was sent to the client.
@@ -73,19 +71,19 @@ pub struct RegistrationState {
     /// The user information.
     pub user: UserInfo,
 
-    /// The user verification requirement requested when the ceremony was started.
+    /// What was asked for when the ceremony started, re-checked against what the
+    /// authenticator actually did.
     pub user_verification: UserVerificationRequirement,
 }
 
-/// Credential data returned by the client after registration.
-///
-/// This structure contains the new credential's ID, public key, and client data.
+/// What the client sends back after `navigator.credentials.create()`.
 #[derive(Deserialize)]
 pub struct RegistrationCredential {
     /// The credential ID (base64url-encoded).
     pub credential_id: String,
 
-    /// The attestation object containing the public key (base64url-encoded).
+    /// The attestation object, which carries the new public key
+    /// (base64url-encoded).
     pub public_key: String,
 
     /// The client data JSON (base64url-encoded).
@@ -94,15 +92,12 @@ pub struct RegistrationCredential {
     /// Extension results from the client (e.g., PRF support flag).
     pub client_extension_results: Option<ClientExtensionResults>,
 
-    /// The attachment modality the client reports for the new credential.
-    /// `None` when the client did not report one.
+    /// Whether the client used a built-in or a separate authenticator. `None`
+    /// when it did not report.
     pub authenticator_attachment: Option<AuthenticatorAttachment>,
 
-    /// What `getTransports()` reported for the new credential. Unknown values
-    /// are dropped and the legacy `cable` value reads as
-    /// [`AuthenticatorTransport::Hybrid`]. Empty when the client sent nothing,
-    /// which is also what a front end that does not forward the list yet leaves
-    /// behind.
+    /// What `getTransports()` reported. Empty when the client sent nothing, and
+    /// also when the front end simply does not forward the list.
     #[serde(default, deserialize_with = "deserialize_transports")]
     pub transports: Vec<AuthenticatorTransport>,
 }
@@ -169,20 +164,17 @@ pub(crate) struct ParsedAttestation {
     /// The signature counter at registration time.
     pub counter: u32,
 
-    /// The AAGUID of the authenticator that created the credential.
+    /// Identifies the authenticator model.
     pub aaguid: [u8; 16],
 
-    /// What the attestation statement turned out to be worth. Left at
-    /// [`AttestationType::None`] by authenticator data parsing, which sees no
-    /// statement; `verify_attestation` fills it in.
+    /// Left at [`AttestationType::None`] here, since parsing authenticator data
+    /// sees no attestation statement; `verify_attestation` fills it in.
     pub attestation_type: AttestationType,
 }
 
 impl Passki {
-    /// Starts a passkey registration ceremony.
-    ///
-    /// Generates a challenge and returns both the challenge to send to the client
-    /// and the state to store on the server.
+    /// Starts a passkey registration: generates a random challenge and returns
+    /// it alongside the state needed to finish.
     ///
     /// # Arguments
     ///
@@ -193,9 +185,7 @@ impl Passki {
     ///
     /// # Returns
     ///
-    /// A tuple containing:
-    /// * `RegistrationChallenge` - Challenge to send to the client
-    /// * `RegistrationState` - State to store on the server
+    /// The challenge to send to the client, and the state to keep on the server.
     ///
     /// # Errors
     ///
@@ -265,10 +255,7 @@ impl Passki {
         Ok((challenge_response, state))
     }
 
-    /// Completes a passkey registration ceremony.
-    ///
-    /// Verifies the credential data returned by the client and returns a
-    /// stored passkey that can be saved in the database.
+    /// Completes a passkey registration by verifying what the client returned.
     ///
     /// # Arguments
     ///
@@ -277,7 +264,7 @@ impl Passki {
     ///
     /// # Returns
     ///
-    /// A `StoredPasskey` containing the credential information to save.
+    /// A `StoredPasskey` to save in the database.
     ///
     /// # Errors
     ///
@@ -296,8 +283,6 @@ impl Passki {
         client_data.verify(ClientDataType::Create, &state.challenge, &self.rp_origins)?;
         let client_data_hash = digest::digest(&SHA256, &client_data_bytes);
 
-        // Parse the attestation object, extract the public key, and verify the
-        // attestation statement.
         let attestation_bytes = Self::base64_decode(&credential.public_key)?;
         let parsed = self.verify_attestation(&attestation_bytes, client_data_hash.as_ref())?;
 
@@ -310,8 +295,8 @@ impl Passki {
             return Err(PasskiError::UserVerificationRequired);
         }
 
-        // The credential ID in the attested credential data is authoritative;
-        // the client-supplied one must match it.
+        // The signed authenticator data is authoritative; the ID the client sent
+        // alongside it must agree.
         let credential_id = Self::base64_decode(&credential.credential_id)?;
         if credential_id != parsed.credential_id {
             return Err(PasskiError::CredentialIdMismatch);
@@ -376,8 +361,7 @@ impl Passki {
         Ok((fmt, auth_data, att_stmt))
     }
 
-    /// Parses a CBOR attestation object into its credential ID, public key, algorithm,
-    /// flags byte, and signature counter.
+    /// Parses an attestation object without verifying its attestation statement.
     #[cfg(test)]
     pub(crate) fn parse_attestation_object(
         &self,
@@ -387,15 +371,14 @@ impl Passki {
         self.parse_auth_data(&auth_data)
     }
 
-    /// Parses authenticator data into its credential ID, public key, algorithm,
-    /// flags byte, signature counter, and AAGUID.
+    /// Parses authenticator data, whose layout is a fixed 37-byte header
+    /// (rpIdHash, flags, counter) followed by the attested credential data.
     pub(crate) fn parse_auth_data(&self, auth_data_bytes: &[u8]) -> Result<ParsedAttestation> {
-        // Parse authenticator data
         if auth_data_bytes.len() < 37 {
             return Err(PasskiError::InvalidAuthenticatorData);
         }
 
-        // Verify rpId hash (bytes 0-31)
+        // Bytes 0-31 bind the credential to our domain.
         let rp_id_hash = digest::digest(&SHA256, self.rp_id.as_bytes());
         if &auth_data_bytes[..32] != rp_id_hash.as_ref() {
             return Err(PasskiError::RpIdHashMismatch);
@@ -414,12 +397,11 @@ impl Passki {
             auth_data_bytes[36],
         ]);
 
-        // Check if attested credential data is present
         if (flags & FLAG_AT) == 0 {
             return Err(PasskiError::NoAttestedCredentialData);
         }
 
-        // Skip: rpIdHash (32) + flags (1) + signCount (4) + aaguid (16) + credIdLen (2) = 55 bytes
+        // Header (37) + aaguid (16) + credential ID length (2) = 55 bytes
         if auth_data_bytes.len() < 55 {
             return Err(PasskiError::InvalidAuthenticatorData);
         }
@@ -448,8 +430,8 @@ impl Passki {
                 PasskiError::InvalidCoseKey("Missing or invalid algorithm".to_string())
             })?;
 
-        // Re-serialize the parsed COSE key so trailing authData bytes (extension
-        // data when the ED flag is set) are not stored with the key
+        // Re-serialize the key: the remaining bytes may carry extension data
+        // after it, which must not be stored as part of the key.
         let mut public_key = Vec::new();
         ciborium::into_writer(&cose_key_value, &mut public_key)?;
 

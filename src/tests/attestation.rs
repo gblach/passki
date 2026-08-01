@@ -25,8 +25,8 @@ fn passki() -> Passki {
     Passki::new("localhost", &["http://localhost:3000"], "Test")
 }
 
-/// Builds a `packed` self-attestation object signed by a freshly generated ES256 key,
-/// returning the CBOR attestation object and the client data hash it was signed over.
+/// A `packed` self-attestation object signed by a fresh ES256 key, returned with
+/// the client data hash it was signed over.
 fn build_packed_self_attestation(alg: i32) -> (Vec<u8>, Vec<u8>) {
     let rng = SystemRandom::new();
     let pkcs8 = EcdsaKeyPair::generate_pkcs8(&ECDSA_P256_SHA256_ASN1_SIGNING, &rng).unwrap();
@@ -206,7 +206,7 @@ fn test_parse_attestation_object_excludes_trailing_extension_data() {
     ciborium::into_writer(&Value::Map(cose_key), &mut cose_key_bytes).unwrap();
     auth_data.extend_from_slice(&cose_key_bytes);
 
-    // Extension data (ED flag) follows the COSE key in authData
+    // Extension data follows the COSE key when the ED flag is set.
     let extensions = vec![(
         Value::Text("credProtect".to_string()),
         Value::Integer(2.into()),
@@ -236,7 +236,7 @@ fn test_parse_attestation_object_excludes_trailing_extension_data() {
 
 #[test]
 fn test_parse_attestation_object_extracts_credential_id() {
-    // The test helper writes credId = [1u8; 16] into the attested credential data
+    // The helper writes credId = [1u8; 16].
     let attestation_obj = create_test_attestation_object(-7, 0x45);
     let parsed = passki().parse_attestation_object(&attestation_obj).unwrap();
 

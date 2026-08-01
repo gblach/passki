@@ -12,7 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Client data parsing and verification for WebAuthn operations.
+//! Parsing and verification of the client data JSON.
+//!
+//! The browser assembles this blob itself and the authenticator signs over its
+//! hash, which is what ties a signature to one challenge and one origin.
 
 use std::fmt;
 use std::str::FromStr;
@@ -56,19 +59,16 @@ impl fmt::Display for ClientDataType {
     }
 }
 
-/// Parsed client data from WebAuthn operations.
-///
-/// This structure contains the parsed fields from the client data JSON
-/// that is sent by the browser during registration and authentication.
+/// The client data JSON the browser sent, parsed.
 #[derive(Debug)]
 pub struct ClientData {
     /// The type of operation (Create for registration, Get for authentication).
     pub type_: ClientDataType,
 
-    /// The challenge that was signed (base64url-encoded).
+    /// The challenge the browser echoed back (base64url-encoded).
     pub challenge: String,
 
-    /// The origin of the requesting page.
+    /// The origin of the page that made the request.
     pub origin: String,
 
     /// Whether the request came from a cross-origin iframe.
@@ -78,19 +78,9 @@ pub struct ClientData {
 impl ClientData {
     /// Parses client data from raw JSON bytes.
     ///
-    /// # Arguments
-    ///
-    /// * `bytes` - The raw JSON bytes
-    ///
-    /// # Returns
-    ///
-    /// A `ClientData` struct containing the parsed fields.
-    ///
     /// # Errors
     ///
-    /// Returns an error if:
-    /// * The JSON parsing fails
-    /// * Required fields are missing
+    /// Returns an error if the JSON is invalid or a required field is missing.
     pub fn from_bytes(bytes: &[u8]) -> Result<ClientData> {
         let json: serde_json::Value = serde_json::from_slice(bytes)?;
 
@@ -120,26 +110,15 @@ impl ClientData {
         })
     }
 
-    /// Parses a base64url-encoded client data JSON string.
+    /// Parses client data straight from the base64url string the client sent.
     ///
-    /// This function decodes and parses the client data JSON that is returned
-    /// by the browser during WebAuthn operations. The challenge field can be
-    /// used to look up pending registration or authentication state.
-    ///
-    /// # Arguments
-    ///
-    /// * `client_data_json` - The base64url-encoded client data JSON string
-    ///
-    /// # Returns
-    ///
-    /// A `ClientData` struct containing the parsed fields.
+    /// Useful before the ceremony is finished: the challenge it exposes can key
+    /// the lookup of the pending registration or authentication state.
     ///
     /// # Errors
     ///
-    /// Returns an error if:
-    /// * The base64url decoding fails
-    /// * The JSON parsing fails
-    /// * Required fields are missing
+    /// Returns an error if the input is not valid base64url, the JSON is
+    /// invalid, or a required field is missing.
     ///
     /// # Example
     ///
@@ -158,16 +137,13 @@ impl ClientData {
     }
 
     #[allow(rustdoc::bare_urls)]
-    /// Verifies the client data against expected values.
-    ///
-    /// Checks that the type and challenge match the expected values, that the
-    /// origin is one of the accepted origins, and that the request did not
-    /// come from a cross-origin iframe.
+    /// Checks the operation type, that the challenge is the one that was issued,
+    /// that the origin is accepted, and that no cross-origin iframe was involved.
     ///
     /// # Arguments
     ///
     /// * `expected_type` - The expected type (Create or Get)
-    /// * `expected_challenge` - The expected challenge bytes
+    /// * `expected_challenge` - The challenge bytes this ceremony issued
     /// * `expected_origins` - The accepted origins (e.g., "https://example.com")
     ///
     /// # Errors
@@ -201,7 +177,6 @@ impl ClientData {
             });
         }
 
-        // Reject requests from cross-origin iframes
         if self.cross_origin {
             return Err(PasskiError::CrossOriginNotAllowed);
         }

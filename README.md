@@ -1,6 +1,6 @@
 # Passki
 
-A simple, secure, and easy-to-use WebAuthn/Passkey implementation for Rust.
+A simple and secure WebAuthn/Passkey implementation for Rust.
 
 [![Crates.io](https://img.shields.io/crates/v/passki.svg)](https://crates.io/crates/passki)
 [![Documentation](https://docs.rs/passki/badge.svg)](https://docs.rs/passki)
@@ -30,52 +30,45 @@ passki = "0.2"
 ```rust
 use passki::{AuthenticationOptions, Passki, RegistrationOptions, StoredPasskey};
 
-// Initialize Passki with your relying party information
 let passki = Passki::new(
-    "example.com",              // Relying Party ID (domain)
-    &["https://example.com"],   // Accepted Relying Party Origins
-    "Example Corp"              // Relying Party Name
+    "example.com",              // relying party ID (the domain)
+    &["https://example.com"],   // accepted origins
+    "Example Corp"              // name shown in the browser prompt
 );
 
-// Registration flow
-// Step 1: Start registration and send challenge to client
-let user_id = b"unique_user_identifier_12345"; // At least 16 bytes
+// Registration step 1: issue a challenge
+let user_id = b"unique_user_identifier_12345"; // at least 16 bytes
 let (registration_challenge, registration_state) = passki.start_passkey_registration(
-    user_id,                        // User ID (bytes)
-    "alice@example.com",            // Username
-    "Alice Smith",                  // Display name
-    RegistrationOptions::default(), // Timeout, attestation, resident key, UV, attachment, exclusions, extensions
+    user_id,
+    "alice@example.com",            // username
+    "Alice Smith",                  // display name
+    RegistrationOptions::default(),
 ).expect("user_id must be at least 16 bytes");
 
-// Send registration_challenge to client (as JSON)
-// Client uses WebAuthn API to create credential
+// Send registration_challenge to the client as JSON, keep registration_state.
 
-// Step 2: Receive credential from client and complete registration
+// Registration step 2: verify the credential the client created
 let mut stored_passkey = passki.finish_passkey_registration(
-    &registration_credential,  // Credential from client
-    &registration_state,       // State from step 1
+    &registration_credential,
+    &registration_state,
 )?;
 
-// Save stored_passkey to your database associated with the user
+// Save stored_passkey in your database, associated with the user.
 
-// Authentication flow
-// Step 1: Start authentication and send challenge to client
+// Authentication step 1: issue a challenge
 let (authentication_challenge, authentication_state) = passki.start_passkey_authentication(
-    &user_passkeys,                   // User's stored passkeys
-    AuthenticationOptions::default(), // Timeout, user verification, extensions
+    &user_passkeys,
+    AuthenticationOptions::default(),
 );
 
-// Send authentication_challenge to client (as JSON)
-// Client uses WebAuthn API to sign the challenge
-
-// Step 2: Receive credential from client and verify authentication
+// Authentication step 2: verify the signature
 let result = passki.finish_passkey_authentication(
-    &authentication_credential,  // Credential from client
-    &authentication_state,       // State from step 1
-    &stored_passkey,             // User's passkey from database
+    &authentication_credential,
+    &authentication_state,
+    &stored_passkey,
 )?;
 
-// Update the counter in your database to prevent replay attacks
+// Persist the new counter, or replay detection has nothing to compare against.
 stored_passkey.counter = result.counter;
 ```
 
@@ -91,9 +84,9 @@ Passki supports the following COSE algorithms:
 
 ## AAGUID
 
-`StoredPasskey::aaguid` is the 16-byte identifier of the authenticator model - which YubiKey, which password manager. It is a plain `[u8; 16]` rather than an `Option`, because all-zero already means "no model to look up".
+`StoredPasskey::aaguid` is the 16-byte identifier of the authenticator model - which YubiKey, which password manager. Look it up in the [FIDO Metadata Service](https://fidoalliance.org/metadata/) or a community AAGUID list.
 
-All zero is the common case. Under the default `AttestationConveyancePreference::None` the browser zeroes the AAGUID before passing the credential on, so you get a model identifier only by asking for attestation - and a non-zero value is worth acting on only once it has been validated, which is what [Attestation](#attestation) sets up. Look the model up in the [FIDO Metadata Service](https://fidoalliance.org/metadata/) or a community AAGUID list.
+All zero is the common case, and means there is no model to look up: under the default `AttestationConveyancePreference::None` the browser zeroes the AAGUID before passing the credential on. A non-zero value is worth acting on only once it has been validated, which is what [Attestation](#attestation) sets up.
 
 The same `StoredPasskey` also carries `be` (backup eligible - the credential is synced rather than bound to one device) and `bs` (currently backed up), both straight from the authenticator data flags.
 
@@ -125,9 +118,7 @@ let passkey = passki.finish_passkey_registration(&credential, &state)?;
 
 ### PRF
 
-The [WebAuthn PRF extension](https://www.w3.org/TR/webauthn-3/#prf-extension) lets a passkey derive deterministic secret bytes from the authenticator's internal HMAC-secret. This is useful for end-to-end encryption, per-user key derivation, and other scenarios where you need a stable secret tied to a specific passkey.
-
-The server passes input salts; the browser computes `SHA-256("WebAuthn PRF" || 0x00 || input)` and feeds the result into the authenticator, which computes the HMAC with the credential's own secret through the CTAP2 `hmac-secret` extension. Passki passes the outputs through without processing them.
+The [WebAuthn PRF extension](https://www.w3.org/TR/webauthn-3/#prf-extension) lets a passkey derive deterministic secret bytes from the authenticator's internal HMAC-secret. This is useful for end-to-end encryption, per-user key derivation, and other scenarios where you need a stable secret tied to a specific passkey. Passki passes the outputs through without processing them.
 
 ```rust
 use passki::{
@@ -222,7 +213,7 @@ Attestation is the authenticator proving its make and model - "genuine YubiKey 5
 
 ### Why the AAGUID needs it
 
-`StoredPasskey::aaguid` is a 16-byte model identifier, and by default it is self-asserted. It comes out of `authData`, which the client controls. A malicious client can claim any AAGUID and mint an attestation certificate to match, and every check Passki performs by default will pass - those checks verify the statement against the certificate the statement itself supplied, which settles internal consistency and nothing else.
+By default the AAGUID is self-asserted. It comes out of `authData`, which the client controls. A malicious client can claim any AAGUID and mint an attestation certificate to match, and every check Passki performs by default will pass - those checks verify the statement against the certificate the statement itself supplied, which settles internal consistency and nothing else.
 
 Trust path validation closes the gap: the `x5c` chain is validated against root certificates you supply out of band. Same shape as TLS - the peer sends leaf and intermediates, you hold the roots.
 
@@ -284,11 +275,9 @@ match passkey.attestation_type {
 | `VerifyWhenPresent` | Must chain to a root, else `UntrustedAttestation` | Accepted                                 |
 | `Required`          | Must chain to a root, else `UntrustedAttestation` | `MissingAttestationChain`                |
 
-`Ignore` is the default and preserves pre-0.3 behaviour exactly.
+`Ignore` preserves pre-0.3 behaviour exactly. `Required` is effectively "security keys only": iCloud Keychain, Google Password Manager and 1Password return `none` attestation regardless of what is requested, so it excludes every phone and laptop passkey.
 
 Anchors act as a vendor whitelist. Install only the Yubico root and a genuine Feitian key is rejected, because its chain ends at a root you do not have.
-
-`Required` is effectively "security keys only". iCloud Keychain, Google Password Manager and 1Password return `none` attestation regardless of what is requested, so it excludes every phone and laptop passkey.
 
 ### Trust anchors
 
@@ -304,26 +293,14 @@ Revocation is not checked: attestation chains have no CRL or OCSP to consult. Ce
 
 ## Security Considerations
 
-- 🔒 **Always use HTTPS in production** to prevent man-in-the-middle attacks
-- 🔄 **Update signature counters** after successful authentication to detect cloned authenticators
-- 🎯 **Verify origin matches** your expected domain (Passki does this automatically)
-- 💾 **Store passkeys securely** in your database with proper access controls
-- ⏱️ **Set appropriate timeouts** for registration and authentication ceremonies
-- 🔐 **Use user verification** when handling sensitive operations
-
-## Architecture
-
-Passki follows a simple two-step pattern for both registration and authentication:
-
-1. **Start**: Generate a challenge and return it to the client
-2. **Finish**: Verify the response from the client
-
-This design keeps state management simple and allows you to store session data however you prefer (in-memory, Redis, database, etc.).
+- 🔒 **Always use HTTPS in production** - browsers refuse WebAuthn on insecure origins
+- 🔄 **Store the counter** returned by each authentication, or cloned authenticators go undetected
+- 🔐 **Require user verification** for sensitive operations
+- ⏱️ **Keep ceremony timeouts short**; the state stored between the two steps expires with them
 
 ## Requirements
 
 - Rust 1.85 or later (Edition 2024)
-- A web server to handle HTTP requests
 - HTTPS in production (required by WebAuthn specification)
 
 ## Examples
@@ -358,13 +335,13 @@ The initial recommendation. Defined the core protocol:
 - [x] Credential exclusion (`excludeCredentials`)
 - [x] `AttestationConveyancePreference` (`none` / `indirect` / `direct`)
 - [x] Attestation object CBOR parsing
-- [x] Attestation statement verification (`packed`, `tpm`, `android-key`, `fido-u2f`) - verifies the statement signature and certificate requirements
-- [x] rpId hash verification in authenticator data - the hash in bytes 0-31 is compared against `sha256(rp_id)`
+- [x] Attestation statement verification (`packed`, `tpm`, `android-key`, `fido-u2f`)
+- [x] rpId hash verification in authenticator data
 - [x] UP (user present) flag enforcement
 - [x] UV (user verified) flag enforcement
-- [x] AAGUID exposure - the authenticator model identifier is surfaced on `StoredPasskey`; needed for Metadata Service lookups
-- [x] `authenticatorAttachment` (`platform` / `cross-platform`) - restrict registration to platform or roaming authenticators, and capture the modality the client reports back
-- [x] Attestation trust path validation - chain the attestation certificate to caller-supplied trusted roots, and report the resulting attestation type on `StoredPasskey`
+- [x] AAGUID exposure
+- [x] `authenticatorAttachment` (`platform` / `cross-platform`)
+- [x] Attestation trust path validation
 
 ### Level 2 (2021)
 
@@ -373,36 +350,36 @@ A substantial expansion, still the most widely implemented level today:
 - [x] Discoverable credentials / usernameless flows (empty `allowCredentials`)
 - [x] `ResidentKeyRequirement` (`discouraged` / `preferred` / `required`)
 - [x] `enterprise` attestation conveyance preference
-- [x] Zero-counter authenticator support (explicitly allowed per spec)
-- [x] `credProps` extension - reports whether a discoverable credential was created
-- [x] `largeBlob` extension - store small blobs on the authenticator (e.g. SSH keys)
-- [x] `userHandle` in authentication response - needed to identify the user in usernameless flows
-- [x] `transports` on credential descriptors - report what `getTransports()` returned so the browser can show the right USB / NFC / BLE / internal prompt
+- [x] Zero-counter authenticator support
+- [x] `credProps` extension
+- [x] `largeBlob` extension
+- [x] `userHandle` in authentication response
+- [x] `transports` on credential descriptors
 
 ### Level 3 (Candidate Recommendation, not yet a W3C Recommendation)
 
 Still under active development:
 
-- [x] PRF extension (`prf`) - deterministic key derivation, backed by the CTAP `hmac-secret` extension
-- [x] BE/BS flags (backup eligibility/state) - exposed on `StoredPasskey`; rejects BS set without BE
-- [ ] Related origin requests - use credentials across subdomains / related origins
-- [ ] Accept the spec's `RegistrationResponseJSON` and `AuthenticationResponseJSON` shapes, so a front end can post `credential.toJSON()` unmodified instead of remapping fields; the outbound challenge JSON already matches `PublicKeyCredentialCreationOptionsJSON`
-- [ ] Signal API - lets RPs notify the browser that a credential was deleted or changed
-- [ ] `hints` (`security-key` / `client-device` / `hybrid`) - guide the client toward a kind of authenticator
-- [ ] `attestationFormats` - state which attestation statement formats the relying party prefers; cheap to add, but it is only a preference and no browser is known to honor it yet
-- [ ] `evalByCredential` in the `prf` extension - per-credential PRF inputs, required when `allowCredentials` holds more than one credential
-- [ ] `authenticatorDisplayName` in the `credProps` extension - human-readable name of the authenticator that created the credential
-- [ ] `remoteClientDataJSON` extension - lets a remote desktop client supply the complete `clientDataJSON`, so a local authenticator can sign into a site displayed on a remote host; [editor's draft](https://w3c.github.io/webauthn/) only, absent from the published Candidate Recommendation, and Chrome is still at Intent to Prototype
-- [ ] `compound` attestation statement format - bundles two or more attestation statements; specified since 2023 but not produced by any authenticator yet, so it is waiting on deployment rather than on effort
+- [x] PRF extension (`prf`)
+- [x] BE/BS flags (backup eligibility/state)
+- [ ] Related origin requests
+- [ ] `RegistrationResponseJSON` and `AuthenticationResponseJSON` request shapes
+- [ ] Signal API
+- [ ] `hints` (`security-key` / `client-device` / `hybrid`)
+- [ ] `attestationFormats`
+- [ ] `evalByCredential` in the `prf` extension
+- [ ] `authenticatorDisplayName` in the `credProps` extension
+- [ ] `remoteClientDataJSON` extension
+- [ ] `compound` attestation statement format
 
 ### Defined outside WebAuthn
 
 These extensions are registered in the [IANA WebAuthn extension identifiers registry](https://www.iana.org/assignments/webauthn/webauthn.xhtml)
 but specified elsewhere, so they are not tied to a WebAuthn level:
 
-- [ ] `credProtect` extension ([CTAP 2.1](https://fidoalliance.org/specs/fido-v2.1-ps-20210615/fido-client-to-authenticator-protocol-v2.1-ps-20210615.html#sctn-credProtect-extension) §12.1) - control the UV requirement for credential access
-- [ ] `minPinLength` extension (CTAP 2.1 §12.4) - query the authenticator's configured minimum PIN length
-- [ ] `payment` extension ([Secure Payment Confirmation](https://www.w3.org/TR/secure-payment-confirmation/) §5) - SPC integration
+- [ ] `credProtect` extension ([CTAP 2.1](https://fidoalliance.org/specs/fido-v2.1-ps-20210615/fido-client-to-authenticator-protocol-v2.1-ps-20210615.html#sctn-credProtect-extension) §12.1)
+- [ ] `minPinLength` extension (CTAP 2.1 §12.4)
+- [ ] `payment` extension ([Secure Payment Confirmation](https://www.w3.org/TR/secure-payment-confirmation/) §5)
 
 ## Contributing
 

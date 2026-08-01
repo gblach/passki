@@ -14,11 +14,13 @@
 
 //! Attestation statement verification.
 //!
-//! Verifies the `attStmt` of an attestation object for the `packed`, `fido-u2f`,
-//! `android-key`, and `tpm` formats. This covers the statement's signature and the
-//! structural requirements on the attestation certificate. Whether the certificate
-//! chains up to a trusted root is a relying party policy decision, handled by
-//! [`crate::trust`] once the checks here have passed.
+//! An attestation statement is the authenticator's signed claim about what kind
+//! of hardware it is. Each vendor ecosystem has its own format; this module
+//! handles `packed`, `fido-u2f`, `android-key` and `tpm`, checking the
+//! statement's signature and the structure of the certificate it carries.
+//!
+//! Whether that certificate leads back to a root the relying party trusts is a
+//! separate question, answered by [`crate::trust`] afterwards.
 
 use aws_lc_rs::digest::{self, SHA256, SHA384};
 use aws_lc_rs::signature::{
@@ -38,7 +40,7 @@ use crate::registration::ParsedAttestation;
 use crate::trust::validate_trust_path;
 use crate::types::*;
 
-/// id-fido-gen-ce-aaguid: the AAGUID extension carried by attestation certificates.
+/// id-fido-gen-ce-aaguid: the model identifier, when the certificate states one.
 const OID_FIDO_AAGUID: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.3.6.1.4.1.45724.1.1.4");
 /// Android Keystore key attestation extension.
 const OID_ANDROID_KEY: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.3.6.1.4.1.11129.2.1.17");
@@ -47,8 +49,8 @@ const OID_SUBJECT_ALT_NAME: ObjectIdentifier = ObjectIdentifier::new_unwrap("2.5
 /// tcg-kp-AIKCertificate extended key usage, required of TPM attestation certificates.
 const OID_TCG_KP_AIK: ObjectIdentifier = ObjectIdentifier::new_unwrap("2.23.133.8.3");
 
-/// A public key extracted from a COSE key or an attestation certificate, used to
-/// check that the attestation key matches the credential key.
+/// Public key parameters, in whichever encoding they were found, so keys from
+/// different sources can be compared.
 enum PublicKey {
     Ec { x: Vec<u8>, y: Vec<u8> },
     Rsa { n: Vec<u8>, e: Vec<u8> },
@@ -56,14 +58,14 @@ enum PublicKey {
 
 /// What an attestation statement offered once its format-specific checks passed.
 enum Evidence {
-    /// The statement carried no certificate, so there is nothing to anchor.
+    /// No certificate, so there is nothing to trace back to a root.
     Unchained(AttestationType),
 
-    /// The statement carried an `x5c` chain, leaf first. `anchored` is the type
-    /// to report if that chain reaches a trust anchor, which the format decides:
-    /// `tpm` mints a certificate per device, so it is an attestation CA. The
-    /// specification lets `packed` be either, and a chain cannot tell the two
-    /// apart on its own, so it is reported as the far more common batch case.
+    /// An `x5c` certificate chain, leaf first. `anchored` is what to report if
+    /// the chain reaches a trusted root, and depends on the format: `tpm` issues
+    /// a certificate per device, so it is an attestation CA. `packed` may be
+    /// either and the chain cannot say which, so it gets the far more common
+    /// batch case.
     Chained {
         chain: Vec<Vec<u8>>,
         anchored: AttestationType,
@@ -71,8 +73,8 @@ enum Evidence {
 }
 
 impl Passki {
-    /// Applies the trust policy to what an attestation statement offered, and
-    /// returns the attestation type to record on the credential.
+    /// Applies the configured trust policy to the evidence, giving the
+    /// attestation type to record on the credential.
     fn resolve_attestation_type(&self, evidence: Evidence) -> Result<AttestationType> {
         let (chain, anchored) = match evidence {
             Evidence::Unchained(attestation_type) => {
@@ -92,8 +94,8 @@ impl Passki {
         Ok(anchored)
     }
 
-    /// Parses an attestation object, extracts the attested credential data, and
-    /// verifies the attestation statement according to its format.
+    /// Parses an attestation object and verifies its statement, dispatching on
+    /// the format the authenticator used.
     pub(crate) fn verify_attestation(
         &self,
         attestation_bytes: &[u8],
@@ -121,7 +123,9 @@ impl Passki {
     }
 }
 
-/// Verifies a `packed` attestation statement (full or self attestation).
+/// Verifies a `packed` statement, the modern general-purpose format. With an
+/// `x5c` a separate attestation key signed; without one the credential key
+/// signed for itself.
 fn verify_packed(
     att_stmt: &Value,
     auth_data: &[u8],
@@ -148,8 +152,8 @@ fn verify_packed(
             })
         }
         None => {
-            // Self attestation: the credential key signs, and the statement's alg
-            // must match the credential key's alg.
+            // Self attestation, so the statement's algorithm has to be the
+            // credential key's own.
             if alg != parsed.algorithm {
                 return Err(PasskiError::InvalidAttestation(
                     "packed self-attestation algorithm does not match credential key".to_string(),
@@ -161,7 +165,8 @@ fn verify_packed(
     }
 }
 
-/// Verifies a `fido-u2f` attestation statement.
+/// Verifies a `fido-u2f` statement, the legacy format of pre-WebAuthn security
+/// keys. Always exactly one certificate and always ES256.
 fn verify_fido_u2f(
     att_stmt: &Value,
     auth_data: &[u8],
@@ -194,7 +199,8 @@ fn verify_fido_u2f(
         ));
     }
 
-    // publicKeyU2F = 0x04 || x || y
+    // The U2F signature is over a fixed byte layout, assembled here exactly as
+    // the format prescribes: publicKeyU2F = 0x04 || x || y
     let mut public_key_u2f = Vec::with_capacity(65);
     public_key_u2f.push(0x04);
     public_key_u2f.extend_from_slice(&x);
@@ -208,7 +214,6 @@ fn verify_fido_u2f(
     verification_data.extend_from_slice(&parsed.credential_id);
     verification_data.extend_from_slice(&public_key_u2f);
 
-    // fido-u2f signatures are always ES256.
     verify_cert_signature(&cert, ALG_ES256, &verification_data, sig)?;
 
     Ok(Evidence::Chained {
@@ -217,7 +222,9 @@ fn verify_fido_u2f(
     })
 }
 
-/// Verifies an `android-key` attestation statement.
+/// Verifies an `android-key` statement, produced by Android's hardware keystore.
+/// Beyond the signature, the certificate must describe a key that was generated
+/// in secure hardware and bound to this ceremony.
 fn verify_android_key(
     att_stmt: &Value,
     auth_data: &[u8],
@@ -236,7 +243,7 @@ fn verify_android_key(
     signed_data.extend_from_slice(client_data_hash);
     verify_cert_signature(&cert, alg, &signed_data, sig)?;
 
-    // The certificate's public key must match the credential public key.
+    // Here the attestation key and the credential key are one and the same.
     if !cert_key_matches(&cert, &cose_public_key(&parsed.public_key)?)? {
         return Err(PasskiError::InvalidAttestation(
             "android-key certificate public key does not match credential key".to_string(),
@@ -257,7 +264,9 @@ fn verify_android_key(
     })
 }
 
-/// Verifies a `tpm` attestation statement.
+/// Verifies a `tpm` statement, produced by the TPM chips Windows Hello uses. The
+/// TPM signs its own description of the credential key, so most of the work is
+/// checking that description against what the ceremony actually saw.
 fn verify_tpm(
     att_stmt: &Value,
     auth_data: &[u8],
@@ -278,7 +287,7 @@ fn verify_tpm(
         PasskiError::InvalidAttestation("tpm attestation is missing x5c".to_string())
     })?;
 
-    // The key in pubArea must match the credential public key.
+    // pubArea is the TPM's own description of the key it certified.
     let (name_alg, tpm_key) = parse_tpmt_public(pub_area)?;
     if !public_keys_match(&tpm_key, &cose_public_key(&parsed.public_key)?) {
         return Err(PasskiError::InvalidAttestation(
@@ -298,7 +307,8 @@ fn verify_tpm(
         ));
     }
 
-    // extraData must be the hash of (authData || clientDataHash).
+    // extraData is where the TPM carries this ceremony's data, so it ties the
+    // certification to this registration rather than an earlier one.
     let mut att_to_be_signed = auth_data.to_vec();
     att_to_be_signed.extend_from_slice(client_data_hash);
     if extra_data != digest_for_alg(alg, &att_to_be_signed)? {
@@ -307,7 +317,8 @@ fn verify_tpm(
         ));
     }
 
-    // The attested name must be nameAlg || H_nameAlg(pubArea).
+    // The name in certInfo must be the digest of the pubArea checked above,
+    // otherwise the TPM certified some other key.
     if attested_name != tpm_name(name_alg, pub_area)? {
         return Err(PasskiError::InvalidAttestation(
             "certInfo attested name mismatch".to_string(),
@@ -406,11 +417,12 @@ pub(crate) fn parse_cert(der: &[u8]) -> Result<Certificate> {
         .map_err(|e| PasskiError::InvalidCertificate(format!("Failed to parse: {}", e)))
 }
 
-/// Returns the raw `tbsCertificate` bytes of a DER-encoded certificate.
+/// Returns the raw `tbsCertificate` bytes, the part of a certificate its issuer
+/// signed over.
 ///
-/// The issuer's signature covers these bytes exactly as they were emitted, so
-/// they are sliced out of the original encoding rather than re-encoded from the
-/// parsed structure, which would only match for input that is already canonical.
+/// Sliced out of the original encoding rather than re-encoded from the parsed
+/// structure, since the signature covers the exact bytes that were emitted and
+/// re-encoding only reproduces those if the input was already canonical.
 pub(crate) fn tbs_der(der: &[u8]) -> Result<&[u8]> {
     DerReader::new(der)
         .read_sequence()
@@ -521,10 +533,11 @@ fn check_eku_contains(cert: &Certificate, oid: &ObjectIdentifier) -> Result<()> 
     Ok(())
 }
 
-/// If the certificate carries the AAGUID extension, verifies it matches `aaguid`.
+/// If the certificate states an AAGUID, verifies the authenticator data claims
+/// the same one. The extension is optional, so its absence is not an error.
 fn check_aaguid_extension(cert: &Certificate, aaguid: &[u8; 16]) -> Result<()> {
     if let Some(value) = cert_extension(cert, &OID_FIDO_AAGUID) {
-        // The extension value is a DER OCTET STRING wrapping the 16-byte AAGUID.
+        // The value is an OCTET STRING wrapping the 16 raw bytes.
         let wrapped = OctetString::from_der(value).map_err(|e| {
             PasskiError::InvalidCertificate(format!("Invalid AAGUID extension: {}", e))
         })?;
@@ -609,7 +622,7 @@ fn digest_for_alg(alg: i32, data: &[u8]) -> Result<Vec<u8>> {
     Ok(digest::digest(algorithm, data).as_ref().to_vec())
 }
 
-/// Compares two big-endian integers for equality, ignoring leading zero bytes.
+/// Compares big-endian integers, which the encodings involved pad differently.
 fn be_eq(a: &[u8], b: &[u8]) -> bool {
     strip_leading_zeros(a) == strip_leading_zeros(b)
 }
@@ -631,7 +644,9 @@ fn parse_rsa_public_key(der: &[u8]) -> Result<(Vec<u8>, Vec<u8>)> {
     ))
 }
 
-/// Verifies the Android key attestation extension (`KeyDescription`).
+/// Checks the certificate's `KeyDescription`: the key must have been generated
+/// in the secure environment, be usable only for signing, be restricted to this
+/// app, and carry this ceremony's client data hash as its challenge.
 fn verify_android_key_description(extension: &[u8], client_data_hash: &[u8]) -> Result<()> {
     let mut kd = DerReader::new(extension).read_sequence()?;
     kd.skip()?; // attestationVersion
@@ -648,14 +663,14 @@ fn verify_android_key_description(extension: &[u8], client_data_hash: &[u8]) -> 
     let software_enforced = kd.read_sequence_bytes()?;
     let tee_enforced = kd.read_sequence_bytes()?;
 
-    // allApplications must not appear in either list: the key must be bound to this RP.
+    // The key would otherwise be usable by any app on the device.
     if authz_has_all_applications(software_enforced)? || authz_has_all_applications(tee_enforced)? {
         return Err(PasskiError::InvalidAttestation(
             "android-key attestation must not allow all applications".to_string(),
         ));
     }
 
-    // origin must be KM_ORIGIN_GENERATED and purpose must contain KM_PURPOSE_SIGN.
+    // Either list will do, though only the hardware-backed one means much.
     if !authz_origin_and_purpose_ok(tee_enforced)?
         && !authz_origin_and_purpose_ok(software_enforced)?
     {
@@ -667,15 +682,17 @@ fn verify_android_key_description(extension: &[u8], client_data_hash: &[u8]) -> 
     Ok(())
 }
 
-/// AuthorizationList tag for the `allApplications` field.
+// Field tags and values inside an Android KeyDescription AuthorizationList.
+
+/// `allApplications`: the key is not restricted to one app.
 const KM_TAG_ALL_APPLICATIONS: u32 = 600;
-/// AuthorizationList tag for the `origin` field.
+/// `origin`: where the key came from.
 const KM_TAG_ORIGIN: u32 = 702;
-/// AuthorizationList tag for the `purpose` field.
+/// `purpose`: what the key may be used for.
 const KM_TAG_PURPOSE: u32 = 1;
-/// KM_ORIGIN_GENERATED: the key was generated in the secure environment.
+/// The key was generated inside the secure environment, not imported.
 const KM_ORIGIN_GENERATED: i64 = 0;
-/// KM_PURPOSE_SIGN.
+/// The key may sign.
 const KM_PURPOSE_SIGN: i64 = 2;
 
 /// Returns whether an AuthorizationList contains the `allApplications` field.
@@ -689,8 +706,8 @@ fn authz_has_all_applications(list: &[u8]) -> Result<bool> {
     Ok(false)
 }
 
-/// Returns whether an AuthorizationList has origin KM_ORIGIN_GENERATED and a purpose
-/// set that contains KM_PURPOSE_SIGN.
+/// Returns whether an AuthorizationList says the key was generated in place and
+/// may be used for signing.
 fn authz_origin_and_purpose_ok(list: &[u8]) -> Result<bool> {
     let mut origin_ok = false;
     let mut purpose_ok = false;
@@ -772,8 +789,8 @@ fn parse_tpms_attest(cert_info: &[u8]) -> Result<(u32, u16, Vec<u8>, Vec<u8>)> {
     Ok((magic, attest_type, extra_data, name))
 }
 
-/// Computes the TPM Name of `pub_area`: the 2-byte name algorithm id followed by the
-/// digest of `pub_area` under that algorithm.
+/// Computes a TPM Name, how a TPM refers to a key: the 2-byte hash algorithm id
+/// followed by the digest of the key's `pub_area` under it.
 fn tpm_name(name_alg: u16, pub_area: &[u8]) -> Result<Vec<u8>> {
     let algorithm = match name_alg {
         0x000B => &SHA256,
@@ -823,16 +840,16 @@ impl<'a> BeReader<'a> {
         Ok(u32::from_be_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]))
     }
 
-    /// Reads a `u16` length followed by that many bytes (a TPM2B buffer).
+    /// Reads a TPM2B buffer: a `u16` length followed by that many bytes.
     fn sized_u16(&mut self) -> Result<&'a [u8]> {
         let len = self.u16()? as usize;
         self.take(len)
     }
 }
 
-// Minimal DER reader for the structures not covered by the typed x509-cert API.
+// Minimal DER reader for the structures the typed x509-cert API does not cover.
 
-/// A cursor over a sequence of DER TLV elements.
+/// A cursor over DER elements, each a tag, a length, then that many bytes.
 struct DerReader<'a> {
     bytes: &'a [u8],
     pos: usize,
@@ -843,7 +860,7 @@ impl<'a> DerReader<'a> {
         Self { bytes, pos: 0 }
     }
 
-    /// Reads one TLV element, returning `(class, constructed, tag number, content)`.
+    /// Reads one element, returning `(class, constructed, tag number, content)`.
     fn read_tlv(&mut self) -> Result<(u8, bool, u32, &'a [u8])> {
         let first = *self
             .bytes
@@ -855,7 +872,8 @@ impl<'a> DerReader<'a> {
 
         let mut tag_number = (first & 0x1F) as u32;
         if tag_number == 0x1F {
-            // High-tag-number form: base-128 with continuation bits.
+            // Tags above 30 continue in following bytes, 7 bits each, with the
+            // top bit marking "more to come".
             tag_number = 0;
             loop {
                 let byte = *self.bytes.get(self.pos).ok_or_else(|| {
@@ -874,6 +892,8 @@ impl<'a> DerReader<'a> {
             .get(self.pos)
             .ok_or_else(|| PasskiError::InvalidAttestation("Truncated DER length".to_string()))?;
         self.pos += 1;
+        // Lengths under 128 fit in the byte itself; longer ones state how many
+        // bytes follow.
         let len = if first_len & 0x80 == 0 {
             first_len as usize
         } else {
@@ -901,8 +921,7 @@ impl<'a> DerReader<'a> {
         Ok((class, constructed, tag_number, content))
     }
 
-    /// Reads one TLV element and returns its complete encoding, tag and length
-    /// header included.
+    /// Reads one element and returns its complete encoding, header included.
     fn read_element(&mut self) -> Result<&'a [u8]> {
         let start = self.pos;
         self.read_tlv()?;
@@ -973,14 +992,14 @@ impl<'a> DerReader<'a> {
         Ok(content)
     }
 
-    /// Skips the next TLV element.
+    /// Skips the next element.
     fn skip(&mut self) -> Result<()> {
         self.read_tlv()?;
         Ok(())
     }
 
-    /// Returns the next context-tagged field as `(tag number, content)`, skipping any
-    /// non-context elements. Returns `None` at the end of the buffer.
+    /// Returns the next context-tagged field as `(tag number, content)`, skipping
+    /// anything else. `None` at the end of the buffer.
     fn next_context_field(&mut self) -> Result<Option<(u32, &'a [u8])>> {
         while self.pos < self.bytes.len() {
             let (class, _, tag, content) = self.read_tlv()?;

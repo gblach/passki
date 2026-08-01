@@ -42,7 +42,7 @@ fn registration_challenge(support: Option<LargeBlobSupport>) -> serde_json::Valu
     serde_json::to_value(&challenge).unwrap()
 }
 
-// ===== Registration challenge serialization =====
+// Registration challenge serialization
 
 #[test]
 fn test_large_blob_required_in_challenge() {
@@ -88,7 +88,7 @@ fn test_large_blob_and_cred_props_can_be_requested_together() {
     assert_eq!(json["extensions"]["largeBlob"]["support"], "preferred");
 }
 
-// ===== Support probe surfaced on StoredPasskey =====
+// Support probe surfaced on StoredPasskey
 
 fn make_registration_credential(
     state: &RegistrationState,
@@ -186,7 +186,7 @@ fn test_stored_passkey_without_large_blob_supported_deserializes() {
     assert_eq!(passkey.large_blob_supported, None);
 }
 
-// ===== Authentication challenge serialization =====
+// Authentication challenge serialization
 
 fn authentication_challenge(large_blob: Option<LargeBlobAuthenticationInput>) -> serde_json::Value {
     let passki = Passki::new("localhost", &["http://localhost:3000"], "Test");
@@ -225,10 +225,10 @@ fn test_large_blob_absent_from_authentication_challenge_when_not_requested() {
     assert!(json["extensions"].get("largeBlob").is_none());
 }
 
-// ===== Blob and write flag in AuthenticationResult =====
+// Blob and write flag in AuthenticationResult
 
-// Creates a fully signed AuthenticationCredential, which the largeBlob outputs
-// are only extracted from after signature verification succeeds.
+// A properly signed credential; largeBlob outputs are only extracted once the
+// signature has verified.
 fn signed_auth_credential(
     credential_id: &[u8],
     challenge: &[u8],
@@ -361,7 +361,7 @@ fn test_large_blob_invalid_base64_returns_error() {
     );
 }
 
-// ===== LargeBlobResult deserialization =====
+// LargeBlobResult deserialization
 
 #[test]
 fn test_client_extension_results_deserializes_supported() {

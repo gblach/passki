@@ -14,7 +14,7 @@
 
 use crate::Passki;
 
-// ===== generate_challenge tests =====
+// generate_challenge tests
 
 #[test]
 fn test_generate_challenge_multiple_unique() {
@@ -23,7 +23,7 @@ fn test_generate_challenge_multiple_unique() {
         challenges.push(Passki::generate_challenge());
     }
 
-    // Check all challenges are unique
+    // Every challenge must differ.
     for i in 0..challenges.len() {
         for j in (i + 1)..challenges.len() {
             assert_ne!(
@@ -36,14 +36,13 @@ fn test_generate_challenge_multiple_unique() {
 
 #[test]
 fn test_generate_challenge_consistency() {
-    // Ensure multiple calls work correctly
     for _ in 0..100 {
         let challenge = Passki::generate_challenge();
         assert_eq!(challenge.len(), 32);
     }
 }
 
-// ===== base64_encode tests =====
+// base64_encode tests
 
 #[test]
 fn test_base64_encode_empty() {
@@ -66,7 +65,7 @@ fn test_base64_encode_with_padding() {
     let data = b"hi";
     let encoded = Passki::base64_encode(data);
 
-    // Should not have padding (URL_SAFE_NO_PAD)
+    // No padding.
     assert!(!encoded.contains('='), "Should not contain padding");
     assert_eq!(encoded, "aGk");
 }
@@ -76,7 +75,7 @@ fn test_base64_encode_binary_data() {
     let data = vec![0x00, 0x01, 0x02, 0xFF, 0xFE];
     let encoded = Passki::base64_encode(&data);
 
-    // Should be valid base64url characters (A-Z, a-z, 0-9, -, _)
+    // Only A-Z, a-z, 0-9, - and _ may appear.
     for ch in encoded.chars() {
         assert!(
             ch.is_alphanumeric() || ch == '-' || ch == '_',
@@ -92,7 +91,7 @@ fn test_base64_encode_url_safe() {
     let data = vec![0xFB, 0xFF];
     let encoded = Passki::base64_encode(&data);
 
-    // Should use - and _ instead of + and /
+    // - and _ replace + and /.
     assert!(!encoded.contains('+'), "Should not contain +");
     assert!(!encoded.contains('/'), "Should not contain /");
 }
@@ -102,7 +101,7 @@ fn test_base64_encode_32_bytes() {
     let data = vec![0xAB; 32];
     let encoded = Passki::base64_encode(&data);
 
-    // 32 bytes should encode to 43 characters (without padding)
+    // 32 bytes encode to 43 characters unpadded.
     assert_eq!(encoded.len(), 43);
 }
 
@@ -117,7 +116,7 @@ fn test_base64_encode_challenge() {
     assert!(!encoded.contains('/'), "Should be URL-safe");
 }
 
-// ===== base64_decode tests =====
+// base64_decode tests
 
 #[test]
 fn test_base64_decode_empty() {
@@ -165,12 +164,12 @@ fn test_base64_decode_invalid_characters() {
 
 #[test]
 fn test_base64_decode_with_padding_fails() {
-    // Our decoder expects no padding (URL_SAFE_NO_PAD)
+    // The decoder expects unpadded input.
     let with_padding = "aGVsbG8=";
     let result = Passki::base64_decode(with_padding);
 
-    // This might fail or might ignore padding depending on implementation
-    // Just ensure it doesn't panic
+    // Rejecting or ignoring the padding are both fine; this only checks that
+    // neither panics.
     let _ = result;
 }
 
@@ -184,7 +183,6 @@ fn test_base64_decode_malformed() {
 
 #[test]
 fn test_base64_decode_url_safe_characters() {
-    // Test URL-safe characters - and _
     let data = vec![0xFB, 0xFF];
     let encoded = Passki::base64_encode(&data);
     let decoded = Passki::base64_decode(&encoded).unwrap();
@@ -192,7 +190,7 @@ fn test_base64_decode_url_safe_characters() {
     assert_eq!(decoded, data);
 }
 
-// ===== Round-trip tests =====
+// Round-trip tests
 
 #[test]
 fn test_base64_roundtrip_various_lengths() {
@@ -216,7 +214,6 @@ fn test_base64_roundtrip_all_byte_values() {
 
 #[test]
 fn test_base64_encode_decode_consistency() {
-    // Test that multiple encode/decode cycles work correctly
     let mut data = b"test data".to_vec();
 
     for _ in 0..5 {
@@ -236,22 +233,20 @@ fn test_base64_decode_case_sensitive() {
     let decoded1 = Passki::base64_decode(encoded1).unwrap();
     let decoded2 = Passki::base64_decode(encoded2);
 
-    // They should produce different results or second should error
+    // Different case means different bytes, or no bytes at all.
     assert!(decoded2.is_err() || decoded1 != decoded2.unwrap());
 }
 
-// ===== Integration tests with challenges =====
+// Integration tests with challenges
 
 #[test]
 fn test_generate_and_encode_challenge() {
     let challenge = Passki::generate_challenge();
     let encoded = Passki::base64_encode(&challenge);
 
-    // Encoded challenge should be valid base64url
     assert!(!encoded.is_empty());
     assert_eq!(encoded.len(), 43); // 32 bytes -> 43 chars without padding
 
-    // Should be decodable
     let decoded = Passki::base64_decode(&encoded).unwrap();
     assert_eq!(decoded, challenge);
 }

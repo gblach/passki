@@ -20,7 +20,7 @@ use aws_lc_rs::digest::{self, SHA256};
 use aws_lc_rs::rand::SystemRandom;
 use aws_lc_rs::signature::{Ed25519KeyPair, KeyPair};
 
-// Builds a fully signed AuthenticationCredential with the given optional user handle.
+// A properly signed credential carrying the given user handle, if any.
 fn signed_auth_credential(
     credential_id: &[u8],
     challenge: &[u8],
@@ -70,7 +70,7 @@ fn authenticate_with_user_handle(user_handle: Option<String>) -> AuthenticationR
         bs: false,
     };
 
-    // Usernameless flow: empty allowCredentials so the user is identified by the handle.
+    // With no allowed credentials, the handle is all the server has to go on.
     let (_, state) = passki.start_passkey_authentication(&[], AuthenticationOptions::default());
 
     let credential = signed_auth_credential(

@@ -21,12 +21,12 @@ pub fn rp_id_hash(rp_id: &str) -> Vec<u8> {
     digest::digest(&SHA256, rp_id.as_bytes()).as_ref().to_vec()
 }
 
-/// Helper function to create a minimal valid attestation object
+/// A minimal attestation object with `fmt` `none` and no counter.
 pub fn create_test_attestation_object(algorithm: i32, flags: u8) -> Vec<u8> {
     create_test_attestation_object_with_counter(algorithm, flags, 0)
 }
 
-/// Helper function to create a minimal valid attestation object with a specific counter
+/// As above, with a chosen signature counter.
 pub fn create_test_attestation_object_with_counter(
     algorithm: i32,
     flags: u8,
@@ -35,7 +35,7 @@ pub fn create_test_attestation_object_with_counter(
     create_test_attestation_object_with_aaguid(algorithm, flags, counter, [0u8; 16])
 }
 
-/// Helper function to create a minimal valid attestation object with a specific AAGUID
+/// As above, with a chosen AAGUID.
 pub fn create_test_attestation_object_with_aaguid(
     algorithm: i32,
     flags: u8,
@@ -52,19 +52,17 @@ pub fn create_test_attestation_object_with_aaguid(
     auth_data.extend_from_slice(&[0, 16]); // credIdLen = 16
     auth_data.extend_from_slice(&[1u8; 16]); // credId
 
-    // Create a minimal COSE key based on algorithm
+    // The public key, in whatever shape the algorithm calls for.
     let mut cose_key = vec![
         (Value::Integer(1.into()), Value::Integer(2.into())), // kty: EC2
         (Value::Integer(3.into()), Value::Integer(algorithm.into())), // alg
     ];
 
     if algorithm == -7 {
-        // ES256: P-256 curve
         cose_key.push((Value::Integer((-1).into()), Value::Integer(1.into()))); // crv: P-256
         cose_key.push((Value::Integer((-2).into()), Value::Bytes(vec![2u8; 32]))); // x
         cose_key.push((Value::Integer((-3).into()), Value::Bytes(vec![3u8; 32]))); // y
     } else if algorithm == -8 {
-        // EdDSA: Ed25519
         cose_key.push((Value::Integer((-1).into()), Value::Integer(6.into()))); // crv: Ed25519
         cose_key.push((Value::Integer((-2).into()), Value::Bytes(vec![4u8; 32]))); // x
     }
@@ -73,7 +71,6 @@ pub fn create_test_attestation_object_with_aaguid(
     ciborium::into_writer(&Value::Map(cose_key), &mut cose_key_bytes).unwrap();
     auth_data.extend_from_slice(&cose_key_bytes);
 
-    // Create attestation object
     let att_obj = vec![
         (
             Value::Text("fmt".to_string()),
@@ -88,7 +85,7 @@ pub fn create_test_attestation_object_with_aaguid(
     result
 }
 
-/// Helper function to create valid client data JSON for registration
+/// Client data JSON as the browser would build it for a registration.
 pub fn create_test_client_data_json(challenge: &[u8], origin: &str) -> Vec<u8> {
     let client_data = serde_json::json!({
         "type": "webauthn.create",
@@ -99,7 +96,8 @@ pub fn create_test_client_data_json(challenge: &[u8], origin: &str) -> Vec<u8> {
     serde_json::to_vec(&client_data).unwrap()
 }
 
-/// Helper function to create valid authenticator data for authentication
+/// Authenticator data for an authentication: the 37-byte header alone, with
+/// no attested credential data after it.
 pub fn create_test_authenticator_data(counter: u32, flags: u8) -> Vec<u8> {
     let mut auth_data = Vec::new();
     auth_data.extend_from_slice(&rp_id_hash("localhost")); // rpIdHash
@@ -108,7 +106,7 @@ pub fn create_test_authenticator_data(counter: u32, flags: u8) -> Vec<u8> {
     auth_data
 }
 
-/// Helper function to create client data JSON for authentication
+/// Client data JSON as the browser would build it for an authentication.
 pub fn create_test_auth_client_data_json(challenge: &[u8], origin: &str) -> Vec<u8> {
     let client_data = serde_json::json!({
         "type": "webauthn.get",
@@ -119,7 +117,7 @@ pub fn create_test_auth_client_data_json(challenge: &[u8], origin: &str) -> Vec<
     serde_json::to_vec(&client_data).unwrap()
 }
 
-/// Helper function to create a valid EdDSA COSE key
+/// An EdDSA COSE key.
 pub fn create_eddsa_cose_key(public_key: &[u8; 32]) -> Vec<u8> {
     use ciborium::Value;
 
@@ -138,7 +136,7 @@ pub fn create_eddsa_cose_key(public_key: &[u8; 32]) -> Vec<u8> {
     result
 }
 
-/// Helper function to create a valid ES256 COSE key
+/// An ES256 COSE key.
 pub fn create_es256_cose_key(x: &[u8], y: &[u8]) -> Vec<u8> {
     use ciborium::Value;
 
@@ -155,7 +153,7 @@ pub fn create_es256_cose_key(x: &[u8], y: &[u8]) -> Vec<u8> {
     result
 }
 
-/// Helper function to create a valid ES384 COSE key
+/// An ES384 COSE key.
 pub fn create_es384_cose_key(x: &[u8], y: &[u8]) -> Vec<u8> {
     use ciborium::Value;
 
@@ -172,7 +170,7 @@ pub fn create_es384_cose_key(x: &[u8], y: &[u8]) -> Vec<u8> {
     result
 }
 
-/// Helper function to create a valid RS256 COSE key
+/// An RS256 COSE key.
 pub fn create_rs256_cose_key(n: &[u8], e: &[u8]) -> Vec<u8> {
     use ciborium::Value;
 
@@ -188,7 +186,7 @@ pub fn create_rs256_cose_key(n: &[u8], e: &[u8]) -> Vec<u8> {
     result
 }
 
-/// Helper function to create a valid RS384 COSE key
+/// An RS384 COSE key.
 pub fn create_rs384_cose_key(n: &[u8], e: &[u8]) -> Vec<u8> {
     use ciborium::Value;
 
@@ -204,47 +202,36 @@ pub fn create_rs384_cose_key(n: &[u8], e: &[u8]) -> Vec<u8> {
     result
 }
 
-/// Helper to create a test RSA key pair and return (key_pair, n, e)
+/// A fresh RSA key pair, with its modulus and exponent split out.
 pub fn create_test_rsa_keypair() -> (RsaKeyPair, Vec<u8>, Vec<u8>) {
     let key_pair = RsaKeyPair::generate(KeySize::Rsa2048).unwrap();
 
-    // Extract public key components from the PKCS#8 structure
-    // The public key is in SubjectPublicKeyInfo format
     let pub_key = key_pair.public_key();
-    let pub_key_bytes = pub_key.as_ref();
-
-    // Parse the RSA public key to extract n and e
-    // RSA public key format: SEQUENCE { n INTEGER, e INTEGER }
-    // Skip the outer SEQUENCE tag and length
-    let (n, e) = parse_rsa_public_key(pub_key_bytes);
+    let (n, e) = parse_rsa_public_key(pub_key.as_ref());
 
     (key_pair, n, e)
 }
 
-/// Parse RSA public key bytes to extract n (modulus) and e (exponent)
+/// Splits a DER `SEQUENCE { n INTEGER, e INTEGER }` into its two integers.
 fn parse_rsa_public_key(pub_key_bytes: &[u8]) -> (Vec<u8>, Vec<u8>) {
-    // RSA public key is DER encoded: SEQUENCE { INTEGER n, INTEGER e }
     let mut pos = 0;
 
-    // Skip SEQUENCE tag (0x30) and read length
     assert_eq!(pub_key_bytes[pos], 0x30);
     pos += 1;
     let (_, len_bytes) = read_der_length(&pub_key_bytes[pos..]);
     pos += len_bytes;
 
-    // Read n (INTEGER)
     assert_eq!(pub_key_bytes[pos], 0x02);
     pos += 1;
     let (n_len, len_bytes) = read_der_length(&pub_key_bytes[pos..]);
     pos += len_bytes;
     let mut n = pub_key_bytes[pos..pos + n_len].to_vec();
-    // Remove leading zero if present (used for positive sign in DER)
+    // DER pads with a zero byte to keep the integer positive.
     if !n.is_empty() && n[0] == 0x00 {
         n.remove(0);
     }
     pos += n_len;
 
-    // Read e (INTEGER)
     assert_eq!(pub_key_bytes[pos], 0x02);
     pos += 1;
     let (e_len, len_bytes) = read_der_length(&pub_key_bytes[pos..]);
@@ -257,7 +244,7 @@ fn parse_rsa_public_key(pub_key_bytes: &[u8]) -> (Vec<u8>, Vec<u8>) {
     (n, e)
 }
 
-/// Read DER length encoding, returns (length, bytes_consumed)
+/// Reads a DER length, returning it with the number of bytes it occupied.
 fn read_der_length(data: &[u8]) -> (usize, usize) {
     if data[0] < 0x80 {
         (data[0] as usize, 1)

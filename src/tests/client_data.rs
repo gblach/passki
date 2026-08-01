@@ -14,7 +14,7 @@
 
 use crate::{ClientData, ClientDataType, Passki};
 
-// ===== ClientData::verify tests =====
+// ClientData::verify tests
 
 #[test]
 fn test_verify_valid_create() {
@@ -375,7 +375,6 @@ fn test_verify_with_extra_fields() {
 fn test_verify_different_rp_origins() {
     let challenge = Passki::generate_challenge();
 
-    // Test with HTTP
     let origin_http = "http://localhost:3000";
     let client_data_http = serde_json::json!({
         "type": "webauthn.create",
@@ -388,7 +387,6 @@ fn test_verify_different_rp_origins() {
     let result_http = client_data.verify(ClientDataType::Create, &challenge, &[origin_http]);
     assert!(result_http.is_ok());
 
-    // Test with HTTPS
     let origin_https = "https://example.com";
     let client_data_https = serde_json::json!({
         "type": "webauthn.create",
@@ -489,7 +487,7 @@ fn test_verify_multiple_valid_calls() {
     }
 }
 
-// ===== ClientData::from_base64 tests =====
+// ClientData::from_base64 tests
 
 #[test]
 fn test_from_base64_valid_create() {

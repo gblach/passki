@@ -20,9 +20,9 @@ use aws_lc_rs::digest::{self, SHA256};
 use aws_lc_rs::rand::SystemRandom;
 use aws_lc_rs::signature::{Ed25519KeyPair, KeyPair};
 
-// Creates a fully signed AuthenticationCredential using a real Ed25519 key pair.
-// This is required for tests that need to reach the PRF extraction step, which
-// only runs after successful signature verification.
+// A properly signed credential, using a real Ed25519 key pair. PRF outputs are
+// only extracted once the signature has verified, so these tests cannot use
+// dummy signatures.
 fn signed_auth_credential(
     credential_id: &[u8],
     challenge: &[u8],
@@ -75,7 +75,7 @@ fn make_stored_passkey(
     }
 }
 
-// ===== Registration challenge extensions =====
+// Registration challenge extensions
 
 #[test]
 fn test_registration_challenge_omits_extensions_when_prf_none() {
@@ -194,7 +194,8 @@ fn test_registration_challenge_extensions_includes_second_input() {
 #[test]
 fn test_registration_challenge_probe_only_has_no_eval() {
     let passki = Passki::new("localhost", &["http://localhost:3000"], "Test");
-    // RegistrationExtensions { prf: Some(PrfInput { eval: None }), .. } -> { "prf": {} } - asks for support flag without evaluating
+    // An eval-less PrfInput serializes to `{}`, which asks whether PRF is
+    // supported without requesting a derivation.
     let extensions = Some(RegistrationExtensions {
         prf: Some(PrfInput { eval: None }),
         ..Default::default()
@@ -220,7 +221,7 @@ fn test_registration_challenge_probe_only_has_no_eval() {
     );
 }
 
-// ===== Authentication challenge extensions =====
+// Authentication challenge extensions
 
 #[test]
 fn test_authentication_challenge_omits_extensions_when_prf_none() {
@@ -345,7 +346,7 @@ fn test_authentication_challenge_extensions_includes_second_input() {
     assert_eq!(eval["second"], Passki::base64_encode(b"second"));
 }
 
-// ===== PRF outputs in AuthenticationResult =====
+// PRF outputs in AuthenticationResult
 
 #[test]
 fn test_prf_outputs_none_when_no_extension_results() {
@@ -393,7 +394,7 @@ fn test_prf_outputs_none_when_results_absent_in_extension() {
         AuthenticationOptions::default(),
     );
 
-    // enabled = true but no results (registration probe response shape)
+    // What a registration probe answers: supported, but nothing derived.
     let ext = PrfExtensionResult {
         enabled: Some(true),
         results: None,
@@ -575,7 +576,7 @@ fn test_prf_invalid_base64_second_returns_error() {
     );
 }
 
-// ===== PrfExtensionResult deserialization =====
+// PrfExtensionResult deserialization
 
 #[test]
 fn test_prf_extension_result_deserializes_enabled_flag() {

@@ -28,8 +28,7 @@ use crate::types::*;
 
 /// Challenge sent to the client to begin passkey authentication.
 ///
-/// This structure contains all the parameters needed by the WebAuthn client
-/// to authenticate using an existing credential.
+/// Serialize this to JSON and hand it to `navigator.credentials.get()`.
 #[derive(Serialize, Debug)]
 pub struct AuthenticationChallenge {
     /// The challenge value (base64url-encoded).
@@ -42,7 +41,8 @@ pub struct AuthenticationChallenge {
     #[serde(rename = "rpId")]
     pub rp_id: String,
 
-    /// List of credentials that are allowed for this authentication.
+    /// The credentials the browser may use. Empty lets the user pick any
+    /// discoverable credential, so no username is needed up front.
     #[serde(rename = "allowCredentials")]
     pub allow_credentials: Vec<AllowCredential>,
 
@@ -55,25 +55,25 @@ pub struct AuthenticationChallenge {
     pub extensions: Option<AuthenticationExtensions>,
 }
 
-/// Server-side state for a passkey authentication in progress.
+/// Server-side half of an authentication in progress.
 ///
-/// This state must be stored temporarily and provided when completing the authentication.
+/// Keep it in a session or cache between the two steps; without it the response
+/// cannot be verified.
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct AuthenticationState {
     /// The challenge that was sent to the client.
     pub challenge: Vec<u8>,
 
-    /// List of credential IDs that are allowed for this authentication.
+    /// The credential IDs the client was offered. Empty means any discoverable
+    /// credential was acceptable.
     pub allowed_credentials: Vec<Vec<u8>>,
 
-    /// The user verification requirement requested when the ceremony was started.
+    /// What was asked for when the ceremony started, re-checked against what the
+    /// authenticator actually did.
     pub user_verification: UserVerificationRequirement,
 }
 
-/// Credential data returned by the client after authentication.
-///
-/// This structure contains the signature and authenticator data needed to
-/// verify the authentication.
+/// What the client sends back after `navigator.credentials.get()`.
 #[derive(Deserialize)]
 pub struct AuthenticationCredential {
     /// The credential ID that was used (base64url-encoded).
@@ -88,52 +88,47 @@ pub struct AuthenticationCredential {
     /// The signature over the authenticator data and client data hash (base64url-encoded).
     pub signature: String,
 
-    /// The user handle returned by the authenticator (base64url-encoded).
-    ///
-    /// This is the `user.id` set during registration. Authenticators only return it
-    /// for discoverable credentials, so it is the primary way to identify the user in
-    /// usernameless flows where `allowCredentials` was empty.
+    /// The `user_id` from registration, base64url-encoded. Only returned for
+    /// discoverable credentials, where it is how the server learns who is
+    /// logging in.
     pub user_handle: Option<String>,
 
     /// Extension results from the client (e.g., PRF outputs).
     pub client_extension_results: Option<ClientExtensionResults>,
 
-    /// The attachment modality the client reports for this ceremony. A
-    /// credential registered as `Platform` that authenticates as `CrossPlatform`
-    /// has been used from another device. `None` when the client did not report
-    /// one.
+    /// Whether the client used a built-in or a separate authenticator. A
+    /// credential registered as `Platform` reporting `CrossPlatform` here was
+    /// used from another device. `None` when the client did not report.
     pub authenticator_attachment: Option<AuthenticatorAttachment>,
 }
 
 /// Result of a successful authentication.
-///
-/// Contains the credential ID, updated counter, and any PRF outputs.
 #[derive(Debug)]
 #[non_exhaustive]
 pub struct AuthenticationResult {
     /// The credential ID that was used for authentication.
     pub credential_id: Vec<u8>,
 
-    /// The updated signature counter from the authenticator.
+    /// The new signature counter. Store it on the passkey, or the next login has
+    /// nothing to compare against.
     pub counter: u32,
 
-    /// The decoded user handle (`user.id` from registration), if the authenticator
-    /// returned one. Use this to identify the user in usernameless flows.
+    /// The decoded `user_id` from registration, if the authenticator returned
+    /// one. Identifies the user when no username was given up front.
     pub user_handle: Option<Vec<u8>>,
 
-    /// Decoded first PRF output, if the PRF extension was requested and supported.
+    /// Decoded first PRF output, if the extension was requested and supported.
     pub prf_first: Option<Vec<u8>>,
 
     /// Decoded second PRF output, if a second input was requested and supported.
     pub prf_second: Option<Vec<u8>>,
 
-    /// The decoded blob read from the credential, if
-    /// [`LargeBlobAuthenticationInput::Read`] was requested and the
-    /// authenticator returned one.
+    /// The decoded blob, if [`LargeBlobAuthenticationInput::Read`] was requested
+    /// and the authenticator returned one.
     pub large_blob: Option<Vec<u8>>,
 
-    /// Whether the blob of [`LargeBlobAuthenticationInput::Write`] was stored.
-    /// `None` when no write was requested or the client did not report.
+    /// Whether a [`LargeBlobAuthenticationInput::Write`] was stored. `None` when
+    /// no write was requested or the client did not report.
     pub large_blob_written: Option<bool>,
 }
 
@@ -165,21 +160,18 @@ impl Default for AuthenticationOptions {
 }
 
 impl Passki {
-    /// Starts a passkey authentication ceremony.
-    ///
-    /// Generates a challenge and returns both the challenge to send to the client
-    /// and the state to store on the server.
+    /// Starts a passkey authentication: generates a random challenge and returns
+    /// it alongside the state needed to finish.
     ///
     /// # Arguments
     ///
-    /// * `passkeys` - List of stored passkeys that are allowed for this authentication
+    /// * `passkeys` - The passkeys the client may use; empty allows any
+    ///   discoverable credential, for logins without a username
     /// * `options` - Ceremony options; see [`AuthenticationOptions`]
     ///
     /// # Returns
     ///
-    /// A tuple containing:
-    /// * `AuthenticationChallenge` - Challenge to send to the client
-    /// * `AuthenticationState` - State to store on the server
+    /// The challenge to send to the client, and the state to keep on the server.
     pub fn start_passkey_authentication(
         &self,
         passkeys: &[StoredPasskey],
@@ -212,9 +204,8 @@ impl Passki {
         (challenge_response, state)
     }
 
-    /// Completes a passkey authentication ceremony.
-    ///
-    /// Verifies the signature and authenticator data returned by the client.
+    /// Completes a passkey authentication by verifying the signature and
+    /// authenticator data the client returned.
     ///
     /// # Arguments
     ///
@@ -241,7 +232,7 @@ impl Passki {
         state: &AuthenticationState,
         stored_passkey: &StoredPasskey,
     ) -> Result<AuthenticationResult> {
-        // Verify credential is allowed (skip check for usernameless/discoverable credential flow)
+        // An empty list means the caller accepted any discoverable credential.
         let credential_id = Self::base64_decode(&credential.credential_id)?;
         if !state.allowed_credentials.is_empty()
             && !state.allowed_credentials.contains(&credential_id)
@@ -258,13 +249,12 @@ impl Passki {
             return Err(PasskiError::InvalidAuthenticatorData);
         }
 
-        // Verify rpId hash (bytes 0-31)
+        // Bytes 0-31 bind the assertion to our domain.
         let rp_id_hash = digest::digest(&SHA256, self.rp_id.as_bytes());
         if &authenticator_data[..32] != rp_id_hash.as_ref() {
             return Err(PasskiError::RpIdHashMismatch);
         }
 
-        // Check UP flag - user must be present
         let flags = authenticator_data[32];
         if (flags & FLAG_UP) == 0 {
             return Err(PasskiError::UserNotPresent);
@@ -274,7 +264,6 @@ impl Passki {
             return Err(PasskiError::InvalidBackupFlags);
         }
 
-        // Check UV flag - required only when user_verification is Required
         if state.user_verification == UserVerificationRequirement::Required
             && (flags & FLAG_UV) == 0
         {
@@ -288,9 +277,8 @@ impl Passki {
             authenticator_data[36],
         ]);
 
-        // Per the WebAuthn spec, the counter check only applies when at least one
-        // of the values is nonzero. Both being zero means the authenticator does
-        // not use counters (e.g. Google Password Manager), which is valid.
+        // Two zeros mean the authenticator does not count at all, which the spec
+        // allows and synced passkeys (e.g. Google Password Manager) do.
         if (counter != 0 || stored_passkey.counter != 0) && counter <= stored_passkey.counter {
             return Err(PasskiError::CounterRegression);
         }
@@ -298,7 +286,7 @@ impl Passki {
         let signature = Self::base64_decode(&credential.signature)?;
         let client_data_hash = digest::digest(&SHA256, &client_data_bytes);
 
-        // Concatenate authenticator data and client data hash
+        // The authenticator signed authData || SHA-256(clientDataJSON).
         let mut signed_data = authenticator_data.clone();
         signed_data.extend_from_slice(client_data_hash.as_ref());
 
@@ -352,7 +340,7 @@ impl Passki {
         })
     }
 
-    /// Verifies a signature using the appropriate algorithm.
+    /// Verifies a signature with the verifier for the credential's algorithm.
     #[inline]
     pub(crate) fn verify_signature(
         cose_key_bytes: &[u8],
@@ -392,7 +380,8 @@ impl Passki {
         }
     }
 
-    /// Parses COSE key bytes into a CBOR map.
+    /// Parses a COSE key, the CBOR map WebAuthn encodes public keys as, into its
+    /// entries. Its fields are keyed by small integers rather than by name.
     pub(crate) fn cose_parse(
         cose_key_bytes: &[u8],
     ) -> Result<Vec<(ciborium::Value, ciborium::Value)>> {
@@ -481,12 +470,12 @@ impl Passki {
         let x = Self::cose_field(&cose_map, -2, "x coordinate")?;
         let y = Self::cose_field(&cose_map, -3, "y coordinate")?;
 
-        // Construct uncompressed public key (0x04 || x || y)
+        // Uncompressed point encoding: 0x04 || x || y
         let mut public_key_bytes = vec![0x04];
         public_key_bytes.extend_from_slice(x);
         public_key_bytes.extend_from_slice(y);
 
-        // The verification algorithm handles hashing internally
+        // signed_data goes in unhashed; the algorithm hashes it itself.
         let public_key = UnparsedPublicKey::new(algorithm, &public_key_bytes);
         public_key
             .verify(signed_data, signature)
@@ -507,7 +496,7 @@ impl Passki {
         let n = Self::cose_field(&cose_map, -1, "n (modulus)")?;
         let e = Self::cose_field(&cose_map, -2, "e (exponent)")?;
 
-        // The verification algorithm handles hashing internally
+        // signed_data goes in unhashed; the algorithm hashes it itself.
         let public_key = RsaPublicKeyComponents { n, e };
         public_key
             .verify(algorithm, signed_data, signature)

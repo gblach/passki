@@ -14,9 +14,13 @@
 
 //! Passki - A WebAuthn/Passkey implementation for Rust
 //!
-//! Passki provides a simple and secure way to implement passkey-based authentication
-//! in your Rust applications. It handles the WebAuthn protocol for both registration
-//! and authentication ceremonies.
+//! Passki implements the server half of the WebAuthn protocol: the browser holds
+//! a private key and signs a challenge with it, this crate issues the challenge
+//! and verifies the response.
+//!
+//! Registration and authentication are both two-step ceremonies. The first step
+//! returns a challenge to send to the browser plus a state value the second step
+//! needs; keep that state in a session or cache in between.
 //!
 //! # Features
 //!
@@ -31,70 +35,61 @@
 //! ```rust
 //! use passki::{AuthenticationOptions, Passki, RegistrationOptions, StoredPasskey};
 //!
-//! // Initialize Passki with your relying party information
 //! let passki = Passki::new(
-//!     "example.com",              // Relying Party ID (domain)
-//!     &["https://example.com"],   // Accepted Relying Party Origins
-//!     "Example Corp"              // Relying Party Name
+//!     "example.com",              // relying party ID (the domain)
+//!     &["https://example.com"],   // accepted origins
+//!     "Example Corp"              // name shown in the browser prompt
 //! );
 //!
-//! // Registration flow
-//! // Step 1: Start registration and send challenge to client
+//! // Registration step 1: issue a challenge
 //! # let user_existing_passkeys: Vec<StoredPasskey> = vec![];
-//! let user_id = b"unique_user_identifier_12345"; // At least 16 bytes
+//! let user_id = b"unique_user_identifier_12345"; // at least 16 bytes
 //! let (registration_challenge, registration_state) = passki.start_passkey_registration(
-//!     user_id,                        // User ID (bytes)
-//!     "alice@example.com",            // Username
-//!     "Alice Smith",                  // Display name
-//!     RegistrationOptions::default(), // Timeout, attestation, resident key, UV, exclusions, extensions
+//!     user_id,
+//!     "alice@example.com",            // username
+//!     "Alice Smith",                  // display name
+//!     RegistrationOptions::default(),
 //! ).expect("user_id must be at least 16 bytes");
 //!
-//! // Send registration_challenge to client (as JSON)
-//! // Client uses WebAuthn API to create credential
+//! // Send registration_challenge to the client as JSON, keep registration_state.
 //!
-//! // Step 2: Receive credential from client and complete registration
+//! // Registration step 2: verify the credential the client created
 //! # /*
 //! let stored_passkey = passki.finish_passkey_registration(
-//!     &registration_credential,  // Credential from client
-//!     &registration_state,       // State from step 1
+//!     &registration_credential,
+//!     &registration_state,
 //! )?;
 //! # */
 //!
-//! // Save stored_passkey to your database associated with the user
+//! // Save stored_passkey in your database, associated with the user.
 //!
-//! // Authentication flow
-//! // Step 1: Start authentication and send challenge to client
+//! // Authentication step 1: issue a challenge
 //! # let user_passkeys: Vec<StoredPasskey> = vec![];
 //! let (authentication_challenge, authentication_state) = passki.start_passkey_authentication(
-//!     &user_passkeys,                   // User's stored passkeys
-//!     AuthenticationOptions::default(), // Timeout, user verification, extensions
+//!     &user_passkeys,
+//!     AuthenticationOptions::default(),
 //! );
 //!
-//! // Send authentication_challenge to client (as JSON)
-//! // Client uses WebAuthn API to sign the challenge
-//!
-//! // Step 2: Receive credential from client and verify authentication
+//! // Authentication step 2: verify the signature
 //! # /*
 //! let result = passki.finish_passkey_authentication(
-//!     &authentication_credential,  // Credential from client
-//!     &authentication_state,       // State from step 1
-//!     &stored_passkey,             // User's passkey from database
+//!     &authentication_credential,
+//!     &authentication_state,
+//!     &stored_passkey,
 //! )?;
 //!
-//! // Update the counter in your database to prevent replay attacks
+//! // Persist the new counter, or replay detection has nothing to compare against.
 //! stored_passkey.counter = result.counter;
 //! # */
 //! ```
 //!
 //! # Security Considerations
 //!
-//! - Always verify that the origin matches your expected domain
-//! - Store and check signature counters to detect cloned authenticators
-//! - Use HTTPS in production to prevent man-in-the-middle attacks
-//! - Store passkeys securely in your database (the public keys are not secret,
-//!   but credential IDs should be treated as sensitive)
-//! - Use credential exclusion during registration to prevent duplicate credentials
-//! - User IDs must be at least 16 bytes for security (recommended: use UUIDs or random bytes)
+//! - Serve over HTTPS; browsers refuse WebAuthn on insecure origins
+//! - Store the counter returned by each authentication to detect cloned authenticators
+//! - Public keys are not secret, but treat credential IDs as sensitive
+//! - Pass existing passkeys as exclusions so a user cannot register the same one twice
+//! - User IDs must be at least 16 bytes (a UUID or random bytes)
 
 mod attestation;
 mod authentication;
@@ -119,10 +114,10 @@ pub use registration::{
 };
 pub use types::*;
 
-/// Main Passki struct for managing passkey registration and authentication.
+/// Entry point of the crate: holds the relying party configuration and starts
+/// and finishes both ceremonies.
 ///
-/// This struct holds the relying party configuration and provides methods
-/// to start and finish passkey operations.
+/// The relying party is the site the passkeys belong to.
 pub struct Passki {
     /// The relying party identifier (typically the domain).
     pub rp_id: String,
@@ -133,12 +128,12 @@ pub struct Passki {
     /// The human-readable relying party name.
     pub rp_name: String,
 
-    /// Root certificates that attestation chains are validated against. Kept
-    /// private so that later additions to the trust configuration do not break
-    /// callers; install them with [`Passki::with_attestation_trust`].
+    /// Root certificates that attestation chains are validated against. Private
+    /// so that later additions to the trust configuration do not break callers;
+    /// install them with [`Passki::with_attestation_trust`].
     pub(crate) attestation_anchors: Vec<Certificate>,
 
-    /// What to do about the trust path of an attestation certificate chain.
+    /// How strictly attestation certificate chains are checked.
     pub(crate) attestation_policy: AttestationTrustPolicy,
 }
 
@@ -171,23 +166,20 @@ impl Passki {
         }
     }
 
-    /// Installs the trust anchors that attestation certificate chains are
-    /// validated against, together with the policy that decides what happens
-    /// when a chain does not reach one.
+    /// Installs the root certificates that attestation certificate chains are
+    /// validated against, plus the policy for chains that do not reach one.
     ///
-    /// Without this, and by default, attestation statements are only checked for
-    /// internal consistency: the signature is verified against the certificate
-    /// the statement itself supplies, which a malicious client can mint while
-    /// claiming any AAGUID it likes. Trust anchors are what turn
-    /// [`StoredPasskey::aaguid`] from a self-asserted value into an attested
-    /// one, so a relying party that wants a usable AAGUID sets
-    /// [`AttestationConveyancePreference::Direct`] on the registration *and*
-    /// installs anchors here. One without the other buys nothing.
+    /// By default no chain is validated, so the certificate an authenticator
+    /// sends proves only that it signed its own statement. A client can mint one
+    /// claiming to be any hardware model it likes. Anchors are what make
+    /// [`StoredPasskey::aaguid`] - the authenticator model identifier - worth
+    /// trusting, so ask for [`AttestationConveyancePreference::Direct`] at
+    /// registration *and* install anchors here; either one alone buys nothing.
     ///
-    /// The anchors are the vendor root CA certificates for the authenticators
-    /// being accepted, in DER form. passki does not bundle them and does not
-    /// fetch the FIDO Metadata Service: that means a network round trip and JWT
-    /// verification on a schedule the relying party controls, not this crate.
+    /// The anchors are the vendor root CA certificates of the authenticators
+    /// being accepted, in DER form. passki neither bundles them nor fetches the
+    /// FIDO Metadata Service, which would mean a network round trip and JWT
+    /// verification on a schedule the relying party should control.
     ///
     /// # Arguments
     ///
@@ -230,30 +222,15 @@ impl Passki {
         challenge
     }
 
-    /// Encodes binary data as base64url (without padding).
-    ///
-    /// # Arguments
-    ///
-    /// * `data` - The binary data to encode
-    ///
-    /// # Returns
-    ///
-    /// A base64url-encoded string without padding.
+    /// Encodes binary data as base64url without padding, the encoding WebAuthn
+    /// uses for every binary value on the wire.
     #[inline]
     pub fn base64_encode(data: &[u8]) -> String {
         use base64ct::{Base64UrlUnpadded, Encoding as _};
         Base64UrlUnpadded::encode_string(data)
     }
 
-    /// Decodes a base64url-encoded string (without padding).
-    ///
-    /// # Arguments
-    ///
-    /// * `s` - The base64url-encoded string
-    ///
-    /// # Returns
-    ///
-    /// The decoded binary data.
+    /// Decodes a base64url string without padding.
     ///
     /// # Errors
     ///

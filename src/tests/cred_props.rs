@@ -15,7 +15,7 @@
 use super::helpers::{create_test_attestation_object, create_test_client_data_json};
 use crate::*;
 
-// ===== Registration challenge serialization =====
+// Registration challenge serialization
 
 #[test]
 fn test_cred_props_in_challenge_when_requested() {
@@ -79,7 +79,7 @@ fn test_cred_props_and_prf_can_be_requested_together() {
     assert!(json["extensions"]["prf"].is_object());
 }
 
-// ===== RegistrationResult cred_props_rk extraction =====
+// RegistrationResult cred_props_rk extraction
 
 fn make_credential(
     state: &RegistrationState,
@@ -205,7 +205,7 @@ fn test_cred_props_rk_none_when_rk_not_reported() {
     assert_eq!(result.rk, None);
 }
 
-// ===== CredPropsResult deserialization =====
+// CredPropsResult deserialization
 
 #[test]
 fn test_cred_props_result_deserializes_rk_true() {
