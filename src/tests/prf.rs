@@ -235,15 +235,44 @@ fn test_authentication_challenge_omits_extensions_when_prf_none() {
 }
 
 #[test]
+fn test_authentication_extensions_default_serializes_to_empty_object() {
+    let json = serde_json::to_value(AuthenticationExtensions::default()).unwrap();
+    assert_eq!(json, serde_json::json!({}));
+}
+
+#[test]
+fn test_authentication_challenge_omits_prf_when_only_another_extension_is_set() {
+    let passki = Passki::new("localhost", &["http://localhost:3000"], "Test");
+    let extensions = Some(AuthenticationExtensions {
+        prf: None,
+        large_blob: Some(LargeBlobAuthenticationInput::Read),
+    });
+    let (challenge, _) = passki.start_passkey_authentication(
+        &[],
+        AuthenticationOptions {
+            extensions,
+            ..Default::default()
+        },
+    );
+
+    let json = serde_json::to_value(&challenge).unwrap();
+    assert!(
+        json["extensions"].get("prf").is_none(),
+        "prf must be absent when it was not requested"
+    );
+    assert_eq!(json["extensions"]["largeBlob"]["read"], true);
+}
+
+#[test]
 fn test_authentication_challenge_includes_extensions_when_prf_some() {
     let passki = Passki::new("localhost", &["http://localhost:3000"], "Test");
     let extensions = Some(AuthenticationExtensions {
-        prf: PrfInput {
+        prf: Some(PrfInput {
             eval: Some(PrfEval {
                 first: Passki::base64_encode(b"salt"),
                 second: None,
             }),
-        },
+        }),
         large_blob: None,
     });
     let (challenge, _) = passki.start_passkey_authentication(
@@ -266,12 +295,12 @@ fn test_authentication_challenge_extensions_json_shape() {
     let passki = Passki::new("localhost", &["http://localhost:3000"], "Test");
     let salt = b"app-context-v1";
     let extensions = Some(AuthenticationExtensions {
-        prf: PrfInput {
+        prf: Some(PrfInput {
             eval: Some(PrfEval {
                 first: Passki::base64_encode(salt),
                 second: None,
             }),
-        },
+        }),
         large_blob: None,
     });
     let (challenge, _) = passki.start_passkey_authentication(
@@ -295,12 +324,12 @@ fn test_authentication_challenge_extensions_json_shape() {
 fn test_authentication_challenge_extensions_includes_second_input() {
     let passki = Passki::new("localhost", &["http://localhost:3000"], "Test");
     let extensions = Some(AuthenticationExtensions {
-        prf: PrfInput {
+        prf: Some(PrfInput {
             eval: Some(PrfEval {
                 first: Passki::base64_encode(b"first"),
                 second: Some(Passki::base64_encode(b"second")),
             }),
-        },
+        }),
         large_blob: None,
     });
     let (challenge, _) = passki.start_passkey_authentication(

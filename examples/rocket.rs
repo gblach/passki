@@ -377,12 +377,12 @@ fn auth_start(
 
     let extensions = req.prf_salt.clone().map(|salt| {
         let mut extensions = AuthenticationExtensions::default();
-        extensions.prf = PrfInput {
+        extensions.prf = Some(PrfInput {
             eval: Some(PrfEval {
                 first: salt,
                 second: None,
             }),
-        };
+        });
         extensions
     });
 

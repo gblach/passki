@@ -588,7 +588,8 @@ pub struct RegistrationExtensions {
 #[derive(Serialize, Debug, Default)]
 #[non_exhaustive]
 pub struct AuthenticationExtensions {
-    pub prf: PrfInput,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub prf: Option<PrfInput>,
     #[serde(rename = "largeBlob", skip_serializing_if = "Option::is_none")]
     pub large_blob: Option<LargeBlobAuthenticationInput>,
 }

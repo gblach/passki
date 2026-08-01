@@ -359,12 +359,12 @@ async fn auth_start(
 
     let extensions = req.prf_salt.map(|salt| {
         let mut extensions = AuthenticationExtensions::default();
-        extensions.prf = PrfInput {
+        extensions.prf = Some(PrfInput {
             eval: Some(PrfEval {
                 first: salt,
                 second: None,
             }),
-        };
+        });
         extensions
     });
 

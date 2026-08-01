@@ -142,12 +142,12 @@ let (challenge, state) = passki.start_passkey_registration(
 
 // During authentication, request a PRF derivation for a given context
 let mut extensions = AuthenticationExtensions::default();
-extensions.prf = PrfInput {
+extensions.prf = Some(PrfInput {
     eval: Some(PrfEval {
         first: Passki::base64_encode(b"my-app-encryption-key-context"),
         second: None,
     }),
-};
+});
 
 let mut options = AuthenticationOptions::default();
 options.extensions = Some(extensions);
