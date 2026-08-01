@@ -17,15 +17,16 @@ ciborium = "0.2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "2"
-x509-cert = { version = "0.2", default-features = false, features = ["std"] }
+x509-cert = { version = "0.3", default-features = false, features = ["std"] }
 
 [dev-dependencies]
 actix-web = "4"
 axum = { version = "0.8", features = ["json"] }
+der = { version = "0.8", features = ["alloc", "derive"] }
 env_logger = "0.11"
 poem = "3"
 rocket = { version = "0.5", features = ["json"] }
-time = ">=0.3, <0.3.52"
+time = "0.3"
 tokio = { version = "1", features = ["full"] }
 tower-http = { version = "0.7", features = ["cors", "trace"] }
 tracing-subscriber = "0.3"

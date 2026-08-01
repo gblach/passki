@@ -66,8 +66,8 @@ fn cose_alg_for_signature_oid(oid: &ObjectIdentifier) -> Result<i32> {
 
 /// Returns a certificate's public key as encoded in its `SubjectPublicKeyInfo`.
 fn spki_bytes(cert: &Certificate) -> Result<&[u8]> {
-    cert.tbs_certificate
-        .subject_public_key_info
+    cert.tbs_certificate()
+        .subject_public_key_info()
         .subject_public_key
         .as_bytes()
         .ok_or_else(|| {
@@ -80,14 +80,14 @@ fn spki_bytes(cert: &Certificate) -> Result<&[u8]> {
 /// Verifies that `cert`, whose original encoding is `der`, names `issuer` and
 /// carries a signature made with the issuer's key.
 fn check_issued_by(der: &[u8], cert: &Certificate, issuer: &Certificate) -> Result<()> {
-    if cert.tbs_certificate.issuer != issuer.tbs_certificate.subject {
+    if cert.tbs_certificate().issuer() != issuer.tbs_certificate().subject() {
         return Err(PasskiError::InvalidCertificateChain(
             "issuer name does not match the subject of the next certificate".to_string(),
         ));
     }
 
-    let alg = cose_alg_for_signature_oid(&cert.signature_algorithm.oid)?;
-    let signature = cert.signature.as_bytes().ok_or_else(|| {
+    let alg = cose_alg_for_signature_oid(&cert.signature_algorithm().oid)?;
+    let signature = cert.signature().as_bytes().ok_or_else(|| {
         PasskiError::InvalidCertificateChain("signature is not byte-aligned".to_string())
     })?;
 
@@ -97,7 +97,7 @@ fn check_issued_by(der: &[u8], cert: &Certificate, issuer: &Certificate) -> Resu
 
 /// Returns an error unless `now` falls inside the certificate's validity period.
 fn check_validity(cert: &Certificate, now: Duration) -> Result<()> {
-    let validity = &cert.tbs_certificate.validity;
+    let validity = cert.tbs_certificate().validity();
 
     if now < validity.not_before.to_unix_duration() {
         return Err(PasskiError::InvalidCertificateChain(

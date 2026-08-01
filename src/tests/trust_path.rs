@@ -20,16 +20,16 @@ use aws_lc_rs::signature::{ECDSA_P256_SHA256_ASN1_SIGNING, EcdsaKeyPair, KeyPair
 use ciborium::Value;
 use std::str::FromStr;
 use std::time::{Duration, SystemTime};
-use x509_cert::der::Encode;
+use x509_cert::Version;
 use x509_cert::der::asn1::{Any, BitString, OctetString};
 use x509_cert::der::oid::{AssociatedOid, ObjectIdentifier};
+use x509_cert::der::{Encode, Sequence};
 use x509_cert::ext::Extension;
 use x509_cert::ext::pkix::BasicConstraints;
 use x509_cert::name::Name;
 use x509_cert::serial_number::SerialNumber;
 use x509_cert::spki::{AlgorithmIdentifierOwned, SubjectPublicKeyInfoOwned};
 use x509_cert::time::{Time, Validity};
-use x509_cert::{Certificate, TbsCertificate, Version};
 
 /// id-ecPublicKey.
 const OID_EC_PUBLIC_KEY: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.2.840.10045.2.1");
@@ -37,6 +37,33 @@ const OID_EC_PUBLIC_KEY: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.2.84
 const OID_PRIME256V1: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.2.840.10045.3.1.7");
 /// ecdsa-with-SHA256.
 const OID_ECDSA_SHA256: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.2.840.10045.4.3.2");
+
+/// The certificate structures of RFC 5280, mirrored here because x509-cert 0.3
+/// keeps its own fields private and offers construction only through a builder
+/// that enforces a profile. These tests need to emit certificates the builder
+/// would refuse, such as expired ones and chains that break their own
+/// `pathLenConstraint`. Only the fields the tests set are modelled; the optional
+/// unique identifiers are always absent.
+#[derive(Sequence)]
+struct TbsCertificate {
+    #[asn1(context_specific = "0", tag_mode = "EXPLICIT")]
+    version: Version,
+    serial_number: SerialNumber,
+    signature: AlgorithmIdentifierOwned,
+    issuer: Name,
+    validity: Validity,
+    subject: Name,
+    subject_public_key_info: SubjectPublicKeyInfoOwned,
+    #[asn1(context_specific = "3", tag_mode = "EXPLICIT", optional = "true")]
+    extensions: Option<Vec<Extension>>,
+}
+
+#[derive(Sequence)]
+struct Certificate {
+    tbs_certificate: TbsCertificate,
+    signature_algorithm: AlgorithmIdentifierOwned,
+    signature: BitString,
+}
 
 /// How a freshly issued certificate is allowed to be used.
 #[derive(Clone, Copy)]
@@ -94,10 +121,10 @@ fn basic_constraints(role: Role) -> Extension {
 
 /// A validity period between two absolute instants.
 fn validity(not_before: SystemTime, not_after: SystemTime) -> Validity {
-    Validity {
-        not_before: Time::try_from(not_before).unwrap(),
-        not_after: Time::try_from(not_after).unwrap(),
-    }
+    Validity::new(
+        Time::try_from(not_before).unwrap(),
+        Time::try_from(not_after).unwrap(),
+    )
 }
 
 /// A validity period covering the present.
@@ -150,8 +177,6 @@ fn issue_certificate(
         validity,
         subject: subject_name.clone(),
         subject_public_key_info: spki(subject_key),
-        issuer_unique_id: None,
-        subject_unique_id: None,
         extensions: Some(vec![basic_constraints(role)]),
     };
 

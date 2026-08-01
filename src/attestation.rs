@@ -329,7 +329,7 @@ fn verify_tpm(
     verify_cert_signature(&cert, alg, cert_info, sig)?;
 
     check_cert_version_3(&cert)?;
-    if !cert.tbs_certificate.subject.0.is_empty() {
+    if !cert.tbs_certificate().subject().as_ref().is_empty() {
         return Err(PasskiError::InvalidCertificate(
             "tpm certificate subject must be empty".to_string(),
         ));
@@ -435,9 +435,8 @@ pub(crate) fn cert_extension<'a>(
     cert: &'a Certificate,
     oid: &ObjectIdentifier,
 ) -> Option<&'a [u8]> {
-    cert.tbs_certificate
-        .extensions
-        .as_ref()?
+    cert.tbs_certificate()
+        .extensions()?
         .iter()
         .find(|ext| &ext.extn_id == oid)
         .map(|ext| ext.extn_value.as_bytes())
@@ -452,8 +451,8 @@ fn verify_cert_signature(
     signature: &[u8],
 ) -> Result<()> {
     let key = cert
-        .tbs_certificate
-        .subject_public_key_info
+        .tbs_certificate()
+        .subject_public_key_info()
         .subject_public_key
         .as_bytes()
         .ok_or_else(|| {
@@ -497,7 +496,7 @@ pub(crate) fn verify_with_key(
 
 /// Returns an error unless the certificate is X.509 v3.
 fn check_cert_version_3(cert: &Certificate) -> Result<()> {
-    if cert.tbs_certificate.version != Version::V3 {
+    if cert.tbs_certificate().version() != Version::V3 {
         return Err(PasskiError::InvalidCertificate("not version 3".to_string()));
     }
     Ok(())
@@ -553,8 +552,8 @@ fn check_aaguid_extension(cert: &Certificate, aaguid: &[u8; 16]) -> Result<()> {
 /// Returns whether the certificate's public key matches the given key.
 fn cert_key_matches(cert: &Certificate, key: &PublicKey) -> Result<bool> {
     let cert_key = cert
-        .tbs_certificate
-        .subject_public_key_info
+        .tbs_certificate()
+        .subject_public_key_info()
         .subject_public_key
         .as_bytes()
         .ok_or_else(|| {
