@@ -360,8 +360,8 @@
                     const prf = result.prf_supported === true ? "\n✓ PRF supported"
                               : result.prf_supported === false ? "\n⚠ PRF not supported"
                               : "";
-                    const rk = result.residental_key === true ? "\n✓ Residental key"
-                               : result.residental_key === false ? "\n⚠ Non-residental key"
+                    const rk = result.resident_key === true ? "\n✓ Resident key"
+                               : result.resident_key === false ? "\n⚠ Non-resident key"
                                : "";
                     showMessage("register-message", `✓ Registration successful!${rk}${prf}`, true);
                     document.getElementById("register-username").value = "";

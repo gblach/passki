@@ -183,9 +183,9 @@ struct ApiResponse {
     /// In usernameless flow, returns the identified username
     #[serde(skip_serializing_if = "Option::is_none")]
     username: Option<String>,
-    /// Registration only: whether a residental key was created
+    /// Registration only: whether a resident key was created
     #[serde(skip_serializing_if = "Option::is_none")]
-    residental_key: Option<bool>,
+    resident_key: Option<bool>,
     /// Registration only: whether this passkey supports PRF
     #[serde(skip_serializing_if = "Option::is_none")]
     prf_supported: Option<bool>,
@@ -299,7 +299,7 @@ async fn register_finish(
     let passkey = passki
         .finish_passkey_registration(&credential, &state)
         .map_err(err)?;
-    let residental_key = passkey.rk;
+    let resident_key = passkey.rk;
 
     // Decode user ID from base64url to UUID
     let user_id_bytes = Passki::base64_decode(&state.user.id).map_err(err)?;
@@ -327,7 +327,7 @@ async fn register_finish(
         success: true,
         message: "Registration successful".into(),
         username: None,
-        residental_key,
+        resident_key,
         prf_supported: Some(prf_supported),
         prf_output: None,
     }))
@@ -463,7 +463,7 @@ async fn auth_finish(
         message: format!("Welcome back, {}!", username),
         username: Some(username),
         prf_supported: None,
-        residental_key: None,
+        resident_key: None,
         prf_output,
     }))
 }
