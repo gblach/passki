@@ -89,6 +89,14 @@ Passki supports the following COSE algorithms:
 - **RS256** (RSASSA-PKCS1-v1_5 with SHA-256) - Algorithm ID: -257
 - **RS384** (RSASSA-PKCS1-v1_5 with SHA-384) - Algorithm ID: -258
 
+## AAGUID
+
+`StoredPasskey::aaguid` is the 16-byte identifier of the authenticator model - which YubiKey, which password manager. It is a plain `[u8; 16]` rather than an `Option`, because all-zero already means "no model to look up".
+
+All zero is the common case. Under the default `AttestationConveyancePreference::None` the browser zeroes the AAGUID before passing the credential on, so you get a model identifier only by asking for attestation - and a non-zero value is worth acting on only once it has been validated, which is what [Attestation](#attestation) sets up. Look the model up in the [FIDO Metadata Service](https://fidoalliance.org/metadata/) or a community AAGUID list.
+
+The same `StoredPasskey` also carries `be` (backup eligible - the credential is synced rather than bound to one device) and `bs` (currently backed up), both straight from the authenticator data flags.
+
 ## Extensions
 
 ### credProps

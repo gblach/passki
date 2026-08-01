@@ -54,11 +54,11 @@
 extern crate rocket;
 
 use passki::{
-    AuthenticationChallenge, AuthenticationCredential, AuthenticationExtensions,
-    AuthenticationOptions, AuthenticationState, AuthenticatorAttachment, AuthenticatorTransport,
-    ClientData, ClientExtensionResults, Passki, PasskiError, PrfEval, PrfInput,
-    RegistrationChallenge, RegistrationCredential, RegistrationExtensions, RegistrationOptions,
-    RegistrationState, StoredPasskey,
+    AttestationConveyancePreference, AuthenticationChallenge, AuthenticationCredential,
+    AuthenticationExtensions, AuthenticationOptions, AuthenticationState, AuthenticatorAttachment,
+    AuthenticatorTransport, ClientData, ClientExtensionResults, Passki, PasskiError, PrfEval,
+    PrfInput, RegistrationChallenge, RegistrationCredential, RegistrationExtensions,
+    RegistrationOptions, RegistrationState, StoredPasskey,
 };
 use rocket::http::Status;
 use rocket::response::content::RawHtml;
@@ -144,6 +144,10 @@ struct User {
 #[derive(Deserialize)]
 struct RegisterStartRequest {
     username: String,
+    /// Ask the authenticator for an attestation statement, which is what turns
+    /// the AAGUID into a real model identifier instead of zeros
+    #[serde(default)]
+    attestation: bool,
 }
 
 /// Data sent by the client after WebAuthn credential creation.
@@ -207,6 +211,15 @@ struct ApiResponse {
     /// Registration only: whether a resident key was created
     #[serde(skip_serializing_if = "Option::is_none")]
     resident_key: Option<bool>,
+    /// Registration only: whether the credential is eligible for backup (BE flag)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    backup_eligible: Option<bool>,
+    /// Registration only: whether the credential is currently backed up (BS flag)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    backed_up: Option<bool>,
+    /// Registration only: the authenticator model, absent when it stayed anonymous
+    #[serde(skip_serializing_if = "Option::is_none")]
+    aaguid: Option<String>,
     /// Registration only: whether this passkey supports PRF
     #[serde(skip_serializing_if = "Option::is_none")]
     prf_supported: Option<bool>,
@@ -252,6 +265,11 @@ fn register_start(
     extensions.prf = Some(PrfInput { eval: None });
 
     let mut options = RegistrationOptions::default();
+    options.attestation = if req.attestation {
+        AttestationConveyancePreference::Direct
+    } else {
+        AttestationConveyancePreference::None
+    };
     options.exclude_credentials = existing.as_deref();
     options.extensions = Some(extensions);
 
@@ -316,6 +334,11 @@ fn register_finish(
     // Verify the credential (checks origin, challenge, parses public key)
     let passkey = passki.finish_passkey_registration(&credential, &reg_state)?;
     let resident_key = passkey.rk;
+    let backup_eligible = passkey.be;
+    let backed_up = passkey.bs;
+    // All-zero unless attestation was requested, which this demo does not do
+    let aaguid =
+        (passkey.aaguid != [0u8; 16]).then(|| Uuid::from_bytes(passkey.aaguid).to_string());
 
     // Decode user ID from base64url to UUID
     let user_id_bytes = Passki::base64_decode(&reg_state.user.id)?;
@@ -344,6 +367,9 @@ fn register_finish(
         message: "Registration successful".into(),
         username: None,
         resident_key,
+        backup_eligible: Some(backup_eligible),
+        backed_up: Some(backed_up),
+        aaguid,
         prf_supported: Some(prf_supported),
         prf_output: None,
     }))
@@ -481,6 +507,9 @@ fn auth_finish(
         username: Some(username),
         prf_supported: None,
         resident_key: None,
+        backup_eligible: None,
+        backed_up: None,
+        aaguid: None,
         prf_output,
     }))
 }
