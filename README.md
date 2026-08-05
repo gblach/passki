@@ -9,11 +9,14 @@ A simple and secure WebAuthn/Passkey implementation for Rust.
 ## Features
 
 - ✨ **Simple API** - Easy-to-use interface for passkey registration and authentication
-- 🔐 **Multiple Algorithms** - Support for EdDSA (Ed25519), ES256/ES384 (P-256/P-384), and RS256/RS384 (RSA)
+- 🔐 **Multiple Algorithms** - Support for EdDSA (Ed25519), ES256/ES384 (P-256/P-384),
+  and RS256/RS384 (RSA)
 - 🛡️ **Security First** - Built-in replay attack protection via signature counters
 - 📦 **Framework Agnostic** - No web framework lock-in, works with any HTTP server
-- 🔑 **Extensions** - Support for `credProps` (discoverable credential reporting), PRF (key derivation / E2E encryption) and `largeBlob` (blob storage on the authenticator)
-- 📜 **Attestation** - Statement verification for `packed`, `tpm`, `android-key` and `fido-u2f`, with opt-in trust path validation against your own roots
+- 🔑 **Extensions** - Support for `credProps` (discoverable credential reporting), PRF (key
+  derivation / E2E encryption) and `largeBlob` (blob storage on the authenticator)
+- 📜 **Attestation** - Statement verification for `packed`, `tpm`, `android-key` and `fido-u2f`,
+  with opt-in trust path validation against your own roots
 - 🦀 **Pure Rust** - Memory-safe implementation with no unsafe code
 
 ## Installation
@@ -84,17 +87,26 @@ Passki supports the following COSE algorithms:
 
 ## AAGUID
 
-`StoredPasskey::aaguid` is the 16-byte identifier of the authenticator model - which YubiKey, which password manager. Look it up in the [FIDO Metadata Service](https://fidoalliance.org/metadata/) or a community AAGUID list.
+`StoredPasskey::aaguid` is the 16-byte identifier of the authenticator model - which YubiKey, which
+password manager. Look it up in the [FIDO Metadata Service](https://fidoalliance.org/metadata/)
+or a community AAGUID list.
 
-All zero is the common case, and means there is no model to look up: under the default `AttestationConveyancePreference::None` the browser zeroes the AAGUID before passing the credential on. A non-zero value is worth acting on only once it has been validated, which is what [Attestation](#attestation) sets up.
+All zero is the common case, and means there is no model to look up: under the default
+`AttestationConveyancePreference::None` the browser zeroes the AAGUID before passing the credential
+on. A non-zero value is worth acting on only once it has been validated, which is what
+[Attestation](#attestation) sets up.
 
-The same `StoredPasskey` also carries `be` (backup eligible - the credential is synced rather than bound to one device) and `bs` (currently backed up), both straight from the authenticator data flags.
+The same `StoredPasskey` also carries `be` (backup eligible - the credential is synced rather than
+bound to one device) and `bs` (currently backed up), both straight from the authenticator data
+flags.
 
 ## Extensions
 
 ### credProps
 
-The `credProps` extension reports whether the authenticator created a discoverable (resident) credential - one stored on the device and usable in passwordless flows. Request it during registration; the result is stored in `StoredPasskey::rk`.
+The `credProps` extension reports whether the authenticator created a discoverable (resident)
+credential - one stored on the device and usable in passwordless flows. Request it during
+registration; the result is stored in `StoredPasskey::rk`.
 
 ```rust
 use passki::{RegistrationExtensions, RegistrationOptions};
@@ -118,7 +130,10 @@ let passkey = passki.finish_passkey_registration(&credential, &state)?;
 
 ### PRF
 
-The [WebAuthn PRF extension](https://www.w3.org/TR/webauthn-3/#prf-extension) lets a passkey derive deterministic secret bytes from the authenticator's internal HMAC-secret. This is useful for end-to-end encryption, per-user key derivation, and other scenarios where you need a stable secret tied to a specific passkey. Passki passes the outputs through without processing them.
+The [WebAuthn PRF extension](https://www.w3.org/TR/webauthn-3/#prf-extension) lets a passkey derive
+deterministic secret bytes from the authenticator's internal HMAC-secret. This is useful
+for end-to-end encryption, per-user key derivation, and other scenarios where you need a stable
+secret tied to a specific passkey. Passki passes the outputs through without processing them.
 
 ```rust
 use passki::{
@@ -159,9 +174,13 @@ let (challenge, state) = passki.start_passkey_authentication(&user_passkeys, opt
 
 ### largeBlob
 
-The [`largeBlob` extension](https://www.w3.org/TR/webauthn-3/#sctn-large-blob-extension) stores a small opaque blob on the authenticator itself, such as an SSH key or a certificate. Registration only probes whether the credential can hold one; reads and writes happen in later authentication ceremonies, one per ceremony, and a write replaces whatever the credential held.
+The [`largeBlob` extension](https://www.w3.org/TR/webauthn-3/#sctn-large-blob-extension) stores
+a small opaque blob on the authenticator itself, such as an SSH key or a certificate. Registration
+only probes whether the credential can hold one; reads and writes happen in later authentication
+ceremonies, one per ceremony, and a write replaces whatever the credential held.
 
-The blob is base64url in both directions, like the PRF inputs and outputs: encode what you write, and `AuthenticationResult::large_blob` hands back the decoded bytes.
+The blob is base64url in both directions, like the PRF inputs and outputs: encode what you write,
+and `AuthenticationResult::large_blob` hands back the decoded bytes.
 
 ```rust
 use passki::{
@@ -205,17 +224,25 @@ extensions.large_blob = Some(LargeBlobAuthenticationInput::Read);
 // result.large_blob contains the decoded bytes
 ```
 
-`LargeBlobSupport::Required` fails the registration when the authenticator cannot store a blob; `Preferred` creates the credential either way and reports what it got.
+`LargeBlobSupport::Required` fails the registration when the authenticator cannot store a blob;
+`Preferred` creates the credential either way and reports what it got.
 
 ## Attestation
 
-Attestation is the authenticator proving its make and model - "genuine YubiKey 5 NFC" rather than "some passkey". Skip this section unless your policy depends on the hardware; most applications accept any passkey, and the defaults are already right for that.
+Attestation is the authenticator proving its make and model - "genuine YubiKey 5 NFC" rather than
+"some passkey". Skip this section unless your policy depends on the hardware; most applications
+accept any passkey, and the defaults are already right for that.
 
 ### Why the AAGUID needs it
 
-By default the AAGUID is self-asserted. It comes out of `authData`, which the client controls. A malicious client can claim any AAGUID and mint an attestation certificate to match, and every check Passki performs by default will pass - those checks verify the statement against the certificate the statement itself supplied, which settles internal consistency and nothing else.
+By default the AAGUID is self-asserted. It comes out of `authData`, which the client controls.
+A malicious client can claim any AAGUID and mint an attestation certificate to match, and every
+check Passki performs by default will pass - those checks verify the statement against
+the certificate the statement itself supplied, which settles internal consistency and nothing else.
 
-Trust path validation closes the gap: the `x5c` chain is validated against root certificates you supply out of band. Same shape as TLS - the peer sends leaf and intermediates, you hold the roots.
+Trust path validation closes the gap: the `x5c` chain is validated against root certificates
+you supply out of band. Same shape as TLS - the peer sends leaf and intermediates, you hold
+the roots.
 
 Two things are needed, and either one alone is useless:
 
@@ -247,7 +274,8 @@ Requesting attestation makes some browsers show the user an extra consent prompt
 
 ### Result
 
-`finish_passkey_registration` either fails, or returns a `StoredPasskey` whose `attestation_type` records what the statement was worth:
+`finish_passkey_registration` either fails, or returns a `StoredPasskey` whose `attestation_type`
+records what the statement was worth:
 
 ```rust
 let passkey = passki.finish_passkey_registration(&credential, &state)?;
@@ -265,7 +293,8 @@ match passkey.attestation_type {
 | `Unverified`       | An `x5c` chain arrived but the policy is `Ignore`, so it was never validated. |
 | `Basic` or `AttCa` | The chain validated up to one of your roots. `aaguid` is attested.            |
 
-`Basic` and `AttCa` differ in whether the vendor issues one certificate per production batch or one per device. Both mean the chain validated, so treat them alike.
+`Basic` and `AttCa` differ in whether the vendor issues one certificate per production batch
+or one per device. Both mean the chain validated, so treat them alike.
 
 ### Policies
 
@@ -275,21 +304,31 @@ match passkey.attestation_type {
 | `VerifyWhenPresent` | Must chain to a root, else `UntrustedAttestation` | Accepted                                 |
 | `Required`          | Must chain to a root, else `UntrustedAttestation` | `MissingAttestationChain`                |
 
-`Ignore` preserves pre-0.3 behaviour exactly. `Required` is effectively "security keys only": iCloud Keychain, Google Password Manager and 1Password return `none` attestation regardless of what is requested, so it excludes every phone and laptop passkey.
+`Ignore` preserves pre-0.3 behaviour exactly. `Required` is effectively "security keys only": iCloud
+Keychain, Google Password Manager and 1Password return `none` attestation regardless of what
+is requested, so it excludes every phone and laptop passkey.
 
-Anchors act as a vendor whitelist. Install only the Yubico root and a genuine Feitian key is rejected, because its chain ends at a root you do not have.
+Anchors act as a vendor whitelist. Install only the Yubico root and a genuine Feitian
+key is rejected, because its chain ends at a root you do not have.
 
 ### Trust anchors
 
 Anchors are DER root certificates you supply. Passki bundles none and performs no network I/O.
 
-For a fixed set of approved models, embed the vendor roots with `include_bytes!`. For broad coverage there is the FIDO Metadata Service, which publishes roots for every certified authenticator - but consuming it means fetching and verifying a signed JWT on a refresh schedule, which belongs in your application rather than in this crate.
+For a fixed set of approved models, embed the vendor roots with `include_bytes!`. For broad coverage
+there is the FIDO Metadata Service, which publishes roots for every certified
+authenticator - but consuming it means fetching and verifying a signed JWT on a refresh schedule,
+which belongs in your application rather than in this crate.
 
 ### What validation covers
 
-Name chaining, the signature of every link, `notBefore`/`notAfter`, `basicConstraints` (CA flag and `pathLenConstraint`), and `keyUsage`/`keyCertSign` when present. An anchor is trusted by configuration, so its own validity period is not re-checked.
+Name chaining, the signature of every link, `notBefore`/`notAfter`, `basicConstraints` (CA flag
+and `pathLenConstraint`), and `keyUsage`/`keyCertSign` when present. An anchor is trusted
+by configuration, so its own validity period is not re-checked.
 
-Revocation is not checked: attestation chains have no CRL or OCSP to consult. Certificate signatures are supported for ECDSA P-256/P-384 with SHA-256/384, RSA PKCS#1 v1.5 with SHA-256/384, and Ed25519; RSASSA-PSS is not.
+Revocation is not checked: attestation chains have no CRL or OCSP to consult. Certificate signatures
+are supported for ECDSA P-256/P-384 with SHA-256/384, RSA PKCS#1 v1.5 with SHA-256/384, and Ed25519;
+RSASSA-PSS is not.
 
 ## Security Considerations
 
@@ -305,10 +344,14 @@ Revocation is not checked: attestation chains have no CRL or OCSP to consult. Ce
 
 ## Examples
 
-The `examples/` directory has complete registration and authentication flows for several web frameworks:
-[Actix-web](examples/actix-web.rs) | [Axum](examples/axum.rs) | [Poem](examples/poem.rs) | [Rocket](examples/rocket.rs) | [Warp](examples/warp.rs)
+The `examples/` directory has complete registration and authentication flows for several
+web frameworks: [Actix-web](examples/actix-web.rs) | [Axum](examples/axum.rs)
+| [Poem](examples/poem.rs)
+| [Rocket](examples/rocket.rs) | [Warp](examples/warp.rs)
 
-All examples request both `credProps` and PRF during registration. Registration reports whether a resident key was created; authentication accepts an optional key context string (`prf_salt`) to derive a 32-byte key.
+All examples request both `credProps` and PRF during registration. Registration reports whether
+a resident key was created; authentication accepts an optional key context string (`prf_salt`)
+to derive a 32-byte key.
 
 ```bash
 cargo run --example axum  # or actix-web, poem, rocket, warp
@@ -374,12 +417,16 @@ Still under active development:
 
 ### Defined outside WebAuthn
 
-These extensions are registered in the [IANA WebAuthn extension identifiers registry](https://www.iana.org/assignments/webauthn/webauthn.xhtml)
-but specified elsewhere, so they are not tied to a WebAuthn level:
+These extensions are registered in the [IANA WebAuthn extension identifiers
+registry](https://www.iana.org/assignments/webauthn/webauthn.xhtml) but specified elsewhere, so they
+are not tied to a WebAuthn level:
 
-- [ ] `credProtect` extension ([CTAP 2.1](https://fidoalliance.org/specs/fido-v2.1-ps-20210615/fido-client-to-authenticator-protocol-v2.1-ps-20210615.html#sctn-credProtect-extension) §12.1)
+- [ ] `credProtect` extension ([CTAP
+  2.1](https://fidoalliance.org/specs/fido-v2.1-ps-20210615/fido-client-to-authenticator-protocol-v2.1-ps-20210615.html#sctn-credProtect-extension)
+  §12.1)
 - [ ] `minPinLength` extension (CTAP 2.1 §12.4)
-- [ ] `payment` extension ([Secure Payment Confirmation](https://www.w3.org/TR/secure-payment-confirmation/) §5)
+- [ ] `payment` extension ([Secure Payment
+  Confirmation](https://www.w3.org/TR/secure-payment-confirmation/) §5)
 
 ## Contributing
 
@@ -387,11 +434,13 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## License
 
-This project is licensed under the [Apache License, Version 2.0](http://www.apache.org/licenses/LICENSE-2.0) ([LICENSE](LICENSE)).
+This project is licensed under the [Apache License, Version
+2.0](http://www.apache.org/licenses/LICENSE-2.0) ([LICENSE](LICENSE)).
 
 ## Acknowledgments
 
-Passki is built on top of [aws-lc-rs](https://github.com/aws/aws-lc-rs) for cryptographic operations.
+Passki is built on top of [aws-lc-rs](https://github.com/aws/aws-lc-rs) for cryptographic
+operations.
 
 ## Resources
 

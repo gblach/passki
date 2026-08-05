@@ -49,8 +49,8 @@ pub struct RegistrationChallenge {
     #[serde(rename = "authenticatorSelection")]
     pub authenticator_selection: AuthenticatorSelection,
 
-    /// Credentials the user already has, which the authenticator must refuse to
-    /// register a second time.
+    /// Credentials the user already has, which the authenticator must refuse to register a second
+    /// time.
     #[serde(rename = "excludeCredentials")]
     pub exclude_credentials: Vec<ExcludeCredential>,
 
@@ -61,8 +61,7 @@ pub struct RegistrationChallenge {
 
 /// Server-side half of a registration in progress.
 ///
-/// Keep it in a session or cache between the two steps; without it the response
-/// cannot be verified.
+/// Keep it in a session or cache between the two steps; without it the response cannot be verified.
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct RegistrationState {
     /// The challenge that was sent to the client.
@@ -71,8 +70,8 @@ pub struct RegistrationState {
     /// The user information.
     pub user: UserInfo,
 
-    /// What was asked for when the ceremony started, re-checked against what the
-    /// authenticator actually did.
+    /// What was asked for when the ceremony started, re-checked against what the authenticator
+    /// actually did.
     pub user_verification: UserVerificationRequirement,
 }
 
@@ -82,8 +81,7 @@ pub struct RegistrationCredential {
     /// The credential ID (base64url-encoded).
     pub credential_id: String,
 
-    /// The attestation object, which carries the new public key
-    /// (base64url-encoded).
+    /// The attestation object, which carries the new public key (base64url-encoded).
     pub public_key: String,
 
     /// The client data JSON (base64url-encoded).
@@ -92,20 +90,20 @@ pub struct RegistrationCredential {
     /// Extension results from the client (e.g., PRF support flag).
     pub client_extension_results: Option<ClientExtensionResults>,
 
-    /// Whether the client used a built-in or a separate authenticator. `None`
-    /// when it did not report.
+    /// Whether the client used a built-in or a separate authenticator. `None` when
+    /// it did not report.
     pub authenticator_attachment: Option<AuthenticatorAttachment>,
 
-    /// What `getTransports()` reported. Empty when the client sent nothing, and
-    /// also when the front end simply does not forward the list.
+    /// What `getTransports()` reported. Empty when the client sent nothing, and also when the front
+    /// end simply does not forward the list.
     #[serde(default, deserialize_with = "deserialize_transports")]
     pub transports: Vec<AuthenticatorTransport>,
 }
 
 /// Options for starting a passkey registration ceremony.
 ///
-/// The [`Default`] value uses a 60 second timeout, no attestation, and
-/// `Preferred` resident key and user verification requirements.
+/// The [`Default`] value uses a 60 second timeout, no attestation, and `Preferred` resident
+/// key and user verification requirements.
 #[derive(Debug)]
 #[non_exhaustive]
 pub struct RegistrationOptions<'a> {
@@ -121,8 +119,8 @@ pub struct RegistrationOptions<'a> {
     /// User verification requirement.
     pub user_verification: UserVerificationRequirement,
 
-    /// Restricts registration to platform or roaming authenticators. `None`
-    /// lets the client offer both.
+    /// Restricts registration to platform or roaming authenticators. `None` lets the client offer
+    /// both.
     pub authenticator_attachment: Option<AuthenticatorAttachment>,
 
     /// Existing credentials to exclude from registration.
@@ -167,14 +165,14 @@ pub(crate) struct ParsedAttestation {
     /// Identifies the authenticator model.
     pub aaguid: [u8; 16],
 
-    /// Left at [`AttestationType::None`] here, since parsing authenticator data
-    /// sees no attestation statement; `verify_attestation` fills it in.
+    /// Left at [`AttestationType::None`] here, since parsing authenticator data sees no attestation
+    /// statement; `verify_attestation` fills it in.
     pub attestation_type: AttestationType,
 }
 
 impl Passki {
-    /// Starts a passkey registration: generates a random challenge and returns
-    /// it alongside the state needed to finish.
+    /// Starts a passkey registration: generates a random challenge and returns it alongside
+    /// the state needed to finish.
     ///
     /// # Arguments
     ///
@@ -295,8 +293,8 @@ impl Passki {
             return Err(PasskiError::UserVerificationRequired);
         }
 
-        // The signed authenticator data is authoritative; the ID the client sent
-        // alongside it must agree.
+        // The signed authenticator data is authoritative; the ID the client sent alongside it must
+        // agree.
         let credential_id = Self::base64_decode(&credential.credential_id)?;
         if credential_id != parsed.credential_id {
             return Err(PasskiError::CredentialIdMismatch);
@@ -371,8 +369,8 @@ impl Passki {
         self.parse_auth_data(&auth_data)
     }
 
-    /// Parses authenticator data, whose layout is a fixed 37-byte header
-    /// (rpIdHash, flags, counter) followed by the attested credential data.
+    /// Parses authenticator data, whose layout is a fixed 37-byte header (rpIdHash, flags, counter)
+    /// followed by the attested credential data.
     pub(crate) fn parse_auth_data(&self, auth_data_bytes: &[u8]) -> Result<ParsedAttestation> {
         if auth_data_bytes.len() < 37 {
             return Err(PasskiError::InvalidAuthenticatorData);
@@ -430,8 +428,8 @@ impl Passki {
                 PasskiError::InvalidCoseKey("Missing or invalid algorithm".to_string())
             })?;
 
-        // Re-serialize the key: the remaining bytes may carry extension data
-        // after it, which must not be stored as part of the key.
+        // Re-serialize the key: the remaining bytes may carry extension data after it, which must
+        // not be stored as part of the key.
         let mut public_key = Vec::new();
         ciborium::into_writer(&cose_key_value, &mut public_key)?;
 

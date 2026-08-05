@@ -41,8 +41,8 @@ pub struct AuthenticationChallenge {
     #[serde(rename = "rpId")]
     pub rp_id: String,
 
-    /// The credentials the browser may use. Empty lets the user pick any
-    /// discoverable credential, so no username is needed up front.
+    /// The credentials the browser may use. Empty lets the user pick any discoverable credential,
+    /// so no username is needed up front.
     #[serde(rename = "allowCredentials")]
     pub allow_credentials: Vec<AllowCredential>,
 
@@ -57,19 +57,18 @@ pub struct AuthenticationChallenge {
 
 /// Server-side half of an authentication in progress.
 ///
-/// Keep it in a session or cache between the two steps; without it the response
-/// cannot be verified.
+/// Keep it in a session or cache between the two steps; without it the response cannot be verified.
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct AuthenticationState {
     /// The challenge that was sent to the client.
     pub challenge: Vec<u8>,
 
-    /// The credential IDs the client was offered. Empty means any discoverable
-    /// credential was acceptable.
+    /// The credential IDs the client was offered. Empty means any discoverable credential
+    /// was acceptable.
     pub allowed_credentials: Vec<Vec<u8>>,
 
-    /// What was asked for when the ceremony started, re-checked against what the
-    /// authenticator actually did.
+    /// What was asked for when the ceremony started, re-checked against what the authenticator
+    /// actually did.
     pub user_verification: UserVerificationRequirement,
 }
 
@@ -88,17 +87,16 @@ pub struct AuthenticationCredential {
     /// The signature over the authenticator data and client data hash (base64url-encoded).
     pub signature: String,
 
-    /// The `user_id` from registration, base64url-encoded. Only returned for
-    /// discoverable credentials, where it is how the server learns who is
-    /// logging in.
+    /// The `user_id` from registration, base64url-encoded. Only returned for discoverable
+    /// credentials, where it is how the server learns who is logging in.
     pub user_handle: Option<String>,
 
     /// Extension results from the client (e.g., PRF outputs).
     pub client_extension_results: Option<ClientExtensionResults>,
 
-    /// Whether the client used a built-in or a separate authenticator. A
-    /// credential registered as `Platform` reporting `CrossPlatform` here was
-    /// used from another device. `None` when the client did not report.
+    /// Whether the client used a built-in or a separate authenticator. A credential registered
+    /// as `Platform` reporting `CrossPlatform` here was used from another device. `None` when
+    /// the client did not report.
     pub authenticator_attachment: Option<AuthenticatorAttachment>,
 }
 
@@ -109,12 +107,12 @@ pub struct AuthenticationResult {
     /// The credential ID that was used for authentication.
     pub credential_id: Vec<u8>,
 
-    /// The new signature counter. Store it on the passkey, or the next login has
-    /// nothing to compare against.
+    /// The new signature counter. Store it on the passkey, or the next login has nothing to compare
+    /// against.
     pub counter: u32,
 
-    /// The decoded `user_id` from registration, if the authenticator returned
-    /// one. Identifies the user when no username was given up front.
+    /// The decoded `user_id` from registration, if the authenticator returned one. Identifies
+    /// the user when no username was given up front.
     pub user_handle: Option<Vec<u8>>,
 
     /// Decoded first PRF output, if the extension was requested and supported.
@@ -127,15 +125,14 @@ pub struct AuthenticationResult {
     /// and the authenticator returned one.
     pub large_blob: Option<Vec<u8>>,
 
-    /// Whether a [`LargeBlobAuthenticationInput::Write`] was stored. `None` when
-    /// no write was requested or the client did not report.
+    /// Whether a [`LargeBlobAuthenticationInput::Write`] was stored. `None` when no write
+    /// was requested or the client did not report.
     pub large_blob_written: Option<bool>,
 }
 
 /// Options for starting a passkey authentication ceremony.
 ///
-/// The [`Default`] value uses a 60 second timeout and a `Preferred` user
-/// verification requirement.
+/// The [`Default`] value uses a 60 second timeout and a `Preferred` user verification requirement.
 #[derive(Debug)]
 #[non_exhaustive]
 pub struct AuthenticationOptions {
@@ -160,8 +157,8 @@ impl Default for AuthenticationOptions {
 }
 
 impl Passki {
-    /// Starts a passkey authentication: generates a random challenge and returns
-    /// it alongside the state needed to finish.
+    /// Starts a passkey authentication: generates a random challenge and returns it alongside
+    /// the state needed to finish.
     ///
     /// # Arguments
     ///
@@ -204,8 +201,8 @@ impl Passki {
         (challenge_response, state)
     }
 
-    /// Completes a passkey authentication by verifying the signature and
-    /// authenticator data the client returned.
+    /// Completes a passkey authentication by verifying the signature and authenticator data
+    /// the client returned.
     ///
     /// # Arguments
     ///
@@ -277,8 +274,8 @@ impl Passki {
             authenticator_data[36],
         ]);
 
-        // Two zeros mean the authenticator does not count at all, which the spec
-        // allows and synced passkeys (e.g. Google Password Manager) do.
+        // Two zeros mean the authenticator does not count at all, which the spec allows and synced
+        // passkeys (e.g. Google Password Manager) do.
         if (counter != 0 || stored_passkey.counter != 0) && counter <= stored_passkey.counter {
             return Err(PasskiError::CounterRegression);
         }
@@ -380,8 +377,8 @@ impl Passki {
         }
     }
 
-    /// Parses a COSE key, the CBOR map WebAuthn encodes public keys as, into its
-    /// entries. Its fields are keyed by small integers rather than by name.
+    /// Parses a COSE key, the CBOR map WebAuthn encodes public keys as, into its entries.
+    /// Its fields are keyed by small integers rather than by name.
     pub(crate) fn cose_parse(
         cose_key_bytes: &[u8],
     ) -> Result<Vec<(ciborium::Value, ciborium::Value)>> {

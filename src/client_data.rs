@@ -14,8 +14,8 @@
 
 //! Parsing and verification of the client data JSON.
 //!
-//! The browser assembles this blob itself and the authenticator signs over its
-//! hash, which is what ties a signature to one challenge and one origin.
+//! The browser assembles this blob itself and the authenticator signs over its hash, which is what
+//! ties a signature to one challenge and one origin.
 
 use std::fmt;
 use std::str::FromStr;
@@ -112,13 +112,13 @@ impl ClientData {
 
     /// Parses client data straight from the base64url string the client sent.
     ///
-    /// Useful before the ceremony is finished: the challenge it exposes can key
-    /// the lookup of the pending registration or authentication state.
+    /// Useful before the ceremony is finished: the challenge it exposes can key the lookup
+    /// of the pending registration or authentication state.
     ///
     /// # Errors
     ///
-    /// Returns an error if the input is not valid base64url, the JSON is
-    /// invalid, or a required field is missing.
+    /// Returns an error if the input is not valid base64url, the JSON is invalid, or a required
+    /// field is missing.
     ///
     /// # Example
     ///
@@ -137,8 +137,8 @@ impl ClientData {
     }
 
     #[allow(rustdoc::bare_urls)]
-    /// Checks the operation type, that the challenge is the one that was issued,
-    /// that the origin is accepted, and that no cross-origin iframe was involved.
+    /// Checks the operation type, that the challenge is the one that was issued, that the origin
+    /// is accepted, and that no cross-origin iframe was involved.
     ///
     /// # Arguments
     ///

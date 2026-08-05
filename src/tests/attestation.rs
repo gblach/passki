@@ -25,8 +25,8 @@ fn passki() -> Passki {
     Passki::new("localhost", &["http://localhost:3000"], "Test")
 }
 
-/// A `packed` self-attestation object signed by a fresh ES256 key, returned with
-/// the client data hash it was signed over.
+/// A `packed` self-attestation object signed by a fresh ES256 key, returned with the client data
+/// hash it was signed over.
 fn build_packed_self_attestation(alg: i32) -> (Vec<u8>, Vec<u8>) {
     let rng = SystemRandom::new();
     let pkcs8 = EcdsaKeyPair::generate_pkcs8(&ECDSA_P256_SHA256_ASN1_SIGNING, &rng).unwrap();

@@ -14,8 +14,8 @@
 
 //! # Passkeys Demo Server
 //!
-//! Passkey registration and login with Passki on the Poem web framework, plus
-//! optional PRF key derivation.
+//! Passkey registration and login with Passki on the Poem web framework, plus optional
+//! PRF key derivation.
 //!
 //! ## Registration
 //! 1. Client posts a username to `/register/start`
@@ -25,19 +25,17 @@
 //! 5. Server verifies it and stores the passkey
 //!
 //! ## Authentication
-//! **With a username**: the challenge names that user's credentials, so the
-//! browser offers only those.
+//! **With a username**: the challenge names that user's credentials, so the browser offers only
+//! those.
 //!
-//! **Without one**: the challenge names none, the browser offers every passkey
-//! it holds for this site, and the server works out who is logging in from the
-//! user handle the authenticator returns.
+//! **Without one**: the challenge names none, the browser offers every passkey it holds for this
+//! site, and the server works out who is logging in from the user handle the authenticator returns.
 //!
 //! ## PRF key derivation (optional)
-//! When the client sends a `prf_salt` with its authentication request, the
-//! server passes it to the authenticator as `extensions.prf.eval.first`. The
-//! authenticator derives 32 bytes from it, returned hex-encoded in
-//! `prf_output`. The same passkey and salt always yield the same bytes, which
-//! makes them usable as an encryption key.
+//! When the client sends a `prf_salt` with its authentication request, the server passes
+//! it to the authenticator as `extensions.prf.eval.first`. The authenticator derives 32 bytes from
+//! it, returned hex-encoded in `prf_output`. The same passkey and salt always yield the same bytes,
+//! which makes them usable as an encryption key.
 //!
 //! ## Running
 //! ```sh
@@ -75,8 +73,7 @@ fn err(msg: impl std::fmt::Display) -> poem::Error {
 
 /// In-memory storage for users and ceremonies in progress.
 ///
-/// A real server would use a database for the users and an expiring cache for
-/// the pending states.
+/// A real server would use a database for the users and an expiring cache for the pending states.
 #[derive(Clone, Default)]
 struct Store {
     /// Keyed by username.
@@ -110,8 +107,8 @@ struct User {
 #[derive(Deserialize)]
 struct RegisterStartRequest {
     username: String,
-    /// Ask for an attestation statement, so the AAGUID names a real
-    /// authenticator model instead of staying all zeros
+    /// Ask for an attestation statement, so the AAGUID names a real authenticator model instead
+    /// of staying all zeros
     #[serde(default)]
     attestation: bool,
 }
@@ -129,8 +126,8 @@ struct RegisterFinishRequest {
     client_extension_results: Option<ClientExtensionResults>,
     /// Whether the browser used a built-in or a separate authenticator
     authenticator_attachment: Option<AuthenticatorAttachment>,
-    /// What `getTransports()` reported, stored so later ceremonies can tell
-    /// the browser where this credential lives
+    /// What `getTransports()` reported, stored so later ceremonies can tell the browser where this
+    /// credential lives
     #[serde(default)]
     transports: Vec<AuthenticatorTransport>,
 }
@@ -138,12 +135,12 @@ struct RegisterFinishRequest {
 /// Both fields are optional.
 #[derive(Deserialize, Default)]
 struct AuthStartRequest {
-    /// When given, the server names the allowed credentials; when omitted, the
-    /// browser offers every passkey it holds for this site.
+    /// When given, the server names the allowed credentials; when omitted, the browser offers every
+    /// passkey it holds for this site.
     #[serde(default)]
     username: Option<String>,
-    /// Base64url-encoded PRF input (e.g. "notes-encryption-v1"). When present,
-    /// the server asks the authenticator to derive a key from it.
+    /// Base64url-encoded PRF input (e.g. "notes-encryption-v1"). When present, the server asks
+    /// the authenticator to derive a key from it.
     #[serde(default)]
     prf_salt: Option<String>,
 }
@@ -203,20 +200,19 @@ fn index() -> poem::web::Html<&'static str> {
 
 /// POST /register/start - Begin passkey registration
 ///
-/// Returns the random challenge the authenticator will have to sign, plus the
-/// options the browser needs to create a credential.
+/// Returns the random challenge the authenticator will have to sign, plus the options the browser
+/// needs to create a credential.
 #[handler]
 async fn register_start(
     Json(req): Json<RegisterStartRequest>,
     passki: Data<&Arc<Passki>>,
     store: Data<&Store>,
 ) -> AppResult<RegistrationChallenge> {
-    // Random and opaque rather than the username, so it cannot be used to
-    // track the user across sites.
+    // Random and opaque rather than the username, so it cannot be used to track the user across
+    // sites.
     let user_id = Uuid::new_v4().as_bytes().to_vec();
 
-    // Passkeys the user already has, which the authenticator must refuse to
-    // register a second time.
+    // Passkeys the user already has, which the authenticator must refuse to register a second time.
     let existing = store
         .users
         .lock()
@@ -224,9 +220,9 @@ async fn register_start(
         .get(&req.username)
         .map(|u| u.passkeys.clone());
 
-    // An eval-less PRF input just asks whether PRF is supported. Requesting a
-    // derivation here instead would report a false negative on authenticators
-    // that only support PRF at authentication time (e.g. YubiKey 5 series).
+    // An eval-less PRF input just asks whether PRF is supported. Requesting a derivation here
+    // instead would report a false negative on authenticators that only support
+    // PRF at authentication time (e.g. YubiKey 5 series).
     let mut extensions = RegistrationExtensions::default();
     extensions.cred_props = Some(true);
     extensions.prf = Some(PrfInput { eval: None });
@@ -261,8 +257,8 @@ async fn register_start(
 
 /// POST /register/finish - Complete passkey registration
 ///
-/// Verifies the new credential, stores it, and reports whether the passkey
-/// supports the PRF extension.
+/// Verifies the new credential, stores it, and reports whether the passkey supports
+/// the PRF extension.
 #[handler]
 async fn register_finish(
     Json(req): Json<RegisterFinishRequest>,
@@ -340,9 +336,8 @@ async fn register_finish(
 
 /// POST /auth/start - Begin passkey authentication
 ///
-/// With a username the challenge names that user's credentials, so the browser
-/// offers only those; without one it names none and the browser offers every
-/// passkey it holds for this site.
+/// With a username the challenge names that user's credentials, so the browser offers only those;
+/// without one it names none and the browser offers every passkey it holds for this site.
 ///
 /// A `prf_salt` is passed on to the authenticator, which derives a key from it.
 #[handler]
@@ -389,8 +384,8 @@ async fn auth_start(
 
 /// POST /auth/finish - Complete passkey authentication
 ///
-/// Verifies the signature and, when a PRF salt was sent, returns the derived
-/// key hex-encoded in `prf_output`.
+/// Verifies the signature and, when a PRF salt was sent, returns the derived key hex-encoded
+/// in `prf_output`.
 #[handler]
 async fn auth_finish(
     Json(req): Json<AuthFinishRequest>,
@@ -409,8 +404,8 @@ async fn auth_finish(
 
     let credential_id = Passki::base64_decode(&req.credential_id).map_err(err)?;
 
-    // The user handle gives a direct lookup; without it, scan every user for a
-    // matching credential ID.
+    // The user handle gives a direct lookup; without it, scan every user for a matching credential
+    // ID.
     let mut users = store.users.lock().unwrap();
     let (username, passkey) = match req.user_handle.as_deref() {
         Some(handle) => {
@@ -450,8 +445,8 @@ async fn auth_finish(
         .finish_passkey_authentication(&credential, &state, passkey)
         .map_err(err)?;
 
-    // Must be stored: if the next login reports a counter that did not grow,
-    // the credential has been cloned.
+    // Must be stored: if the next login reports a counter that did not grow, the credential
+    // has been cloned.
     passkey.counter = result.counter;
 
     let prf_output = result
@@ -477,8 +472,8 @@ async fn auth_finish(
 async fn main() -> Result<(), std::io::Error> {
     tracing_subscriber::fmt().with_target(false).init();
 
-    // The domain the passkeys are bound to, the origins allowed to use them,
-    // and the name authenticators show in their prompt.
+    // The domain the passkeys are bound to, the origins allowed to use them, and the name
+    // authenticators show in their prompt.
     let passki = Arc::new(Passki::new(
         "localhost",
         &["http://localhost:3000"],

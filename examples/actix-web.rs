@@ -14,8 +14,8 @@
 
 //! # Passkeys Demo Server (Actix Web)
 //!
-//! Passkey registration and login with Passki on the Actix Web web framework, plus
-//! optional PRF key derivation.
+//! Passkey registration and login with Passki on the Actix Web web framework, plus optional
+//! PRF key derivation.
 //!
 //! ## Registration
 //! 1. Client posts a username to `/register/start`
@@ -25,19 +25,17 @@
 //! 5. Server verifies it and stores the passkey
 //!
 //! ## Authentication
-//! **With a username**: the challenge names that user's credentials, so the
-//! browser offers only those.
+//! **With a username**: the challenge names that user's credentials, so the browser offers only
+//! those.
 //!
-//! **Without one**: the challenge names none, the browser offers every passkey
-//! it holds for this site, and the server works out who is logging in from the
-//! user handle the authenticator returns.
+//! **Without one**: the challenge names none, the browser offers every passkey it holds for this
+//! site, and the server works out who is logging in from the user handle the authenticator returns.
 //!
 //! ## PRF key derivation (optional)
-//! When the client sends a `prf_salt` with its authentication request, the
-//! server passes it to the authenticator as `extensions.prf.eval.first`. The
-//! authenticator derives 32 bytes from it, returned hex-encoded in
-//! `prf_output`. The same passkey and salt always yield the same bytes, which
-//! makes them usable as an encryption key.
+//! When the client sends a `prf_salt` with its authentication request, the server passes
+//! it to the authenticator as `extensions.prf.eval.first`. The authenticator derives 32 bytes from
+//! it, returned hex-encoded in `prf_output`. The same passkey and salt always yield the same bytes,
+//! which makes them usable as an encryption key.
 //!
 //! ## Running
 //! ```sh
@@ -93,8 +91,7 @@ type AppResult<T> = Result<web::Json<T>, AppError>;
 
 /// In-memory storage for users and ceremonies in progress.
 ///
-/// A real server would use a database for the users and an expiring cache for
-/// the pending states.
+/// A real server would use a database for the users and an expiring cache for the pending states.
 #[derive(Clone, Default)]
 struct Store {
     /// Keyed by username.
@@ -128,8 +125,8 @@ struct User {
 #[derive(Deserialize)]
 struct RegisterStartRequest {
     username: String,
-    /// Ask for an attestation statement, so the AAGUID names a real
-    /// authenticator model instead of staying all zeros
+    /// Ask for an attestation statement, so the AAGUID names a real authenticator model instead
+    /// of staying all zeros
     #[serde(default)]
     attestation: bool,
 }
@@ -147,8 +144,8 @@ struct RegisterFinishRequest {
     client_extension_results: Option<ClientExtensionResults>,
     /// Whether the browser used a built-in or a separate authenticator
     authenticator_attachment: Option<AuthenticatorAttachment>,
-    /// What `getTransports()` reported, stored so later ceremonies can tell
-    /// the browser where this credential lives
+    /// What `getTransports()` reported, stored so later ceremonies can tell the browser where this
+    /// credential lives
     #[serde(default)]
     transports: Vec<AuthenticatorTransport>,
 }
@@ -156,12 +153,12 @@ struct RegisterFinishRequest {
 /// Both fields are optional.
 #[derive(Deserialize, Default)]
 struct AuthStartRequest {
-    /// When given, the server names the allowed credentials; when omitted, the
-    /// browser offers every passkey it holds for this site
+    /// When given, the server names the allowed credentials; when omitted, the browser offers every
+    /// passkey it holds for this site
     #[serde(default)]
     username: Option<String>,
-    /// Base64url-encoded PRF input. When present, the server asks the
-    /// authenticator to derive a key from it.
+    /// Base64url-encoded PRF input. When present, the server asks the authenticator to derive
+    /// a key from it.
     #[serde(default)]
     prf_salt: Option<String>,
 }
@@ -229,18 +226,17 @@ async fn index() -> HttpResponse {
 
 /// POST /register/start - Begin passkey registration
 ///
-/// Returns the random challenge the authenticator will have to sign, plus the
-/// options the browser needs to create a credential.
+/// Returns the random challenge the authenticator will have to sign, plus the options the browser
+/// needs to create a credential.
 async fn register_start(
     state: web::Data<AppState>,
     req: web::Json<RegisterStartRequest>,
 ) -> AppResult<RegistrationChallenge> {
-    // Random and opaque rather than the username, so it cannot be used to
-    // track the user across sites.
+    // Random and opaque rather than the username, so it cannot be used to track the user across
+    // sites.
     let user_id = Uuid::new_v4().as_bytes().to_vec();
 
-    // Passkeys the user already has, which the authenticator must refuse to
-    // register a second time.
+    // Passkeys the user already has, which the authenticator must refuse to register a second time.
     let existing = state
         .store
         .users
@@ -249,8 +245,8 @@ async fn register_start(
         .get(&req.username)
         .map(|u| u.passkeys.clone());
 
-    // credProps reports whether a discoverable credential was created. The
-    // eval-less PRF input only asks whether PRF is supported at all.
+    // credProps reports whether a discoverable credential was created. The eval-less PRF input only
+    // asks whether PRF is supported at all.
     let mut extensions = RegistrationExtensions::default();
     extensions.cred_props = Some(true);
     extensions.prf = Some(PrfInput { eval: None });
@@ -284,8 +280,8 @@ async fn register_start(
 
 /// POST /register/finish - Complete passkey registration
 ///
-/// Verifies the new credential, stores it, and reports whether the passkey
-/// supports the PRF extension.
+/// Verifies the new credential, stores it, and reports whether the passkey supports
+/// the PRF extension.
 async fn register_finish(
     state: web::Data<AppState>,
     req: web::Json<RegisterFinishRequest>,
@@ -364,9 +360,8 @@ async fn register_finish(
 
 /// POST /auth/start - Begin passkey authentication
 ///
-/// With a username the challenge names that user's credentials, so the browser
-/// offers only those; without one it names none and the browser offers every
-/// passkey it holds for this site.
+/// With a username the challenge names that user's credentials, so the browser offers only those;
+/// without one it names none and the browser offers every passkey it holds for this site.
 ///
 /// A `prf_salt` is passed on to the authenticator, which derives a key from it.
 async fn auth_start(
@@ -416,8 +411,8 @@ async fn auth_start(
 
 /// POST /auth/finish - Complete passkey authentication
 ///
-/// Verifies the signature and, when a PRF salt was sent, returns the derived
-/// key hex-encoded in `prf_output`.
+/// Verifies the signature and, when a PRF salt was sent, returns the derived key hex-encoded
+/// in `prf_output`.
 async fn auth_finish(
     state: web::Data<AppState>,
     req: web::Json<AuthFinishRequest>,
@@ -437,8 +432,8 @@ async fn auth_finish(
 
     let credential_id = Passki::base64_decode(&req.credential_id)?;
 
-    // The user handle gives a direct lookup; without it, scan every user for a
-    // matching credential ID.
+    // The user handle gives a direct lookup; without it, scan every user for a matching credential
+    // ID.
     let mut users = state.store.users.lock().unwrap();
     let (username, passkey) = match req.user_handle.as_deref() {
         Some(handle) => {
@@ -477,8 +472,8 @@ async fn auth_finish(
         .passki
         .finish_passkey_authentication(&credential, &auth_state, passkey)?;
 
-    // Must be stored: if the next login reports a counter that did not grow,
-    // the credential has been cloned.
+    // Must be stored: if the next login reports a counter that did not grow, the credential
+    // has been cloned.
     passkey.counter = result.counter;
 
     let prf_output = result
@@ -504,8 +499,8 @@ async fn auth_finish(
 async fn main() -> std::io::Result<()> {
     env_logger::init();
 
-    // The domain the passkeys are bound to, the origins allowed to use them,
-    // and the name authenticators show in their prompt.
+    // The domain the passkeys are bound to, the origins allowed to use them, and the name
+    // authenticators show in their prompt.
     let state = web::Data::new(AppState {
         passki: Passki::new("localhost", &["http://localhost:3000"], "Passkeys Demo"),
         store: Store::default(),

@@ -168,8 +168,7 @@ fn test_base64_decode_with_padding_fails() {
     let with_padding = "aGVsbG8=";
     let result = Passki::base64_decode(with_padding);
 
-    // Rejecting or ignoring the padding are both fine; this only checks that
-    // neither panics.
+    // Rejecting or ignoring the padding are both fine; this only checks that neither panics.
     let _ = result;
 }
 

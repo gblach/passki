@@ -227,8 +227,8 @@ fn test_large_blob_absent_from_authentication_challenge_when_not_requested() {
 
 // Blob and write flag in AuthenticationResult
 
-// A properly signed credential; largeBlob outputs are only extracted once the
-// signature has verified.
+// A properly signed credential; largeBlob outputs are only extracted once the signature
+// has verified.
 fn signed_auth_credential(
     credential_id: &[u8],
     challenge: &[u8],

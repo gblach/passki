@@ -20,9 +20,8 @@ use aws_lc_rs::digest::{self, SHA256};
 use aws_lc_rs::rand::SystemRandom;
 use aws_lc_rs::signature::{Ed25519KeyPair, KeyPair};
 
-// A properly signed credential, using a real Ed25519 key pair. PRF outputs are
-// only extracted once the signature has verified, so these tests cannot use
-// dummy signatures.
+// A properly signed credential, using a real Ed25519 key pair. PRF outputs are only extracted once
+// the signature has verified, so these tests cannot use dummy signatures.
 fn signed_auth_credential(
     credential_id: &[u8],
     challenge: &[u8],
@@ -194,8 +193,8 @@ fn test_registration_challenge_extensions_includes_second_input() {
 #[test]
 fn test_registration_challenge_probe_only_has_no_eval() {
     let passki = Passki::new("localhost", &["http://localhost:3000"], "Test");
-    // An eval-less PrfInput serializes to `{}`, which asks whether PRF is
-    // supported without requesting a derivation.
+    // An eval-less PrfInput serializes to `{}`, which asks whether PRF is supported without
+    // requesting a derivation.
     let extensions = Some(RegistrationExtensions {
         prf: Some(PrfInput { eval: None }),
         ..Default::default()

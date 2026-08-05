@@ -14,16 +14,15 @@
 
 //! Attestation certificate trust path validation.
 //!
-//! Decides whether the certificate chain of an attestation statement leads back
-//! to a root the relying party installed with
-//! [`crate::Passki::with_attestation_trust`]. Without that link, a statement
-//! proves only that it is internally consistent, and a client can mint its own
-//! certificate claiming any hardware model it likes.
+//! Decides whether the certificate chain of an attestation statement leads back to a root
+//! the relying party installed with [`crate::Passki::with_attestation_trust`]. Without that link,
+//! a statement proves only that it is internally consistent, and a client can mint
+//! its own certificate claiming any hardware model it likes.
 //!
-//! Deliberately a small subset of RFC 5280 path validation: name chaining,
-//! signature links, validity periods and the CA constraints. Name constraints,
-//! policy mapping and revocation are left out, since attestation chains are
-//! short, vendor-controlled, and have no revocation service to consult.
+//! Deliberately a small subset of RFC 5280 path validation: name chaining, signature links,
+//! validity periods and the CA constraints. Name constraints, policy mapping and revocation
+//! are left out, since attestation chains are short, vendor-controlled, and have no revocation
+//! service to consult.
 
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use x509_cert::Certificate;
@@ -45,11 +44,11 @@ const OID_RSA_SHA384: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.2.840.1
 /// id-Ed25519.
 const OID_ED25519: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.3.101.112");
 
-/// Maps an X.509 signature algorithm OID to the equivalent COSE identifier, so
-/// certificate signatures can reuse the attestation statement verifier.
+/// Maps an X.509 signature algorithm OID to the equivalent COSE identifier, so certificate
+/// signatures can reuse the attestation statement verifier.
 ///
-/// RSASSA-PSS is deliberately absent: its hash and salt length live in the
-/// algorithm parameters, which a plain identifier cannot carry.
+/// RSASSA-PSS is deliberately absent: its hash and salt length live in the algorithm parameters,
+/// which a plain identifier cannot carry.
 fn cose_alg_for_signature_oid(oid: &ObjectIdentifier) -> Result<i32> {
     match *oid {
         OID_ECDSA_SHA256 => Ok(ALG_ES256),
@@ -77,8 +76,8 @@ fn spki_bytes(cert: &Certificate) -> Result<&[u8]> {
         })
 }
 
-/// Verifies that `cert`, whose original encoding is `der`, names `issuer` and
-/// carries a signature made with the issuer's key.
+/// Verifies that `cert`, whose original encoding is `der`, names `issuer` and carries a signature
+/// made with the issuer's key.
 fn check_issued_by(der: &[u8], cert: &Certificate, issuer: &Certificate) -> Result<()> {
     if cert.tbs_certificate().issuer() != issuer.tbs_certificate().subject() {
         return Err(PasskiError::InvalidCertificateChain(
@@ -115,8 +114,8 @@ fn check_validity(cert: &Certificate, now: Duration) -> Result<()> {
 
 /// Returns an error unless the certificate is allowed to issue the one below it.
 ///
-/// `intermediates_below` is how many CA certificates sit between this one and
-/// the leaf, which is what a certificate's `pathLenConstraint` caps.
+/// `intermediates_below` is how many CA certificates sit between this one and the leaf, which
+/// is what a certificate's `pathLenConstraint` caps.
 fn check_can_issue(cert: &Certificate, intermediates_below: usize) -> Result<()> {
     let value = cert_extension(cert, &BasicConstraints::OID).ok_or_else(|| {
         PasskiError::InvalidCertificateChain(
@@ -140,8 +139,8 @@ fn check_can_issue(cert: &Certificate, intermediates_below: usize) -> Result<()>
         ));
     }
 
-    // Key usage is optional, but a CA that states one must have listed
-    // certificate signing among the uses it allows.
+    // Key usage is optional, but a CA that states one must have listed certificate signing among
+    // the uses it allows.
     if let Some(value) = cert_extension(cert, &KeyUsage::OID) {
         let key_usage = KeyUsage::from_der(value).map_err(|e| {
             PasskiError::InvalidCertificateChain(format!("Invalid key usage: {}", e))
@@ -165,9 +164,8 @@ fn now() -> Duration {
 
 /// Validates an attestation certificate chain against the installed roots.
 ///
-/// `chain` is DER-encoded and ordered leaf first, as `x5c` requires. Some
-/// authenticators append the root and some do not; either way it counts only
-/// because it matches an installed one.
+/// `chain` is DER-encoded and ordered leaf first, as `x5c` requires. Some authenticators append
+/// the root and some do not; either way it counts only because it matches an installed one.
 pub(crate) fn validate_trust_path(chain: &[Vec<u8>], anchors: &[Certificate]) -> Result<()> {
     if anchors.is_empty() {
         return Err(PasskiError::UntrustedAttestation);
@@ -178,8 +176,8 @@ pub(crate) fn validate_trust_path(chain: &[Vec<u8>], anchors: &[Certificate]) ->
         .map(|der| parse_cert(der))
         .collect::<Result<Vec<_>>>()?;
 
-    // An appended root carries no more authority than our own copy of it, so
-    // drop it and let the search below decide.
+    // An appended root carries no more authority than our own copy of it, so drop
+    // it and let the search below decide.
     let root_included = certificates.len() > 1
         && certificates
             .last()
@@ -193,8 +191,8 @@ pub(crate) fn validate_trust_path(chain: &[Vec<u8>], anchors: &[Certificate]) ->
         check_validity(certificate, deadline)?;
     }
 
-    // Walk upwards: the certificate at i + 1 issued the one at i, and has i
-    // intermediates below it, indices 1 through i, since index 0 is the leaf.
+    // Walk upwards: the certificate at i + 1 issued the one at i, and has i intermediates below
+    // it, indices 1 through i, since index 0 is the leaf.
     for (i, link) in certificates.windows(2).enumerate() {
         check_issued_by(&chain[i], &link[0], &link[1])?;
         check_can_issue(&link[1], i)?;
@@ -205,15 +203,15 @@ pub(crate) fn validate_trust_path(chain: &[Vec<u8>], anchors: &[Certificate]) ->
     })?;
     let intermediates_below = certificates.len() - 1;
 
-    // Name and signature pick out which root was meant. Whether that root was
-    // allowed to issue the chain is asked separately below, so a misconfigured
-    // root does not report as "no root matched".
+    // Name and signature pick out which root was meant. Whether that root was allowed to issue
+    // the chain is asked separately below, so a misconfigured root does not report as "no root
+    // matched".
     let anchor = anchors
         .iter()
         .find(|anchor| check_issued_by(&chain[intermediates_below], last, anchor).is_ok())
         .ok_or(PasskiError::UntrustedAttestation)?;
 
-    // A root is trusted by configuration, so its validity period and
-    // self-signature are not re-checked, only its authority to issue.
+    // A root is trusted by configuration, so its validity period and self-signature
+    // are not re-checked, only its authority to issue.
     check_can_issue(anchor, intermediates_below)
 }

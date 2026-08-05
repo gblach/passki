@@ -14,13 +14,12 @@
 
 //! Passki - A WebAuthn/Passkey implementation for Rust
 //!
-//! Passki implements the server half of the WebAuthn protocol: the browser holds
-//! a private key and signs a challenge with it, this crate issues the challenge
-//! and verifies the response.
+//! Passki implements the server half of the WebAuthn protocol: the browser holds a private
+//! key and signs a challenge with it, this crate issues the challenge and verifies the response.
 //!
-//! Registration and authentication are both two-step ceremonies. The first step
-//! returns a challenge to send to the browser plus a state value the second step
-//! needs; keep that state in a session or cache in between.
+//! Registration and authentication are both two-step ceremonies. The first step returns a challenge
+//! to send to the browser plus a state value the second step needs; keep that state in a session
+//! or cache in between.
 //!
 //! # Features
 //!
@@ -114,8 +113,8 @@ pub use registration::{
 };
 pub use types::*;
 
-/// Entry point of the crate: holds the relying party configuration and starts
-/// and finishes both ceremonies.
+/// Entry point of the crate: holds the relying party configuration and starts and finishes both
+/// ceremonies.
 ///
 /// The relying party is the site the passkeys belong to.
 pub struct Passki {
@@ -128,9 +127,9 @@ pub struct Passki {
     /// The human-readable relying party name.
     pub rp_name: String,
 
-    /// Root certificates that attestation chains are validated against. Private
-    /// so that later additions to the trust configuration do not break callers;
-    /// install them with [`Passki::with_attestation_trust`].
+    /// Root certificates that attestation chains are validated against. Private so that later
+    /// additions to the trust configuration do not break callers; install them with
+    /// [`Passki::with_attestation_trust`].
     pub(crate) attestation_anchors: Vec<Certificate>,
 
     /// How strictly attestation certificate chains are checked.
@@ -166,20 +165,19 @@ impl Passki {
         }
     }
 
-    /// Installs the root certificates that attestation certificate chains are
-    /// validated against, plus the policy for chains that do not reach one.
+    /// Installs the root certificates that attestation certificate chains are validated against,
+    /// plus the policy for chains that do not reach one.
     ///
-    /// By default no chain is validated, so the certificate an authenticator
-    /// sends proves only that it signed its own statement. A client can mint one
-    /// claiming to be any hardware model it likes. Anchors are what make
-    /// [`StoredPasskey::aaguid`] - the authenticator model identifier - worth
-    /// trusting, so ask for [`AttestationConveyancePreference::Direct`] at
-    /// registration *and* install anchors here; either one alone buys nothing.
+    /// By default no chain is validated, so the certificate an authenticator sends proves only that
+    /// it signed its own statement. A client can mint one claiming to be any hardware model
+    /// it likes. Anchors are what make [`StoredPasskey::aaguid`] - the authenticator model
+    /// identifier - worth trusting, so ask for [`AttestationConveyancePreference::Direct`]
+    /// at registration *and* install anchors here; either one alone buys nothing.
     ///
-    /// The anchors are the vendor root CA certificates of the authenticators
-    /// being accepted, in DER form. passki neither bundles them nor fetches the
-    /// FIDO Metadata Service, which would mean a network round trip and JWT
-    /// verification on a schedule the relying party should control.
+    /// The anchors are the vendor root CA certificates of the authenticators being accepted,
+    /// in DER form. passki neither bundles them nor fetches the FIDO Metadata Service, which would
+    /// mean a network round trip and JWT verification on a schedule the relying party should
+    /// control.
     ///
     /// # Arguments
     ///
@@ -222,8 +220,8 @@ impl Passki {
         challenge
     }
 
-    /// Encodes binary data as base64url without padding, the encoding WebAuthn
-    /// uses for every binary value on the wire.
+    /// Encodes binary data as base64url without padding, the encoding WebAuthn uses for every
+    /// binary value on the wire.
     #[inline]
     pub fn base64_encode(data: &[u8]) -> String {
         use base64ct::{Base64UrlUnpadded, Encoding as _};

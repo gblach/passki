@@ -14,13 +14,13 @@
 
 //! Attestation statement verification.
 //!
-//! An attestation statement is the authenticator's signed claim about what kind
-//! of hardware it is. Each vendor ecosystem has its own format; this module
-//! handles `packed`, `fido-u2f`, `android-key` and `tpm`, checking the
-//! statement's signature and the structure of the certificate it carries.
+//! An attestation statement is the authenticator's signed claim about what kind of hardware
+//! it is. Each vendor ecosystem has its own format; this module handles `packed`, `fido-u2f`,
+//! `android-key` and `tpm`, checking the statement's signature and the structure of the certificate
+//! it carries.
 //!
-//! Whether that certificate leads back to a root the relying party trusts is a
-//! separate question, answered by [`crate::trust`] afterwards.
+//! Whether that certificate leads back to a root the relying party trusts is a separate question,
+//! answered by [`crate::trust`] afterwards.
 
 use aws_lc_rs::digest::{self, SHA256, SHA384};
 use aws_lc_rs::signature::{
@@ -49,8 +49,8 @@ const OID_SUBJECT_ALT_NAME: ObjectIdentifier = ObjectIdentifier::new_unwrap("2.5
 /// tcg-kp-AIKCertificate extended key usage, required of TPM attestation certificates.
 const OID_TCG_KP_AIK: ObjectIdentifier = ObjectIdentifier::new_unwrap("2.23.133.8.3");
 
-/// Public key parameters, in whichever encoding they were found, so keys from
-/// different sources can be compared.
+/// Public key parameters, in whichever encoding they were found, so keys from different sources
+/// can be compared.
 enum PublicKey {
     Ec { x: Vec<u8>, y: Vec<u8> },
     Rsa { n: Vec<u8>, e: Vec<u8> },
@@ -61,11 +61,10 @@ enum Evidence {
     /// No certificate, so there is nothing to trace back to a root.
     Unchained(AttestationType),
 
-    /// An `x5c` certificate chain, leaf first. `anchored` is what to report if
-    /// the chain reaches a trusted root, and depends on the format: `tpm` issues
-    /// a certificate per device, so it is an attestation CA. `packed` may be
-    /// either and the chain cannot say which, so it gets the far more common
-    /// batch case.
+    /// An `x5c` certificate chain, leaf first. `anchored` is what to report if the chain reaches
+    /// a trusted root, and depends on the format: `tpm` issues a certificate per device,
+    /// so it is an attestation CA. `packed` may be either and the chain cannot say which,
+    /// so it gets the far more common batch case.
     Chained {
         chain: Vec<Vec<u8>>,
         anchored: AttestationType,
@@ -73,8 +72,8 @@ enum Evidence {
 }
 
 impl Passki {
-    /// Applies the configured trust policy to the evidence, giving the
-    /// attestation type to record on the credential.
+    /// Applies the configured trust policy to the evidence, giving the attestation type to record
+    /// on the credential.
     fn resolve_attestation_type(&self, evidence: Evidence) -> Result<AttestationType> {
         let (chain, anchored) = match evidence {
             Evidence::Unchained(attestation_type) => {
@@ -94,8 +93,8 @@ impl Passki {
         Ok(anchored)
     }
 
-    /// Parses an attestation object and verifies its statement, dispatching on
-    /// the format the authenticator used.
+    /// Parses an attestation object and verifies its statement, dispatching on the format
+    /// the authenticator used.
     pub(crate) fn verify_attestation(
         &self,
         attestation_bytes: &[u8],
@@ -123,9 +122,8 @@ impl Passki {
     }
 }
 
-/// Verifies a `packed` statement, the modern general-purpose format. With an
-/// `x5c` a separate attestation key signed; without one the credential key
-/// signed for itself.
+/// Verifies a `packed` statement, the modern general-purpose format. With an `x5c` a separate
+/// attestation key signed; without one the credential key signed for itself.
 fn verify_packed(
     att_stmt: &Value,
     auth_data: &[u8],
@@ -152,8 +150,7 @@ fn verify_packed(
             })
         }
         None => {
-            // Self attestation, so the statement's algorithm has to be the
-            // credential key's own.
+            // Self attestation, so the statement's algorithm has to be the credential key's own.
             if alg != parsed.algorithm {
                 return Err(PasskiError::InvalidAttestation(
                     "packed self-attestation algorithm does not match credential key".to_string(),
@@ -165,8 +162,8 @@ fn verify_packed(
     }
 }
 
-/// Verifies a `fido-u2f` statement, the legacy format of pre-WebAuthn security
-/// keys. Always exactly one certificate and always ES256.
+/// Verifies a `fido-u2f` statement, the legacy format of pre-WebAuthn security keys. Always exactly
+/// one certificate and always ES256.
 fn verify_fido_u2f(
     att_stmt: &Value,
     auth_data: &[u8],
@@ -199,8 +196,8 @@ fn verify_fido_u2f(
         ));
     }
 
-    // The U2F signature is over a fixed byte layout, assembled here exactly as
-    // the format prescribes: publicKeyU2F = 0x04 || x || y
+    // The U2F signature is over a fixed byte layout, assembled here exactly as the format
+    // prescribes: publicKeyU2F = 0x04 || x || y
     let mut public_key_u2f = Vec::with_capacity(65);
     public_key_u2f.push(0x04);
     public_key_u2f.extend_from_slice(&x);
@@ -222,9 +219,9 @@ fn verify_fido_u2f(
     })
 }
 
-/// Verifies an `android-key` statement, produced by Android's hardware keystore.
-/// Beyond the signature, the certificate must describe a key that was generated
-/// in secure hardware and bound to this ceremony.
+/// Verifies an `android-key` statement, produced by Android's hardware keystore. Beyond
+/// the signature, the certificate must describe a key that was generated in secure hardware
+/// and bound to this ceremony.
 fn verify_android_key(
     att_stmt: &Value,
     auth_data: &[u8],
@@ -264,9 +261,9 @@ fn verify_android_key(
     })
 }
 
-/// Verifies a `tpm` statement, produced by the TPM chips Windows Hello uses. The
-/// TPM signs its own description of the credential key, so most of the work is
-/// checking that description against what the ceremony actually saw.
+/// Verifies a `tpm` statement, produced by the TPM chips Windows Hello uses. The TPM signs
+/// its own description of the credential key, so most of the work is checking that description
+/// against what the ceremony actually saw.
 fn verify_tpm(
     att_stmt: &Value,
     auth_data: &[u8],
@@ -307,8 +304,8 @@ fn verify_tpm(
         ));
     }
 
-    // extraData is where the TPM carries this ceremony's data, so it ties the
-    // certification to this registration rather than an earlier one.
+    // extraData is where the TPM carries this ceremony's data, so it ties the certification to this
+    // registration rather than an earlier one.
     let mut att_to_be_signed = auth_data.to_vec();
     att_to_be_signed.extend_from_slice(client_data_hash);
     if extra_data != digest_for_alg(alg, &att_to_be_signed)? {
@@ -317,8 +314,8 @@ fn verify_tpm(
         ));
     }
 
-    // The name in certInfo must be the digest of the pubArea checked above,
-    // otherwise the TPM certified some other key.
+    // The name in certInfo must be the digest of the pubArea checked above, otherwise
+    // the TPM certified some other key.
     if attested_name != tpm_name(name_alg, pub_area)? {
         return Err(PasskiError::InvalidAttestation(
             "certInfo attested name mismatch".to_string(),
@@ -417,12 +414,11 @@ pub(crate) fn parse_cert(der: &[u8]) -> Result<Certificate> {
         .map_err(|e| PasskiError::InvalidCertificate(format!("Failed to parse: {}", e)))
 }
 
-/// Returns the raw `tbsCertificate` bytes, the part of a certificate its issuer
-/// signed over.
+/// Returns the raw `tbsCertificate` bytes, the part of a certificate its issuer signed over.
 ///
-/// Sliced out of the original encoding rather than re-encoded from the parsed
-/// structure, since the signature covers the exact bytes that were emitted and
-/// re-encoding only reproduces those if the input was already canonical.
+/// Sliced out of the original encoding rather than re-encoded from the parsed structure, since
+/// the signature covers the exact bytes that were emitted and re-encoding only reproduces those
+/// if the input was already canonical.
 pub(crate) fn tbs_der(der: &[u8]) -> Result<&[u8]> {
     DerReader::new(der)
         .read_sequence()
@@ -442,8 +438,8 @@ pub(crate) fn cert_extension<'a>(
         .map(|ext| ext.extn_value.as_bytes())
 }
 
-/// Verifies a signature over `signed_data` using the certificate's public key and
-/// the given COSE algorithm.
+/// Verifies a signature over `signed_data` using the certificate's public key and the given COSE
+/// algorithm.
 fn verify_cert_signature(
     cert: &Certificate,
     alg: i32,
@@ -532,8 +528,8 @@ fn check_eku_contains(cert: &Certificate, oid: &ObjectIdentifier) -> Result<()> 
     Ok(())
 }
 
-/// If the certificate states an AAGUID, verifies the authenticator data claims
-/// the same one. The extension is optional, so its absence is not an error.
+/// If the certificate states an AAGUID, verifies the authenticator data claims the same one.
+/// The extension is optional, so its absence is not an error.
 fn check_aaguid_extension(cert: &Certificate, aaguid: &[u8; 16]) -> Result<()> {
     if let Some(value) = cert_extension(cert, &OID_FIDO_AAGUID) {
         // The value is an OCTET STRING wrapping the 16 raw bytes.
@@ -643,9 +639,9 @@ fn parse_rsa_public_key(der: &[u8]) -> Result<(Vec<u8>, Vec<u8>)> {
     ))
 }
 
-/// Checks the certificate's `KeyDescription`: the key must have been generated
-/// in the secure environment, be usable only for signing, be restricted to this
-/// app, and carry this ceremony's client data hash as its challenge.
+/// Checks the certificate's `KeyDescription`: the key must have been generated in the secure
+/// environment, be usable only for signing, be restricted to this app, and carry this ceremony's
+/// client data hash as its challenge.
 fn verify_android_key_description(extension: &[u8], client_data_hash: &[u8]) -> Result<()> {
     let mut kd = DerReader::new(extension).read_sequence()?;
     kd.skip()?; // attestationVersion
@@ -705,8 +701,8 @@ fn authz_has_all_applications(list: &[u8]) -> Result<bool> {
     Ok(false)
 }
 
-/// Returns whether an AuthorizationList says the key was generated in place and
-/// may be used for signing.
+/// Returns whether an AuthorizationList says the key was generated in place and may be used
+/// for signing.
 fn authz_origin_and_purpose_ok(list: &[u8]) -> Result<bool> {
     let mut origin_ok = false;
     let mut purpose_ok = false;
@@ -788,8 +784,8 @@ fn parse_tpms_attest(cert_info: &[u8]) -> Result<(u32, u16, Vec<u8>, Vec<u8>)> {
     Ok((magic, attest_type, extra_data, name))
 }
 
-/// Computes a TPM Name, how a TPM refers to a key: the 2-byte hash algorithm id
-/// followed by the digest of the key's `pub_area` under it.
+/// Computes a TPM Name, how a TPM refers to a key: the 2-byte hash algorithm id followed
+/// by the digest of the key's `pub_area` under it.
 fn tpm_name(name_alg: u16, pub_area: &[u8]) -> Result<Vec<u8>> {
     let algorithm = match name_alg {
         0x000B => &SHA256,
@@ -871,8 +867,8 @@ impl<'a> DerReader<'a> {
 
         let mut tag_number = (first & 0x1F) as u32;
         if tag_number == 0x1F {
-            // Tags above 30 continue in following bytes, 7 bits each, with the
-            // top bit marking "more to come".
+            // Tags above 30 continue in following bytes, 7 bits each, with the top bit marking
+            // "more to come".
             tag_number = 0;
             loop {
                 let byte = *self.bytes.get(self.pos).ok_or_else(|| {
@@ -891,8 +887,7 @@ impl<'a> DerReader<'a> {
             .get(self.pos)
             .ok_or_else(|| PasskiError::InvalidAttestation("Truncated DER length".to_string()))?;
         self.pos += 1;
-        // Lengths under 128 fit in the byte itself; longer ones state how many
-        // bytes follow.
+        // Lengths under 128 fit in the byte itself; longer ones state how many bytes follow.
         let len = if first_len & 0x80 == 0 {
             first_len as usize
         } else {
@@ -997,8 +992,8 @@ impl<'a> DerReader<'a> {
         Ok(())
     }
 
-    /// Returns the next context-tagged field as `(tag number, content)`, skipping
-    /// anything else. `None` at the end of the buffer.
+    /// Returns the next context-tagged field as `(tag number, content)`, skipping anything else.
+    /// `None` at the end of the buffer.
     fn next_context_field(&mut self) -> Result<Option<(u32, &'a [u8])>> {
         while self.pos < self.bytes.len() {
             let (class, _, tag, content) = self.read_tlv()?;

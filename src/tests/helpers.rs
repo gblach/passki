@@ -96,8 +96,8 @@ pub fn create_test_client_data_json(challenge: &[u8], origin: &str) -> Vec<u8> {
     serde_json::to_vec(&client_data).unwrap()
 }
 
-/// Authenticator data for an authentication: the 37-byte header alone, with
-/// no attested credential data after it.
+/// Authenticator data for an authentication: the 37-byte header alone, with no attested credential
+/// data after it.
 pub fn create_test_authenticator_data(counter: u32, flags: u8) -> Vec<u8> {
     let mut auth_data = Vec::new();
     auth_data.extend_from_slice(&rp_id_hash("localhost")); // rpIdHash

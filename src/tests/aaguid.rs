@@ -123,8 +123,8 @@ fn test_stored_passkey_zero_aaguid_is_serialized() {
         bs: false,
     };
 
-    // A round trip cannot catch a stray `skip_serializing_if` here: an omitted
-    // field deserializes back to the same zeros it started as.
+    // A round trip cannot catch a stray `skip_serializing_if` here: an omitted field deserializes
+    // back to the same zeros it started as.
     let json = serde_json::to_string(&passkey).unwrap();
     assert!(json.contains("aaguid"));
 }

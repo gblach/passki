@@ -56,8 +56,8 @@ fn test_challenge_carries_cross_platform_attachment() {
 fn test_challenge_omits_attachment_by_default() {
     let json = start(None);
 
-    // An absent member lets the client offer both modalities; an explicit null
-    // would be a validation error in the browser.
+    // An absent member lets the client offer both modalities; an explicit null would
+    // be a validation error in the browser.
     assert!(
         json["authenticatorSelection"]
             .get("authenticatorAttachment")

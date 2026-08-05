@@ -24,8 +24,8 @@ use crate::client_data::ClientDataType;
 /// Error type for Passki operations.
 ///
 /// One variant per way a ceremony can fail, so callers can react to a specific
-/// failure - a [`PasskiError::CounterRegression`] means something quite
-/// different from a malformed request - without matching on message strings.
+/// failure - a [`PasskiError::CounterRegression`] means something quite different from a malformed
+/// request - without matching on message strings.
 #[derive(Debug, Error)]
 #[non_exhaustive]
 pub enum PasskiError {
@@ -92,13 +92,13 @@ pub enum PasskiError {
     #[error("User verification required but UV flag not set")]
     UserVerificationRequired,
 
-    /// The BS (backup state) flag was set without the BE (backup eligibility)
-    /// flag, which the WebAuthn spec forbids.
+    /// The BS (backup state) flag was set without the BE (backup eligibility) flag, which
+    /// the WebAuthn spec forbids.
     #[error("BS flag set without BE flag")]
     InvalidBackupFlags,
 
-    /// The signature counter did not increase, indicating a possible replay
-    /// attack or a cloned authenticator.
+    /// The signature counter did not increase, indicating a possible replay attack or a cloned
+    /// authenticator.
     #[error("Invalid counter (possible replay attack)")]
     CounterRegression,
 
@@ -110,8 +110,8 @@ pub enum PasskiError {
     #[error("Credential not allowed")]
     CredentialNotAllowed,
 
-    /// The credential ID reported by the client did not match the one in the
-    /// attested credential data.
+    /// The credential ID reported by the client did not match the one in the attested credential
+    /// data.
     #[error("Credential ID mismatch between client and attested credential data")]
     CredentialIdMismatch,
 
@@ -139,28 +139,27 @@ pub enum PasskiError {
     #[error("Missing {0} in attStmt")]
     MissingAttStmtField(String),
 
-    /// The attestation statement failed a format-specific structural or
-    /// signature check.
+    /// The attestation statement failed a format-specific structural or signature check.
     #[error("Invalid attestation: {0}")]
     InvalidAttestation(String),
 
-    /// The attestation certificate was malformed or did not satisfy the
-    /// WebAuthn attestation certificate requirements.
+    /// The attestation certificate was malformed or did not satisfy the WebAuthn attestation
+    /// certificate requirements.
     #[error("Invalid attestation certificate: {0}")]
     InvalidCertificate(String),
 
-    /// The certificate chain did not hold together: a broken signature link, an
-    /// expired certificate, or an issuer that is not a CA.
+    /// The certificate chain did not hold together: a broken signature link, an expired
+    /// certificate, or an issuer that is not a CA.
     #[error("Invalid attestation certificate chain: {0}")]
     InvalidCertificateChain(String),
 
-    /// The chain was well formed but did not reach any of the roots installed
-    /// with [`crate::Passki::with_attestation_trust`].
+    /// The chain was well formed but did not reach any of the roots installed with
+    /// [`crate::Passki::with_attestation_trust`].
     #[error("Attestation certificate chain does not reach a trust anchor")]
     UntrustedAttestation,
 
-    /// [`AttestationTrustPolicy::Required`] is in effect but the authenticator
-    /// sent no attestation certificate to validate.
+    /// [`AttestationTrustPolicy::Required`] is in effect but the authenticator sent no attestation
+    /// certificate to validate.
     #[error("Attestation is required but the statement carried no certificate chain")]
     MissingAttestationChain,
 }
@@ -212,11 +211,10 @@ pub(crate) const CRV_P384: i64 = 2;
 /// Ed25519 curve.
 pub(crate) const CRV_ED25519: i64 = 6;
 
-/// How much the relying party wants to learn about the authenticator hardware
-/// at registration.
+/// How much the relying party wants to learn about the authenticator hardware at registration.
 ///
-/// Attestation is the authenticator's signed claim about what model it is.
-/// Synced passkeys usually return nothing regardless of what is asked for.
+/// Attestation is the authenticator's signed claim about what model it is. Synced passkeys usually
+/// return nothing regardless of what is asked for.
 #[derive(Serialize, Debug)]
 #[serde(rename_all = "lowercase")]
 pub enum AttestationConveyancePreference {
@@ -232,62 +230,58 @@ pub enum AttestationConveyancePreference {
 
 /// What an attestation statement turned out to be worth.
 ///
-/// [`AttestationType::Basic`] and [`AttestationType::AttCa`] are only reported
-/// after a certificate chain reached a trusted root, so either of them means the
-/// authenticator model is proven. Every other variant leaves it a claim.
+/// [`AttestationType::Basic`] and [`AttestationType::AttCa`] are only reported after a certificate
+/// chain reached a trusted root, so either of them means the authenticator model is proven. Every
+/// other variant leaves it a claim.
 #[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Debug, Default)]
 #[serde(rename_all = "kebab-case")]
 pub enum AttestationType {
-    /// No statement at all, which is what
-    /// [`AttestationConveyancePreference::None`] asks for. Nothing is known
-    /// about the authenticator model.
+    /// No statement at all, which is what [`AttestationConveyancePreference::None`] asks for.
+    /// Nothing is known about the authenticator model.
     #[default]
     None,
 
-    /// The credential key signed its own statement, proving only that the
-    /// authenticator holds the matching private key.
+    /// The credential key signed its own statement, proving only that the authenticator holds
+    /// the matching private key.
     SelfAttested,
 
     /// A certificate chain arrived but was not validated, because
-    /// [`AttestationTrustPolicy::Ignore`] is in effect. A client can mint such a
-    /// certificate claiming any model and still pass every check made here.
+    /// [`AttestationTrustPolicy::Ignore`] is in effect. A client can mint such a certificate
+    /// claiming any model and still pass every check made here.
     Unverified,
 
-    /// Validated chain from a certificate shared by all authenticators of the
-    /// same model.
+    /// Validated chain from a certificate shared by all authenticators of the same model.
     Basic,
 
     /// Validated chain from a per-device certificate issued by the vendor's CA.
     AttCa,
 }
 
-/// How strictly attestation certificate chains are checked, set together with
-/// the trust anchors by [`crate::Passki::with_attestation_trust`].
+/// How strictly attestation certificate chains are checked, set together with the trust anchors
+/// by [`crate::Passki::with_attestation_trust`].
 #[derive(Clone, Copy, PartialEq, Debug, Default)]
 pub enum AttestationTrustPolicy {
-    /// Do not validate chains. Statements are still checked for internal
-    /// consistency, and one carrying certificates is reported as
-    /// [`AttestationType::Unverified`]. The default, and what releases before
-    /// 0.3.0 did unconditionally.
+    /// Do not validate chains. Statements are still checked for internal consistency,
+    /// and one carrying certificates is reported as [`AttestationType::Unverified`]. The default,
+    /// and what releases before 0.3.0 did unconditionally.
     #[default]
     Ignore,
 
-    /// Validate whenever the statement carries certificates, and reject the
-    /// registration if the chain does not reach an anchor. Statements without
-    /// certificates are still accepted.
+    /// Validate whenever the statement carries certificates, and reject the registration
+    /// if the chain does not reach an anchor. Statements without certificates are still accepted.
     VerifyWhenPresent,
 
-    /// As [`AttestationTrustPolicy::VerifyWhenPresent`], but also reject
-    /// statements carrying no chain at all. Most synced passkeys return none, so
-    /// this only suits deployments limited to security keys.
+    /// As [`AttestationTrustPolicy::VerifyWhenPresent`], but also reject statements carrying
+    /// no chain at all. Most synced passkeys return none, so this only suits deployments limited
+    /// to security keys.
     Required,
 }
 
 /// Whether the authenticator is built into the device or a separate one.
 ///
-/// As a registration option it restricts what the client offers. Reported back
-/// on a credential it says what was actually used, but that value comes from the
-/// client and is not signed, so treat it as a hint, not as authorization.
+/// As a registration option it restricts what the client offers. Reported back on a credential
+/// it says what was actually used, but that value comes from the client and is not signed, so treat
+/// it as a hint, not as authorization.
 #[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Debug)]
 #[serde(rename_all = "kebab-case")]
 pub enum AuthenticatorAttachment {
@@ -299,9 +293,9 @@ pub enum AuthenticatorAttachment {
 
 /// How an authenticator can be reached.
 ///
-/// The client reports this at registration via `getTransports()`. Echoing it
-/// back in later ceremonies lets the browser prompt for the one the credential
-/// actually lives on instead of offering every option.
+/// The client reports this at registration via `getTransports()`. Echoing it back in later
+/// ceremonies lets the browser prompt for the one the credential actually lives on instead
+/// of offering every option.
 #[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Debug)]
 #[serde(rename_all = "kebab-case")]
 pub enum AuthenticatorTransport {
@@ -313,16 +307,16 @@ pub enum AuthenticatorTransport {
     Ble,
     /// ISO/IEC 7816 smart card.
     SmartCard,
-    /// A phone acting as an authenticator for a nearby computer, over a mix of
-    /// Bluetooth and the network. Called `cable` before it was renamed.
+    /// A phone acting as an authenticator for a nearby computer, over a mix of Bluetooth
+    /// and the network. Called `cable` before it was renamed.
     Hybrid,
     /// Built into the client device and not removable.
     Internal,
 }
 
 impl AuthenticatorTransport {
-    /// Maps a transport string to its variant, accepting the legacy `cable`
-    /// spelling. Returns `None` for anything else.
+    /// Maps a transport string to its variant, accepting the legacy `cable` spelling. Returns
+    /// `None` for anything else.
     fn parse(value: &str) -> Option<Self> {
         match value {
             "usb" => Some(Self::Usb),
@@ -336,13 +330,12 @@ impl AuthenticatorTransport {
     }
 }
 
-/// Deserializes a `transports` list, dropping unknown values and normalizing the
-/// legacy `cable` value to `hybrid`. A missing or `null` list reads as empty.
+/// Deserializes a `transports` list, dropping unknown values and normalizing the legacy `cable`
+/// value to `hybrid`. A missing or `null` list reads as empty.
 ///
-/// Clients send transports from newer spec levels than the server was built
-/// against, and the spec says not to fail on those, so an unrecognized entry is
-/// dropped rather than rejecting the whole credential. Nothing is lost: the list
-/// is only a hint passed back to the client.
+/// Clients send transports from newer spec levels than the server was built against, and the spec
+/// says not to fail on those, so an unrecognized entry is dropped rather than rejecting the whole
+/// credential. Nothing is lost: the list is only a hint passed back to the client.
 pub(crate) fn deserialize_transports<'de, D>(
     deserializer: D,
 ) -> std::result::Result<Vec<AuthenticatorTransport>, D::Error>
@@ -365,9 +358,9 @@ where
 
 /// Whether the authenticator should store the credential itself.
 ///
-/// A resident (discoverable) credential can be picked from a list without the
-/// user typing a username first; otherwise the server must name the credential
-/// up front. Storage on the authenticator is limited, hence the choice.
+/// A resident (discoverable) credential can be picked from a list without the user typing
+/// a username first; otherwise the server must name the credential up front. Storage
+/// on the authenticator is limited, hence the choice.
 #[derive(Serialize, Debug)]
 #[serde(rename_all = "lowercase")]
 pub enum ResidentKeyRequirement {
@@ -379,8 +372,8 @@ pub enum ResidentKeyRequirement {
     Required,
 }
 
-/// Whether the user must prove who they are, with a PIN or biometric, rather
-/// than merely touching the authenticator.
+/// Whether the user must prove who they are, with a PIN or biometric, rather than merely touching
+/// the authenticator.
 #[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Debug)]
 #[serde(rename_all = "lowercase")]
 pub enum UserVerificationRequirement {
@@ -394,9 +387,8 @@ pub enum UserVerificationRequirement {
 
 /// A registered passkey, as it should be saved in the database.
 ///
-/// Everything needed to verify this credential's future authentications. All
-/// `#[serde(default)]` fields read as their default for passkeys serialized
-/// before that field existed.
+/// Everything needed to verify this credential's future authentications. All `#[serde(default)]`
+/// fields read as their default for passkeys serialized before that field existed.
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct StoredPasskey {
     /// The unique identifier for this credential.
@@ -405,37 +397,36 @@ pub struct StoredPasskey {
     /// The public key in COSE format.
     pub public_key: Vec<u8>,
 
-    /// Counts how often this credential has been used. Must be stored after each
-    /// authentication; a value that fails to increase means a cloned authenticator.
+    /// Counts how often this credential has been used. Must be stored after each authentication;
+    /// a value that fails to increase means a cloned authenticator.
     pub counter: u32,
 
     /// The COSE algorithm identifier (e.g., -7 for ES256, -8 for EdDSA, -257 for RS256).
     pub algorithm: i32,
 
-    /// Identifies the authenticator model. All-zero when the authenticator stayed
-    /// anonymous, which is what [`AttestationConveyancePreference::None`] asks for.
+    /// Identifies the authenticator model. All-zero when the authenticator stayed anonymous, which
+    /// is what [`AttestationConveyancePreference::None`] asks for.
     #[serde(default)]
     pub aaguid: [u8; 16],
 
-    /// Whether `aaguid` above was proven or merely claimed. Only
-    /// [`AttestationType::Basic`] and [`AttestationType::AttCa`] mean proven.
+    /// Whether `aaguid` above was proven or merely claimed. Only [`AttestationType::Basic`]
+    /// and [`AttestationType::AttCa`] mean proven.
     #[serde(default)]
     pub attestation_type: AttestationType,
 
-    /// What the client reported at registration, sent back in later ceremonies so
-    /// the browser prompts for the right one. Empty if the client reported none.
+    /// What the client reported at registration, sent back in later ceremonies so the browser
+    /// prompts for the right one. Empty if the client reported none.
     #[serde(default, deserialize_with = "deserialize_transports")]
     pub transports: Vec<AuthenticatorTransport>,
 
-    /// Whether a discoverable (resident) credential was created, per the
-    /// `credProps` extension. `None` if that extension was not requested or the
-    /// client did not answer.
+    /// Whether a discoverable (resident) credential was created, per the `credProps` extension.
+    /// `None` if that extension was not requested or the client did not answer.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rk: Option<bool>,
 
-    /// Whether this credential can store a blob, per the `largeBlob` extension.
-    /// Only reported at registration, so a caller that drops it cannot find out
-    /// later whether a read or write is worth attempting.
+    /// Whether this credential can store a blob, per the `largeBlob` extension. Only reported
+    /// at registration, so a caller that drops it cannot find out later whether a read or write
+    /// is worth attempting.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub large_blob_supported: Option<bool>,
 
@@ -487,8 +478,8 @@ pub struct PubKeyCredParam {
 #[derive(Serialize, Debug)]
 #[non_exhaustive]
 pub struct AuthenticatorSelection {
-    /// Restricts registration to platform or roaming authenticators. Omitted
-    /// from the challenge when `None`, which lets the client offer both.
+    /// Restricts registration to platform or roaming authenticators. Omitted from the challenge
+    /// when `None`, which lets the client offer both.
     #[serde(
         rename = "authenticatorAttachment",
         skip_serializing_if = "Option::is_none"
@@ -515,8 +506,8 @@ pub struct ExcludeCredential {
     #[serde(rename = "type")]
     pub type_: &'static str,
 
-    /// Transports reported at registration. Omitted when empty, leaving the
-    /// client free to probe everything it supports.
+    /// Transports reported at registration. Omitted when empty, leaving the client free to probe
+    /// everything it supports.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub transports: Vec<AuthenticatorTransport>,
 }
@@ -532,8 +523,8 @@ pub struct AllowCredential {
     #[serde(rename = "type")]
     pub type_: &'static str,
 
-    /// Transports reported at registration. Omitted when empty, leaving the
-    /// client free to probe everything it supports.
+    /// Transports reported at registration. Omitted when empty, leaving the client free to probe
+    /// everything it supports.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub transports: Vec<AuthenticatorTransport>,
 }
@@ -562,9 +553,9 @@ pub struct AuthenticationExtensions {
 
 /// `prf` extension input included in challenges.
 ///
-/// The authenticator derives a secret from the credential and the inputs below.
-/// The same inputs always yield the same secret, which makes it usable as an
-/// encryption key that never leaves the user's devices.
+/// The authenticator derives a secret from the credential and the inputs below. The same inputs
+/// always yield the same secret, which makes it usable as an encryption key that never leaves
+/// the user's devices.
 #[derive(Serialize, Debug, Default)]
 pub struct PrfInput {
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -583,9 +574,8 @@ pub struct PrfEval {
 
 /// `largeBlob` extension input included in registration challenges.
 ///
-/// Asks for a credential that can hold a small amount of data on the
-/// authenticator itself. The data is read and written in later authentication
-/// ceremonies, with [`LargeBlobAuthenticationInput`].
+/// Asks for a credential that can hold a small amount of data on the authenticator itself. The data
+/// is read and written in later authentication ceremonies, with [`LargeBlobAuthenticationInput`].
 #[derive(Serialize, Debug)]
 pub struct LargeBlobRegistrationInput {
     /// How badly the relying party wants blob storage.
@@ -598,22 +588,20 @@ pub struct LargeBlobRegistrationInput {
 pub enum LargeBlobSupport {
     /// Fail the registration when the authenticator cannot store a blob.
     Required,
-    /// Register either way, and report the answer in
-    /// [`StoredPasskey::large_blob_supported`].
+    /// Register either way, and report the answer in [`StoredPasskey::large_blob_supported`].
     Preferred,
 }
 
 /// `largeBlob` extension input included in authentication challenges.
 ///
-/// An enum because the spec allows only one of read and write per ceremony. A
-/// write replaces the whole blob; there is no append.
+/// An enum because the spec allows only one of read and write per ceremony. A write replaces
+/// the whole blob; there is no append.
 #[derive(Debug)]
 pub enum LargeBlobAuthenticationInput {
-    /// Read the blob, which arrives decoded in
-    /// [`crate::AuthenticationResult::large_blob`].
+    /// Read the blob, which arrives decoded in [`crate::AuthenticationResult::large_blob`].
     Read,
-    /// Overwrite the blob with these base64url-encoded bytes, as produced by
-    /// [`crate::Passki::base64_encode`].
+    /// Overwrite the blob with these base64url-encoded bytes, as produced
+    /// by [`crate::Passki::base64_encode`].
     Write(String),
 }
 
@@ -633,11 +621,10 @@ impl Serialize for LargeBlobAuthenticationInput {
     }
 }
 
-/// What `credential.getClientExtensionResults()` returned in the browser, one
-/// field per extension.
+/// What `credential.getClientExtensionResults()` returned in the browser, one field per extension.
 ///
-/// Shared by [`RegistrationCredential`] and [`AuthenticationCredential`];
-/// supporting another extension means adding a field here.
+/// Shared by [`RegistrationCredential`] and [`AuthenticationCredential`]; supporting another
+/// extension means adding a field here.
 #[derive(Deserialize, Debug, Default)]
 #[non_exhaustive]
 pub struct ClientExtensionResults {
@@ -679,8 +666,8 @@ pub struct PrfResults {
 
 /// `largeBlob` extension result returned by the client.
 ///
-/// Which field is set follows what was asked for: `supported` answers a
-/// registration input, `blob` a read, `written` a write.
+/// Which field is set follows what was asked for: `supported` answers a registration input, `blob`
+/// a read, `written` a write.
 #[derive(Deserialize, Debug)]
 pub struct LargeBlobResult {
     /// Set at registration: whether the new credential can store a blob.

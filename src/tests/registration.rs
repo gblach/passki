@@ -650,8 +650,7 @@ fn test_finish_passkey_registration_credential_id_mismatch() {
         )
         .unwrap();
 
-    // The attestation object carries credId = [1u8; 16]; the client claims
-    // something else.
+    // The attestation object carries credId = [1u8; 16]; the client claims something else.
     let attestation_obj = create_test_attestation_object(-7, 0x45);
     let client_data_json = create_test_client_data_json(&state.challenge, "http://localhost:3000");
 

@@ -68,8 +68,8 @@ fn test_credential_reads_every_defined_transport() {
 
 #[test]
 fn test_credential_tolerates_unknown_transports() {
-    // A client is free to report a transport from a later specification level
-    // than this crate knows about; that must not fail the whole registration.
+    // A client is free to report a transport from a later specification level than this crate knows
+    // about; that must not fail the whole registration.
     let credential = credential_with_transports(serde_json::json!(["usb", "quantum-tunnel"]));
 
     assert_eq!(credential.transports, vec![AuthenticatorTransport::Usb]);
@@ -84,8 +84,8 @@ fn test_credential_normalizes_legacy_cable_transport() {
 
 #[test]
 fn test_credential_deduplicates_cable_and_hybrid() {
-    // Normalizing `cable` can collide with an explicit `hybrid`, and the
-    // descriptor member is a set.
+    // Normalizing `cable` can collide with an explicit `hybrid`, and the descriptor member
+    // is a set.
     let credential = credential_with_transports(serde_json::json!(["cable", "hybrid"]));
 
     assert_eq!(credential.transports, vec![AuthenticatorTransport::Hybrid]);
@@ -191,8 +191,8 @@ fn test_descriptors_omit_empty_transports() {
         passki.start_passkey_authentication(&passkeys, AuthenticationOptions::default());
     let json = serde_json::to_value(&challenge).unwrap();
 
-    // An absent member means "no hint"; an empty array tells the client the
-    // credential is reachable over nothing at all.
+    // An absent member means "no hint"; an empty array tells the client the credential is reachable
+    // over nothing at all.
     assert!(json["allowCredentials"][0].get("transports").is_none());
     assert_eq!(json["allowCredentials"][0]["type"], "public-key");
 }

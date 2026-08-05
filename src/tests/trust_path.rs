@@ -38,12 +38,11 @@ const OID_PRIME256V1: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.2.840.1
 /// ecdsa-with-SHA256.
 const OID_ECDSA_SHA256: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.2.840.10045.4.3.2");
 
-/// The certificate structures of RFC 5280, mirrored here because x509-cert 0.3
-/// keeps its own fields private and offers construction only through a builder
-/// that enforces a profile. These tests need to emit certificates the builder
-/// would refuse, such as expired ones and chains that break their own
-/// `pathLenConstraint`. Only the fields the tests set are modelled; the optional
-/// unique identifiers are always absent.
+/// The certificate structures of RFC 5280, mirrored here because x509-cert 0.3 keeps its own fields
+/// private and offers construction only through a builder that enforces a profile. These tests need
+/// to emit certificates the builder would refuse, such as expired ones and chains that break their
+/// own `pathLenConstraint`. Only the fields the tests set are modelled; the optional unique
+/// identifiers are always absent.
 #[derive(Sequence)]
 struct TbsCertificate {
     #[asn1(context_specific = "0", tag_mode = "EXPLICIT")]
@@ -154,8 +153,7 @@ fn not_yet_valid() -> Validity {
     )
 }
 
-/// Assembles and signs a certificate for `subject_key`, issued by `issuer_key`
-/// under `issuer_name`.
+/// Assembles and signs a certificate for `subject_key`, issued by `issuer_key` under `issuer_name`.
 fn issue_certificate(
     issuer_key: &EcdsaKeyPair,
     issuer_name: &Name,
@@ -237,8 +235,8 @@ impl TestCert {
     }
 }
 
-/// Builds a `packed` full-attestation object whose statement is signed by the
-/// first certificate of `chain` and commits to `client_data_hash`.
+/// Builds a `packed` full-attestation object whose statement is signed by the first certificate
+/// of `chain` and commits to `client_data_hash`.
 fn packed_attestation_over(chain: &[&TestCert], client_data_hash: &[u8]) -> Vec<u8> {
     let cose_key = vec![
         (Value::Integer(1.into()), Value::Integer(2.into())), // kty: EC2
@@ -296,8 +294,8 @@ fn packed_attestation_over(chain: &[&TestCert], client_data_hash: &[u8]) -> Vec<
     bytes
 }
 
-/// Builds a `packed` full-attestation object over a fixed client data hash, and
-/// returns both so the caller can hand them to `verify_attestation`.
+/// Builds a `packed` full-attestation object over a fixed client data hash, and returns both
+/// so the caller can hand them to `verify_attestation`.
 fn packed_attestation(chain: &[&TestCert]) -> (Vec<u8>, Vec<u8>) {
     let client_data_hash = digest(&SHA256, b"trust path client data").as_ref().to_vec();
     let bytes = packed_attestation_over(chain, &client_data_hash);
@@ -360,8 +358,8 @@ fn test_chain_through_an_intermediate_is_accepted() {
 
 #[test]
 fn test_root_included_in_x5c_is_accepted() {
-    // Authenticators may append the root to x5c. It carries no more authority
-    // than the installed copy, and must not short-circuit the anchor check.
+    // Authenticators may append the root to x5c. It carries no more authority than the installed
+    // copy, and must not short-circuit the anchor check.
     let root = TestCert::root("Passki Test Root");
     let leaf = root.leaf("Passki Attestation");
     let (bytes, client_data_hash) = packed_attestation(&[&leaf, &root]);
@@ -403,8 +401,8 @@ fn test_certificate_from_a_foreign_root_is_rejected() {
 
 #[test]
 fn test_anchor_with_the_same_name_but_a_different_key_is_rejected() {
-    // The anchor's subject name matches the leaf's issuer, so only its key
-    // separates it from the real root. Copying a root's name must not be enough.
+    // The anchor's subject name matches the leaf's issuer, so only its key separates it from
+    // the real root. Copying a root's name must not be enough.
     let root = TestCert::root("Passki Test Root");
     let leaf = root.leaf("Passki Attestation");
     let (bytes, client_data_hash) = packed_attestation(&[&leaf]);
@@ -421,8 +419,8 @@ fn test_anchor_with_the_same_name_but_a_different_key_is_rejected() {
 fn test_broken_signature_link_inside_the_chain_is_rejected() {
     let root = TestCert::root("Passki Test Root");
     let signing = root.ca("Passki Test Intermediate");
-    // A second intermediate with the same subject name but a different key, so
-    // name chaining passes and only the signature link fails.
+    // A second intermediate with the same subject name but a different key, so name chaining passes
+    // and only the signature link fails.
     let decoy = root.ca("Passki Test Intermediate");
     let leaf = signing.leaf("Passki Attestation");
     let (bytes, client_data_hash) = packed_attestation(&[&leaf, &decoy]);
@@ -493,8 +491,8 @@ fn test_not_yet_valid_certificate_is_rejected() {
 
 #[test]
 fn test_expired_anchor_still_anchors() {
-    // A trust anchor is trusted by configuration, so its own validity period is
-    // not what decides the outcome.
+    // A trust anchor is trusted by configuration, so its own validity period is not what decides
+    // the outcome.
     let root = TestCert::root_with("Passki Test Root", Role::Ca(None), expired());
     let leaf = root.leaf("Passki Attestation");
     let (bytes, client_data_hash) = packed_attestation(&[&leaf]);

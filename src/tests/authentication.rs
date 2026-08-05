@@ -231,8 +231,8 @@ fn test_finish_passkey_authentication_success() {
 
     let result = passki.finish_passkey_authentication(&credential, &state, &stored_passkey);
 
-    // The dummy public key makes signature verification fail; what matters is
-    // that everything checked before it passed.
+    // The dummy public key makes signature verification fail; what matters is that everything
+    // checked before it passed.
     assert!(result.is_err());
 }
 
@@ -685,8 +685,8 @@ fn test_finish_passkey_authentication_usernameless() {
 
     let result = passki.finish_passkey_authentication(&credential, &state, &stored_passkey);
 
-    // Must not fail as "Credential not allowed": with no allow list that check
-    // is skipped, so the dummy signature is what fails instead.
+    // Must not fail as "Credential not allowed": with no allow list that check is skipped,
+    // so the dummy signature is what fails instead.
     assert!(result.is_err());
     assert!(
         !result
