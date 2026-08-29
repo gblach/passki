@@ -399,9 +399,10 @@ A substantial expansion, still the most widely implemented level today:
 - [x] `userHandle` in authentication response
 - [x] `transports` on credential descriptors
 
-### Level 3 (Candidate Recommendation, not yet a W3C Recommendation)
+### Level 3 (2026)
 
-Still under active development:
+A W3C Recommendation since 25 August 2026, though browser support for its newer parts is still
+filling in:
 
 - [x] PRF extension (`prf`)
 - [x] BE/BS flags (backup eligibility/state)
