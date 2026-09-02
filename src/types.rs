@@ -692,3 +692,64 @@ pub struct LargeBlobResult {
     /// Set after a write: whether the blob was stored.
     pub written: Option<bool>,
 }
+
+// Signal API payloads
+
+/// Payload for `PublicKeyCredential.signalUnknownCredential()`.
+///
+/// Names a credential the user's device still holds but this server does not.
+/// Built by [`crate::Passki::signal_unknown_credential`]. Your response carries it to your page,
+/// the page passes it to the browser, and the browser hides the passkey behind it.
+#[derive(Serialize, Debug)]
+pub struct UnknownCredentialSignal {
+    /// The relying party identifier.
+    #[serde(rename = "rpId")]
+    pub rp_id: String,
+
+    /// The credential the relying party does not recognize (base64url-encoded).
+    #[serde(rename = "credentialId")]
+    pub credential_id: String,
+}
+
+/// Payload for `PublicKeyCredential.signalAllAcceptedCredentials()`.
+///
+/// Built by [`crate::Passki::signal_all_accepted_credentials`]. Your response carries it to your
+/// page, the page passes it to the browser, and the browser hides every passkey missing from
+/// the list - so the list has to be complete.
+#[derive(Serialize, Debug)]
+pub struct AllAcceptedCredentialsSignal {
+    /// The relying party identifier.
+    #[serde(rename = "rpId")]
+    pub rp_id: String,
+
+    /// The user the credentials belong to (base64url-encoded).
+    #[serde(rename = "userId")]
+    pub user_id: String,
+
+    /// Every credential still valid for that user (base64url-encoded).
+    #[serde(rename = "allAcceptedCredentialIds")]
+    pub all_accepted_credential_ids: Vec<String>,
+}
+
+/// Payload for `PublicKeyCredential.signalCurrentUserDetails()`.
+///
+/// Built by [`crate::Passki::signal_current_user_details`]. Your response carries it to your page,
+/// the page passes it to the browser, and the browser relabels the account in the passkey
+/// picker.
+#[derive(Serialize, Debug)]
+pub struct CurrentUserDetailsSignal {
+    /// The relying party identifier.
+    #[serde(rename = "rpId")]
+    pub rp_id: String,
+
+    /// The user whose details changed (base64url-encoded).
+    #[serde(rename = "userId")]
+    pub user_id: String,
+
+    /// The current username.
+    pub name: String,
+
+    /// The current human-readable display name.
+    #[serde(rename = "displayName")]
+    pub display_name: String,
+}

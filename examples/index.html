@@ -645,6 +645,33 @@
                 return Object.keys(out).length ? out : null;
             }
 
+            // Hand each payload to the browser, which hides or relabels passkeys to match
+            // the server. Firefox implements none of these methods, and a signal is advisory,
+            // so every call is feature-detected and a rejection is only logged.
+            async function processSignals(signals) {
+                if (!signals) return;
+
+                try {
+                    if (signals.unknown_credential) {
+                        await PublicKeyCredential.signalUnknownCredential?.(
+                            signals.unknown_credential,
+                        );
+                    }
+                    if (signals.all_accepted_credentials) {
+                        await PublicKeyCredential.signalAllAcceptedCredentials?.(
+                            signals.all_accepted_credentials,
+                        );
+                    }
+                    if (signals.current_user_details) {
+                        await PublicKeyCredential.signalCurrentUserDetails?.(
+                            signals.current_user_details,
+                        );
+                    }
+                } catch (err) {
+                    console.warn("Signal rejected:", err);
+                }
+            }
+
             async function register() {
                 conditionalAbortController?.abort();
                 conditionalAbortController = null;
@@ -712,6 +739,7 @@
                         throw new Error("Registration finish failed");
 
                     const result = await finishRes.json();
+                    await processSignals(result.signals);
 
                     renderReadout("Registration", username, {
                         rk: result.resident_key,
@@ -755,6 +783,8 @@
                     if (context) startBody.prf_salt = textToBase64url(context);
 
                     const result = await authenticate(startBody);
+                    await processSignals(result.signals);
+                    if (!result.success) throw new Error(result.message);
 
                     showAssertion(result, context);
                     $("login-username").value = "";
@@ -883,6 +913,9 @@
                         throw new Error(`Authentication finish failed: ${text}`);
                     }
                     const result = await finishRes.json();
+                    await processSignals(result.signals);
+                    if (!result.success) throw new Error(result.message);
+
                     showAssertion(result, "");
                     $("login-username").value = "";
                     $("prf-context").value = "";

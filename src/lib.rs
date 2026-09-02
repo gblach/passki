@@ -262,6 +262,84 @@ impl Passki {
         }
     }
 
+    /// Builds the payload saying this server does not hold that credential.
+    ///
+    /// The passkey is still on the user's device; your database is the side that lost it, so
+    /// the browser keeps offering a credential that cannot work.
+    ///
+    /// Return it in the response to an authentication that failed on an unknown credential ID.
+    /// The page passes it to `PublicKeyCredential.signalUnknownCredential()`, and the browser
+    /// hides the passkey. It names no user, so it is safe to return to a caller who is not
+    /// signed in.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use passki::Passki;
+    /// let passki = Passki::new("example.com", &["https://example.com"], "Example Corp");
+    ///
+    /// let signal = passki.signal_unknown_credential(&[1, 2, 3]);
+    /// assert_eq!(signal.credential_id, "AQID");
+    /// ```
+    pub fn signal_unknown_credential(&self, credential_id: &[u8]) -> UnknownCredentialSignal {
+        UnknownCredentialSignal {
+            rp_id: self.rp_id.clone(),
+            credential_id: Self::base64_encode(credential_id),
+        }
+    }
+
+    /// Builds the payload listing every passkey this user still has.
+    ///
+    /// Return it after a successful sign-in, and whenever the user adds or removes a passkey.
+    /// The page passes it to `PublicKeyCredential.signalAllAcceptedCredentials()`, and the browser
+    /// hides every passkey missing from `passkeys` - an empty slice hides all of them. It reveals
+    /// how many passkeys the account has, so return it only to that user, signed in.
+    ///
+    /// # Arguments
+    ///
+    /// * `user_id` - The user handle given to [`Passki::start_passkey_registration`]
+    /// * `passkeys` - Every passkey still valid for that user
+    pub fn signal_all_accepted_credentials(
+        &self,
+        user_id: &[u8],
+        passkeys: &[StoredPasskey],
+    ) -> AllAcceptedCredentialsSignal {
+        AllAcceptedCredentialsSignal {
+            rp_id: self.rp_id.clone(),
+            user_id: Self::base64_encode(user_id),
+            all_accepted_credential_ids: passkeys
+                .iter()
+                .map(|passkey| Self::base64_encode(&passkey.credential_id))
+                .collect(),
+        }
+    }
+
+    /// Builds the payload carrying the name to show for this account.
+    ///
+    /// Return it when the username or display name changes, and on every sign-in. The page passes
+    /// it to `PublicKeyCredential.signalCurrentUserDetails()`, and the browser relabels the account
+    /// in the passkey picker - though a password manager may keep a name the user edited
+    /// themselves.
+    ///
+    /// # Arguments
+    ///
+    /// * `user_id` - The user handle given to [`Passki::start_passkey_registration`]
+    /// * `username` - The current username or account identifier
+    /// * `display_name` - The current human-readable display name
+    pub fn signal_current_user_details(
+        &self,
+        user_id: &[u8],
+        username: &str,
+        display_name: &str,
+    ) -> CurrentUserDetailsSignal {
+        CurrentUserDetailsSignal {
+            rp_id: self.rp_id.clone(),
+            user_id: Self::base64_encode(user_id),
+            name: username.to_string(),
+            display_name: display_name.to_string(),
+        }
+    }
+
     /// Generates a cryptographically secure random challenge.
     pub(crate) fn generate_challenge() -> Vec<u8> {
         let rng = SystemRandom::new();

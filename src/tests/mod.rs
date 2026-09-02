@@ -28,6 +28,7 @@ mod prf;
 mod registration;
 mod related_origins;
 mod serde;
+mod signal;
 mod signature;
 mod transports;
 mod trust_path;

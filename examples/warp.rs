@@ -37,6 +37,11 @@
 //! it, returned hex-encoded in `prf_output`. The same passkey and salt always yield the same bytes,
 //! which makes them usable as an encryption key.
 //!
+//! ## Signal API
+//! Responses carry a `signals` object for the page to hand to the browser's
+//! `PublicKeyCredential.signal*` methods. Registration and sign-in send the account's passkey list
+//! and name; a credential this server does not hold sends the unknown-credential signal instead.
+//!
 //! ## Running
 //! ```sh
 //! cargo run --example warp
@@ -44,10 +49,11 @@
 //! Then open http://localhost:3000 in your browser.
 
 use passki::{
-    AttestationConveyancePreference, AuthenticationCredential, AuthenticationExtensions,
-    AuthenticationOptions, AuthenticationState, AuthenticatorAttachment, AuthenticatorTransport,
-    ClientData, ClientExtensionResults, Passki, PrfEval, PrfInput, RegistrationCredential,
-    RegistrationExtensions, RegistrationOptions, RegistrationState, StoredPasskey,
+    AllAcceptedCredentialsSignal, AttestationConveyancePreference, AuthenticationCredential,
+    AuthenticationExtensions, AuthenticationOptions, AuthenticationState, AuthenticatorAttachment,
+    AuthenticatorTransport, ClientData, ClientExtensionResults, CurrentUserDetailsSignal, Passki,
+    PrfEval, PrfInput, RegistrationCredential, RegistrationExtensions, RegistrationOptions,
+    RegistrationState, StoredPasskey, UnknownCredentialSignal,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -169,7 +175,7 @@ struct AuthFinishRequest {
     authenticator_attachment: Option<AuthenticatorAttachment>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Default)]
 struct ApiResponse {
     success: bool,
     message: String,
@@ -194,6 +200,27 @@ struct ApiResponse {
     /// Authentication only: hex-encoded 32-byte derived key, when prf_salt was provided
     #[serde(skip_serializing_if = "Option::is_none")]
     prf_output: Option<String>,
+
+    /// What the page should pass to the browser's `PublicKeyCredential.signal*` methods
+    #[serde(skip_serializing_if = "Option::is_none")]
+    signals: Option<Signals>,
+}
+
+/// Payloads the page hands to the browser's `PublicKeyCredential.signal*` methods, so the passkeys
+/// the browser offers match what this server holds.
+#[derive(Serialize, Default)]
+struct Signals {
+    /// A credential this server does not hold; the browser hides that passkey
+    #[serde(skip_serializing_if = "Option::is_none")]
+    unknown_credential: Option<UnknownCredentialSignal>,
+
+    /// Every passkey the user still has; the browser hides whatever the list omits
+    #[serde(skip_serializing_if = "Option::is_none")]
+    all_accepted_credentials: Option<AllAcceptedCredentialsSignal>,
+
+    /// The name the passkey picker should show for this account
+    #[serde(skip_serializing_if = "Option::is_none")]
+    current_user_details: Option<CurrentUserDetailsSignal>,
 }
 
 // Application state
@@ -329,7 +356,7 @@ async fn register_finish(
 
     // Store the passkey so it can be used to log in.
     let mut users = state.store.users.lock().unwrap();
-    users
+    let user = users
         .entry(reg_state.user.name.clone())
         .and_modify(|user| {
             user.passkeys.push(passkey.clone());
@@ -343,6 +370,21 @@ async fn register_finish(
             prf_supported,
         });
 
+    // The user's passkey list just changed, so tell the client what to keep and what to show.
+    let signals = Signals {
+        all_accepted_credentials: Some(
+            state
+                .passki
+                .signal_all_accepted_credentials(user.id.as_bytes(), &user.passkeys),
+        ),
+        current_user_details: Some(state.passki.signal_current_user_details(
+            user.id.as_bytes(),
+            &user.username,
+            &user.display_name,
+        )),
+        ..Default::default()
+    };
+
     Ok(reply::json(&ApiResponse {
         success: true,
         message: "Registration successful".into(),
@@ -353,6 +395,7 @@ async fn register_finish(
         aaguid,
         prf_supported: Some(prf_supported),
         prf_output: None,
+        signals: Some(signals),
     }))
 }
 
@@ -430,7 +473,7 @@ async fn auth_finish(
     // The user handle gives a direct lookup; without it, scan every user for a matching credential
     // ID.
     let mut users = state.store.users.lock().unwrap();
-    let (username, passkey) = match req.user_handle.as_deref() {
+    let found = match req.user_handle.as_deref() {
         Some(handle) => {
             let handle_bytes = Passki::base64_decode(handle)
                 .map_err(|e| warp::reject::custom(AppError(e.to_string())))?;
@@ -452,8 +495,21 @@ async fn auth_finish(
                 .find(|pk| pk.credential_id == credential_id)
                 .map(|pk| (name.clone(), pk))
         }),
-    }
-    .ok_or_else(|| warp::reject::custom(AppError("Unknown credential".into())))?;
+    };
+
+    // The browser offered a passkey this server does not hold. The signal tells it to hide that
+    // passkey rather than offer it again; it names no user, so a signed-out caller may see it.
+    let Some((username, passkey)) = found else {
+        return Ok(reply::json(&ApiResponse {
+            success: false,
+            message: "Unknown credential".into(),
+            signals: Some(Signals {
+                unknown_credential: Some(state.passki.signal_unknown_credential(&credential_id)),
+                ..Default::default()
+            }),
+            ..Default::default()
+        }));
+    };
 
     let credential = AuthenticationCredential {
         credential_id: req.credential_id,
@@ -475,6 +531,22 @@ async fn auth_finish(
     // has been cloned.
     passkey.counter = result.counter;
 
+    // The passkey borrow is done, so the whole user is reachable again.
+    let user = &users[&username];
+    let signals = Signals {
+        all_accepted_credentials: Some(
+            state
+                .passki
+                .signal_all_accepted_credentials(user.id.as_bytes(), &user.passkeys),
+        ),
+        current_user_details: Some(state.passki.signal_current_user_details(
+            user.id.as_bytes(),
+            &user.username,
+            &user.display_name,
+        )),
+        ..Default::default()
+    };
+
     let prf_output = result
         .prf_first
         .map(|bytes| bytes.iter().map(|b| format!("{b:02x}")).collect());
@@ -489,6 +561,7 @@ async fn auth_finish(
         backed_up: None,
         aaguid: None,
         prf_output,
+        signals: Some(signals),
     }))
 }
 
