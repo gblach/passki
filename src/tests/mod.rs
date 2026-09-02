@@ -22,6 +22,7 @@ mod backup_flags;
 mod base64;
 mod client_data;
 mod cred_props;
+mod extensions;
 mod large_blob;
 mod prf;
 mod registration;

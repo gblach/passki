@@ -165,6 +165,11 @@ pub(crate) struct ParsedAttestation {
     /// Identifies the authenticator model.
     pub aaguid: [u8; 16],
 
+    /// The authenticator extension outputs, empty when the ED flag is clear. Nothing reads them
+    /// yet; `credProtect` and `minPinLength` report their results here.
+    #[allow(dead_code)]
+    pub extensions: Vec<(ciborium::Value, ciborium::Value)>,
+
     /// Left at [`AttestationType::None`] here, since parsing authenticator data sees no attestation
     /// statement; `verify_attestation` fills it in.
     pub attestation_type: AttestationType,
@@ -369,8 +374,38 @@ impl Passki {
         self.parse_auth_data(&auth_data)
     }
 
+    /// Parses the authenticator extension outputs, the CBOR map that closes out authenticator data.
+    ///
+    /// These are the results of extensions the authenticator itself handled, as opposed
+    /// to the client extension results, which arrive beside the credential rather than inside
+    /// the signed bytes.
+    ///
+    /// The block is present exactly when the ED flag is set, so trailing bytes without the flag,
+    /// and a missing, non-map or over-long block with it, all mean the authenticator data
+    /// is malformed.
+    fn parse_extensions(rest: &[u8], flags: u8) -> Result<Vec<(ciborium::Value, ciborium::Value)>> {
+        if (flags & FLAG_ED) == 0 {
+            if !rest.is_empty() {
+                return Err(PasskiError::InvalidAuthenticatorData);
+            }
+            return Ok(Vec::new());
+        }
+
+        let mut reader = std::io::Cursor::new(rest);
+        let value: ciborium::Value = ciborium::from_reader(&mut reader)?;
+
+        if reader.position() as usize != rest.len() {
+            return Err(PasskiError::InvalidAuthenticatorData);
+        }
+
+        match value {
+            ciborium::Value::Map(map) => Ok(map),
+            _ => Err(PasskiError::InvalidAuthenticatorData),
+        }
+    }
+
     /// Parses authenticator data, whose layout is a fixed 37-byte header (rpIdHash, flags, counter)
-    /// followed by the attested credential data.
+    /// followed by the attested credential data and then the authenticator extension outputs.
     pub(crate) fn parse_auth_data(&self, auth_data_bytes: &[u8]) -> Result<ParsedAttestation> {
         if auth_data_bytes.len() < 37 {
             return Err(PasskiError::InvalidAuthenticatorData);
@@ -417,7 +452,9 @@ impl Passki {
         let credential_id = auth_data_bytes[55..cose_key_offset].to_vec();
 
         let cose_key_bytes = &auth_data_bytes[cose_key_offset..];
-        let cose_key_value: ciborium::Value = ciborium::from_reader(cose_key_bytes)?;
+        let mut reader = std::io::Cursor::new(cose_key_bytes);
+        let cose_key_value: ciborium::Value = ciborium::from_reader(&mut reader)?;
+        let cose_key_len = reader.position() as usize;
 
         let algorithm = cose_key_value
             .as_map()
@@ -428,10 +465,12 @@ impl Passki {
                 PasskiError::InvalidCoseKey("Missing or invalid algorithm".to_string())
             })?;
 
-        // Re-serialize the key: the remaining bytes may carry extension data after it, which must
-        // not be stored as part of the key.
+        // Re-serialize the key rather than slicing it out, so that only the key itself is stored
+        // and not whatever the authenticator appended after it.
         let mut public_key = Vec::new();
         ciborium::into_writer(&cose_key_value, &mut public_key)?;
+
+        let extensions = Self::parse_extensions(&cose_key_bytes[cose_key_len..], flags)?;
 
         Ok(ParsedAttestation {
             credential_id,
@@ -440,6 +479,7 @@ impl Passki {
             flags,
             counter,
             aaguid,
+            extensions,
             attestation_type: AttestationType::None,
         })
     }

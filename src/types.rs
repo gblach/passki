@@ -179,6 +179,8 @@ pub(crate) const FLAG_BE: u8 = 0x08;
 pub(crate) const FLAG_BS: u8 = 0x10;
 /// AT: attested credential data follows the fixed-size header.
 pub(crate) const FLAG_AT: u8 = 0x40;
+/// ED: authenticator extension outputs close out the authenticator data.
+pub(crate) const FLAG_ED: u8 = 0x80;
 
 // COSE algorithm identifiers
 

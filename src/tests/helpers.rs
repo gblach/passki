@@ -42,6 +42,17 @@ pub fn create_test_attestation_object_with_aaguid(
     counter: u32,
     aaguid: [u8; 16],
 ) -> Vec<u8> {
+    create_test_attestation_object_with_extensions(algorithm, flags, counter, aaguid, &[])
+}
+
+/// As above, with raw bytes appended where the authenticator extension block belongs.
+pub fn create_test_attestation_object_with_extensions(
+    algorithm: i32,
+    flags: u8,
+    counter: u32,
+    aaguid: [u8; 16],
+    extensions: &[u8],
+) -> Vec<u8> {
     use ciborium::Value;
 
     let mut auth_data = Vec::new();
@@ -70,6 +81,7 @@ pub fn create_test_attestation_object_with_aaguid(
     let mut cose_key_bytes = Vec::new();
     ciborium::into_writer(&Value::Map(cose_key), &mut cose_key_bytes).unwrap();
     auth_data.extend_from_slice(&cose_key_bytes);
+    auth_data.extend_from_slice(extensions);
 
     let att_obj = vec![
         (
