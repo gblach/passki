@@ -434,6 +434,8 @@ RSASSA-PSS is not.
 - 🔄 **Store the counter** returned by each authentication, or cloned authenticators go undetected
 - 🔐 **Require user verification** for sensitive operations
 - ⏱️ **Keep ceremony timeouts short**; the state stored between the two steps expires with them
+- 🖼️ **Cross-origin ceremonies are refused**; a `crossOrigin` client data flag fails verification,
+  so a passkey cannot be created or used from an iframe on another site
 
 ## Requirements
 
@@ -517,8 +519,8 @@ filling in:
 - [ ] `attestationFormats`
 - [ ] `evalByCredential` in the `prf` extension
 - [ ] `authenticatorDisplayName` in the `credProps` extension
-- [ ] `remoteClientDataJSON` extension
 - [ ] `compound` attestation statement format
+- [ ] Cross-origin ceremonies in iframes, verifying `topOrigin`
 
 ### Defined outside WebAuthn
 
