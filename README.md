@@ -15,6 +15,8 @@ A simple and secure WebAuthn/Passkey implementation for Rust.
 - 📦 **Framework Agnostic** - No web framework lock-in, works with any HTTP server
 - 🔑 **Extensions** - Support for `credProps` (discoverable credential reporting), PRF (key
   derivation / E2E encryption) and `largeBlob` (blob storage on the authenticator)
+- 🌐 **Related Origins** - One passkey across several domains, with a helper for
+  the `.well-known/webauthn` file
 - 📜 **Attestation** - Statement verification for `packed`, `tpm`, `android-key` and `fido-u2f`,
   with opt-in trust path validation against your own roots
 - 🦀 **Pure Rust** - Memory-safe implementation with no unsafe code
@@ -227,6 +229,50 @@ extensions.large_blob = Some(LargeBlobAuthenticationInput::Read);
 `LargeBlobSupport::Required` fails the registration when the authenticator cannot store a blob;
 `Preferred` creates the credential either way and reports what it got.
 
+## Related Origins
+
+A passkey belongs to one `rp_id`, and browsers normally require the calling page's domain to match
+it. Related origin requests lift that restriction for a fixed list of domains, so one credential
+covers `example.com`, `example.co.uk` and `example.de` rather than making the user register once
+per domain.
+
+The browser does the checking. When a WebAuthn call arrives from an origin whose registrable domain
+does not match the `rp_id`, it fetches `https://<rp_id>/.well-known/webauthn` and continues only
+if the calling origin is listed there.
+
+Browsers honour at most five distinct *labels* from that file, a label being the name before
+the effective top level domain. So `example.com`, `example.co.uk` and `example.de` cost one label
+between them and a country-domain rollout has room to spare, while five unrelated brand names
+use up the budget.
+
+The server does two things: list every origin when constructing `Passki`, and serve the file.
+
+```rust
+use passki::Passki;
+
+let passki = Passki::new(
+    "example.com",                                      // one rp_id for every domain
+    &["https://example.com", "https://example.co.uk"],  // every origin allowed to call
+    "Example Corp",
+);
+
+// Serve as application/json from https://example.com/.well-known/webauthn
+let well_known = serde_json::to_string(&passki.related_origins())?;
+// {"origins":["https://example.co.uk"]}
+```
+
+`https://example.com` is missing from that payload on purpose: the specification says to leave out
+origins the `rp_id` already reaches, which is every origin on the `rp_id` host or a subdomain
+of it. A relying party on a single domain therefore gets an empty list and needs no file at all.
+
+Verification needs nothing special. Every ceremony carries the same `rp_id`, whichever domain
+it came from, and Passki accepts any origin on the list - so a credential registered
+on `example.co.uk` authenticates on `example.com`. Send the same `rp_id` in the challenge from
+every domain; do not substitute the calling domain.
+
+Build a `RelatedOrigins` directly if the published list should be narrower than the origins
+the server accepts.
+
 ## Attestation
 
 Attestation is the authenticator proving its make and model - "genuine YubiKey 5 NFC" rather than
@@ -406,7 +452,7 @@ filling in:
 
 - [x] PRF extension (`prf`)
 - [x] BE/BS flags (backup eligibility/state)
-- [ ] Related origin requests
+- [x] Related origin requests
 - [ ] `RegistrationResponseJSON` and `AuthenticationResponseJSON` request shapes
 - [ ] Signal API
 - [ ] `hints` (`security-key` / `client-device` / `hybrid`)

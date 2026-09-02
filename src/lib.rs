@@ -211,6 +211,57 @@ impl Passki {
         Ok(self)
     }
 
+    /// Whether an origin is already usable under `rp_id` alone, because its host is the `rp_id`
+    /// or a subdomain of it. Such an origin needs no entry in the well-known file.
+    fn covered_by_rp_id(&self, origin: &str) -> bool {
+        let host = origin.split_once("://").map_or(origin, |(_, rest)| rest);
+        let host = host.split(['/', ':']).next().unwrap_or(host);
+
+        host == self.rp_id || host.ends_with(&format!(".{}", self.rp_id))
+    }
+
+    /// Builds the `/.well-known/webauthn` payload that authorizes this relying party's related
+    /// origins, serialized as `{"origins": ["https://example.co.uk", ...]}`.
+    ///
+    /// Serve it with content type `application/json` from `https://<rp_id>/.well-known/webauthn`
+    /// when passkeys for one `rp_id` are used from more than one domain, such as a brand with
+    /// country-specific domains. Without the file a browser refuses a ceremony whose calling origin
+    /// does not match the `rp_id`; with it, the origins listed here share one credential.
+    ///
+    /// Every origin passed to [`Passki::new`] is listed except those already reachable under
+    /// the `rp_id` itself, which the specification says to leave out. That can leave the list
+    /// empty, in which case there is nothing to serve.
+    ///
+    /// Browsers honour at most five distinct *labels* - the name before the effective top level
+    /// domain - so `example.com`, `example.co.uk` and `example.de` together cost one of the five,
+    /// while five unrelated brand names exhaust them. Build a [`RelatedOrigins`] directly
+    /// to publish a list narrower than the origins this crate accepts.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use passki::Passki;
+    /// let passki = Passki::new(
+    ///     "example.com",
+    ///     &["https://example.com", "https://example.co.uk"],
+    ///     "Example Corp",
+    /// );
+    ///
+    /// // https://example.com is left out: the rp_id already covers it.
+    /// let payload = passki.related_origins();
+    /// assert_eq!(payload.origins, ["https://example.co.uk"]);
+    /// ```
+    pub fn related_origins(&self) -> RelatedOrigins {
+        RelatedOrigins {
+            origins: self
+                .rp_origins
+                .iter()
+                .filter(|origin| !self.covered_by_rp_id(origin))
+                .cloned()
+                .collect(),
+        }
+    }
+
     /// Generates a cryptographically secure random challenge.
     pub(crate) fn generate_challenge() -> Vec<u8> {
         let rng = SystemRandom::new();

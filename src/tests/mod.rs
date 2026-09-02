@@ -26,6 +26,7 @@ mod extensions;
 mod large_blob;
 mod prf;
 mod registration;
+mod related_origins;
 mod serde;
 mod signature;
 mod transports;

@@ -451,6 +451,19 @@ pub struct RelyingParty {
     pub id: String,
 }
 
+/// The `/.well-known/webauthn` payload that lets one `rp_id` be used from several domains.
+///
+/// A browser that sees a WebAuthn call from an origin whose registrable domain does not match
+/// the `rp_id` fetches this file from `https://<rp_id>/.well-known/webauthn` and continues only
+/// if the calling origin is listed. Origins the `rp_id` already covers belong nowhere in it.
+/// Build it with [`crate::Passki::related_origins`], or construct one directly to serve a list
+/// narrower than the origins the server accepts.
+#[derive(Serialize, Debug)]
+pub struct RelatedOrigins {
+    /// The origins allowed to use this relying party's `rp_id`.
+    pub origins: Vec<String>,
+}
+
 /// Information about the user account.
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct UserInfo {

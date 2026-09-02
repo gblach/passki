@@ -53,10 +53,29 @@ pub fn create_test_attestation_object_with_extensions(
     aaguid: [u8; 16],
     extensions: &[u8],
 ) -> Vec<u8> {
+    create_test_attestation_object_for_rp(
+        "localhost",
+        algorithm,
+        flags,
+        counter,
+        aaguid,
+        extensions,
+    )
+}
+
+/// As above, for a relying party other than `localhost`.
+pub fn create_test_attestation_object_for_rp(
+    rp_id: &str,
+    algorithm: i32,
+    flags: u8,
+    counter: u32,
+    aaguid: [u8; 16],
+    extensions: &[u8],
+) -> Vec<u8> {
     use ciborium::Value;
 
     let mut auth_data = Vec::new();
-    auth_data.extend_from_slice(&rp_id_hash("localhost")); // rpIdHash
+    auth_data.extend_from_slice(&rp_id_hash(rp_id)); // rpIdHash
     auth_data.push(flags);
     auth_data.extend_from_slice(&counter.to_be_bytes()); // counter
     auth_data.extend_from_slice(&aaguid); // aaguid
@@ -111,8 +130,13 @@ pub fn create_test_client_data_json(challenge: &[u8], origin: &str) -> Vec<u8> {
 /// Authenticator data for an authentication: the 37-byte header alone, with no attested credential
 /// data after it.
 pub fn create_test_authenticator_data(counter: u32, flags: u8) -> Vec<u8> {
+    create_test_authenticator_data_for_rp("localhost", counter, flags)
+}
+
+/// As above, for a relying party other than `localhost`.
+pub fn create_test_authenticator_data_for_rp(rp_id: &str, counter: u32, flags: u8) -> Vec<u8> {
     let mut auth_data = Vec::new();
-    auth_data.extend_from_slice(&rp_id_hash("localhost")); // rpIdHash
+    auth_data.extend_from_slice(&rp_id_hash(rp_id)); // rpIdHash
     auth_data.push(flags);
     auth_data.extend_from_slice(&counter.to_be_bytes()); // counter
     auth_data
