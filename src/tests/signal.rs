@@ -31,6 +31,7 @@ fn passkey(credential_id: Vec<u8>) -> StoredPasskey {
         transports: Vec::new(),
         rk: None,
         large_blob_supported: None,
+        cred_protect: None,
         be: false,
         bs: false,
     }

@@ -148,6 +148,7 @@ fn test_authentication_accepts_an_origin_other_than_the_one_registered_on() {
         transports: Vec::new(),
         rk: None,
         large_blob_supported: None,
+        cred_protect: None,
         be: false,
         bs: false,
     };

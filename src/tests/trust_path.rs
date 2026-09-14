@@ -657,6 +657,7 @@ fn test_attestation_type_round_trips_through_json() {
         transports: Vec::new(),
         rk: None,
         large_blob_supported: None,
+        cred_protect: None,
         be: false,
         bs: false,
     };

@@ -66,6 +66,7 @@ fn authenticate_with_user_handle(user_handle: Option<String>) -> AuthenticationR
         transports: Vec::new(),
         rk: None,
         large_blob_supported: None,
+        cred_protect: None,
         be: false,
         bs: false,
     };
@@ -119,6 +120,7 @@ fn test_user_handle_invalid_base64_returns_error() {
         transports: Vec::new(),
         rk: None,
         large_blob_supported: None,
+        cred_protect: None,
         be: false,
         bs: false,
     };

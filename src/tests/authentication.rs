@@ -29,6 +29,7 @@ fn test_start_passkey_authentication_returns_challenge() {
         transports: Vec::new(),
         rk: None,
         large_blob_supported: None,
+        cred_protect: None,
         be: false,
         bs: false,
     }];
@@ -62,6 +63,7 @@ fn test_start_passkey_authentication_multiple_credentials() {
             transports: Vec::new(),
             rk: None,
             large_blob_supported: None,
+            cred_protect: None,
             be: false,
             bs: false,
         },
@@ -75,6 +77,7 @@ fn test_start_passkey_authentication_multiple_credentials() {
             transports: Vec::new(),
             rk: None,
             large_blob_supported: None,
+            cred_protect: None,
             be: false,
             bs: false,
         },
@@ -88,6 +91,7 @@ fn test_start_passkey_authentication_multiple_credentials() {
             transports: Vec::new(),
             rk: None,
             large_blob_supported: None,
+            cred_protect: None,
             be: false,
             bs: false,
         },
@@ -147,6 +151,7 @@ fn test_start_passkey_authentication_generates_unique_challenges() {
         transports: Vec::new(),
         rk: None,
         large_blob_supported: None,
+        cred_protect: None,
         be: false,
         bs: false,
     }];
@@ -176,6 +181,7 @@ fn test_start_passkey_authentication_with_different_settings() {
         transports: Vec::new(),
         rk: None,
         large_blob_supported: None,
+        cred_protect: None,
         be: false,
         bs: false,
     }];
@@ -207,6 +213,7 @@ fn test_finish_passkey_authentication_success() {
         transports: Vec::new(),
         rk: None,
         large_blob_supported: None,
+        cred_protect: None,
         be: false,
         bs: false,
     };
@@ -250,6 +257,7 @@ fn test_finish_passkey_authentication_wrong_credential_id() {
         transports: Vec::new(),
         rk: None,
         large_blob_supported: None,
+        cred_protect: None,
         be: false,
         bs: false,
     };
@@ -296,6 +304,7 @@ fn test_finish_passkey_authentication_wrong_challenge() {
         transports: Vec::new(),
         rk: None,
         large_blob_supported: None,
+        cred_protect: None,
         be: false,
         bs: false,
     };
@@ -343,6 +352,7 @@ fn test_finish_passkey_authentication_wrong_origin() {
         transports: Vec::new(),
         rk: None,
         large_blob_supported: None,
+        cred_protect: None,
         be: false,
         bs: false,
     };
@@ -383,6 +393,7 @@ fn test_finish_passkey_authentication_invalid_counter() {
         transports: Vec::new(),
         rk: None,
         large_blob_supported: None,
+        cred_protect: None,
         be: false,
         bs: false,
     };
@@ -424,6 +435,7 @@ fn test_finish_passkey_authentication_too_short_authenticator_data() {
         transports: Vec::new(),
         rk: None,
         large_blob_supported: None,
+        cred_protect: None,
         be: false,
         bs: false,
     };
@@ -470,6 +482,7 @@ fn test_finish_passkey_authentication_uv_required_flag_set() {
         transports: Vec::new(),
         rk: None,
         large_blob_supported: None,
+        cred_protect: None,
         be: false,
         bs: false,
     };
@@ -522,6 +535,7 @@ fn test_finish_passkey_authentication_uv_required_flag_not_set() {
         transports: Vec::new(),
         rk: None,
         large_blob_supported: None,
+        cred_protect: None,
         be: false,
         bs: false,
     };
@@ -568,6 +582,7 @@ fn test_finish_passkey_authentication_uv_preferred_flag_not_set() {
         transports: Vec::new(),
         rk: None,
         large_blob_supported: None,
+        cred_protect: None,
         be: false,
         bs: false,
     };
@@ -615,6 +630,7 @@ fn test_finish_passkey_authentication_up_flag_not_set() {
         transports: Vec::new(),
         rk: None,
         large_blob_supported: None,
+        cred_protect: None,
         be: false,
         bs: false,
     };
@@ -658,6 +674,7 @@ fn test_finish_passkey_authentication_usernameless() {
         transports: Vec::new(),
         rk: None,
         large_blob_supported: None,
+        cred_protect: None,
         be: false,
         bs: false,
     };

@@ -24,6 +24,7 @@ fn test_registration_state_roundtrip() {
             display_name: "Alice Smith".to_string(),
         },
         user_verification: UserVerificationRequirement::Preferred,
+        required_cred_protect: None,
     };
 
     let json = serde_json::to_string(&state).unwrap();
@@ -45,6 +46,7 @@ fn test_registration_state_json_shape() {
             display_name: "Bob".to_string(),
         },
         user_verification: UserVerificationRequirement::Required,
+        required_cred_protect: None,
     };
 
     let value: serde_json::Value = serde_json::to_value(&state).unwrap();

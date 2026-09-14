@@ -37,6 +37,7 @@ fn passkey_with_transports(transports: Vec<AuthenticatorTransport>) -> StoredPas
         transports,
         rk: None,
         large_blob_supported: None,
+        cred_protect: None,
         be: false,
         bs: false,
     }

@@ -92,6 +92,14 @@ pub enum PasskiError {
     #[error("User verification required but UV flag not set")]
     UserVerificationRequired,
 
+    /// `enforceCredentialProtectionPolicy` was requested, but the authenticator reported a weaker
+    /// `credProtect` policy than asked for, or none at all.
+    #[error("Credential protection policy not applied: required {required:?}, got {applied:?}")]
+    CredentialProtectionNotApplied {
+        required: CredentialProtectionPolicy,
+        applied: Option<CredentialProtectionPolicy>,
+    },
+
     /// The BS (backup state) flag was set without the BE (backup eligibility) flag, which
     /// the WebAuthn spec forbids.
     #[error("BS flag set without BE flag")]
@@ -358,6 +366,23 @@ where
     Ok(transports)
 }
 
+/// When a credential may be used at all, per the `credProtect` extension (CTAP 2.1 §12.1).
+///
+/// Variants are ordered from least to most protected, so comparing two says whether one is at least
+/// as strict as the other.
+#[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
+#[serde(rename_all = "camelCase")]
+pub enum CredentialProtectionPolicy {
+    /// Usable with or without user verification. What a credential gets when nothing is requested.
+    UserVerificationOptional,
+    /// Without user verification, usable only when the relying party names it
+    /// in `allowCredentials`, so it cannot be discovered from the `rp_id` alone.
+    #[serde(rename = "userVerificationOptionalWithCredentialIDList")]
+    UserVerificationOptionalWithCredentialIdList,
+    /// Unusable without user verification.
+    UserVerificationRequired,
+}
+
 /// Whether the authenticator should store the credential itself.
 ///
 /// A resident (discoverable) credential can be picked from a list without the user typing
@@ -431,6 +456,13 @@ pub struct StoredPasskey {
     /// is worth attempting.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub large_blob_supported: Option<bool>,
+
+    /// The policy the authenticator applied, per the `credProtect` extension. Read from the signed
+    /// authenticator data, and only reported at registration. `None` if the authenticator reported
+    /// none. [`CredentialProtectionPolicy::UserVerificationRequired`] makes every later
+    /// authentication require the UV flag.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cred_protect: Option<CredentialProtectionPolicy>,
 
     /// BE flag: the credential may be synced across the user's devices.
     #[serde(default)]
@@ -554,6 +586,21 @@ pub struct RegistrationExtensions {
     pub prf: Option<PrfInput>,
     #[serde(rename = "largeBlob", skip_serializing_if = "Option::is_none")]
     pub large_blob: Option<LargeBlobRegistrationInput>,
+    /// The `credProtect` policy to ask the authenticator for. The one it applied lands
+    /// in [`StoredPasskey::cred_protect`], and may be stricter than asked.
+    #[serde(
+        rename = "credentialProtectionPolicy",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub credential_protection_policy: Option<CredentialProtectionPolicy>,
+    /// Fail rather than create a credential with a weaker policy than
+    /// `credential_protection_policy`. Only meaningful for the two stricter levels. The browser
+    /// enforces it, and [`crate::Passki::finish_passkey_registration`] checks again.
+    #[serde(
+        rename = "enforceCredentialProtectionPolicy",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub enforce_credential_protection_policy: Option<bool>,
 }
 
 /// Extensions included in an authentication challenge.

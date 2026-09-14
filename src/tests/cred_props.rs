@@ -68,6 +68,8 @@ fn test_cred_props_and_prf_can_be_requested_together() {
                     cred_props: Some(true),
                     prf: Some(PrfInput { eval: None }),
                     large_blob: None,
+                    credential_protection_policy: None,
+                    enforce_credential_protection_policy: None,
                 }),
                 ..Default::default()
             },

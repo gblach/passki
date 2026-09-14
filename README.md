@@ -14,7 +14,8 @@ A simple and secure WebAuthn/Passkey implementation for Rust.
 - 🛡️ **Security First** - Built-in replay attack protection via signature counters
 - 📦 **Framework Agnostic** - No web framework lock-in, works with any HTTP server
 - 🔑 **Extensions** - Support for `credProps` (discoverable credential reporting), PRF (key
-  derivation / E2E encryption) and `largeBlob` (blob storage on the authenticator)
+  derivation / E2E encryption), `largeBlob` (blob storage on the authenticator) and `credProtect`
+  (user verification policy on security keys)
 - 🌐 **Related Origins** - One passkey across several domains, with a helper for
   the `.well-known/webauthn` file
 - 📡 **Signal API** - Payloads that tell the browser when a passkey or a username changed,
@@ -230,6 +231,54 @@ extensions.large_blob = Some(LargeBlobAuthenticationInput::Read);
 
 `LargeBlobSupport::Required` fails the registration when the authenticator cannot store a blob;
 `Preferred` creates the credential either way and reports what it got.
+
+### credProtect
+
+The [`credProtect`
+extension](https://fidoalliance.org/specs/fido-v2.1-ps-20210615/fido-client-to-authenticator-protocol-v2.1-ps-20210615.html#sctn-credProtect-extension)
+(CTAP 2.1 §12.1) sets when a credential on a security key may be used at all:
+
+| Policy                                         | Without user verification, the credential is                  |
+| ---------------------------------------------- | ------------------------------------------------------------- |
+| `UserVerificationOptional`                     | usable, as with no policy                                     |
+| `UserVerificationOptionalWithCredentialIdList` | usable only when named in `allowCredentials`, so not listable |
+| `UserVerificationRequired`                     | unusable                                                      |
+
+The authenticator reports the level it applied in the signed authenticator data, and only
+at registration, so passki stores it in `StoredPasskey::cred_protect`. It may be stricter than
+the one requested. Chrome asks for a level on its own when creating a discoverable credential
+on a security key, so the field can be set even when you requested nothing.
+
+```rust
+use passki::{CredentialProtectionPolicy, RegistrationExtensions, RegistrationOptions};
+
+let mut extensions = RegistrationExtensions::default();
+extensions.credential_protection_policy =
+    Some(CredentialProtectionPolicy::UserVerificationRequired);
+extensions.enforce_credential_protection_policy = Some(true);
+
+let mut options = RegistrationOptions::default();
+options.extensions = Some(extensions);
+
+let (challenge, state) = passki.start_passkey_registration(
+    user_id, username, display_name, options,
+)?;
+
+let passkey = passki.finish_passkey_registration(&credential, &state)?;
+// passkey.cred_protect == Some(UserVerificationRequired) → the authenticator applied it
+// Store it: the authenticator only reports this at registration
+```
+
+With `enforce_credential_protection_policy` set, the browser should refuse to create
+the credential with a weaker policy, and `finish_passkey_registration` checks it again: it returns
+`PasskiError::CredentialProtectionNotApplied` when the authenticator reports a weaker level or none.
+Authenticators that never report the extension, which can include platform passkeys, then cannot
+register at all. Enforcing `UserVerificationOptional` has no effect, since every credential
+satisfies it.
+
+A passkey stored with `UserVerificationRequired` must carry the UV flag in every later
+authentication. `finish_passkey_authentication` rejects one without it with
+`PasskiError::UserVerificationRequired`, even when the ceremony asked only for `Preferred`.
 
 ## Related Origins
 
@@ -528,7 +577,7 @@ These extensions are registered in the [IANA WebAuthn extension identifiers
 registry](https://www.iana.org/assignments/webauthn/webauthn.xhtml) but specified elsewhere, so they
 are not tied to a WebAuthn level:
 
-- [ ] `credProtect` extension ([CTAP
+- [x] `credProtect` extension ([CTAP
   2.1](https://fidoalliance.org/specs/fido-v2.1-ps-20210615/fido-client-to-authenticator-protocol-v2.1-ps-20210615.html#sctn-credProtect-extension)
   §12.1)
 - [ ] `minPinLength` extension (CTAP 2.1 §12.4)

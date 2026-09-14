@@ -77,6 +77,8 @@ fn test_large_blob_and_cred_props_can_be_requested_together() {
                     large_blob: Some(LargeBlobRegistrationInput {
                         support: LargeBlobSupport::Preferred,
                     }),
+                    credential_protection_policy: None,
+                    enforce_credential_protection_policy: None,
                 }),
                 ..Default::default()
             },
@@ -279,6 +281,7 @@ fn authenticate_with_large_blob_result(
         transports: Vec::new(),
         rk: None,
         large_blob_supported: Some(true),
+        cred_protect: None,
         be: false,
         bs: false,
     };

@@ -73,6 +73,11 @@ pub struct RegistrationState {
     /// What was asked for when the ceremony started, re-checked against what the authenticator
     /// actually did.
     pub user_verification: UserVerificationRequirement,
+
+    /// The `credProtect` policy the authenticator must have applied. Set only when
+    /// `enforceCredentialProtectionPolicy` was requested with one of the two stricter levels.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub required_cred_protect: Option<CredentialProtectionPolicy>,
 }
 
 /// What the client sends back after `navigator.credentials.create()`.
@@ -165,9 +170,7 @@ pub(crate) struct ParsedAttestation {
     /// Identifies the authenticator model.
     pub aaguid: [u8; 16],
 
-    /// The authenticator extension outputs, empty when the ED flag is clear. Nothing reads them
-    /// yet; `credProtect` and `minPinLength` report their results here.
-    #[allow(dead_code)]
+    /// The authenticator extension outputs, empty when the ED flag is clear.
     pub extensions: Vec<(ciborium::Value, ciborium::Value)>,
 
     /// Left at [`AttestationType::None`] here, since parsing authenticator data sees no attestation
@@ -218,6 +221,15 @@ impl Passki {
             })
             .collect();
 
+        // The spec gives enforcement meaning only for the two stricter levels, since the lowest
+        // one is what every credential gets anyway.
+        let required_cred_protect = options
+            .extensions
+            .as_ref()
+            .filter(|ext| ext.enforce_credential_protection_policy == Some(true))
+            .and_then(|ext| ext.credential_protection_policy)
+            .filter(|&policy| policy > CredentialProtectionPolicy::UserVerificationOptional);
+
         let user = UserInfo {
             id: Self::base64_encode(&user_id_bytes),
             name: username.to_string(),
@@ -253,9 +265,34 @@ impl Passki {
             challenge: challenge.clone(),
             user,
             user_verification: options.user_verification,
+            required_cred_protect,
         };
 
         Ok((challenge_response, state))
+    }
+
+    /// Reads the `credProtect` level from the authenticator extension outputs.
+    ///
+    /// It can be there even when the relying party asked for nothing, since Chrome requests
+    /// a level on its own for discoverable credentials on security keys.
+    fn cred_protect_output(
+        extensions: &[(ciborium::Value, ciborium::Value)],
+    ) -> Result<Option<CredentialProtectionPolicy>> {
+        let Some((_, value)) = extensions
+            .iter()
+            .find(|(k, _)| k.as_text() == Some("credProtect"))
+        else {
+            return Ok(None);
+        };
+
+        match value.as_integer().and_then(|i| u8::try_from(i).ok()) {
+            Some(1) => Ok(Some(CredentialProtectionPolicy::UserVerificationOptional)),
+            Some(2) => Ok(Some(
+                CredentialProtectionPolicy::UserVerificationOptionalWithCredentialIdList,
+            )),
+            Some(3) => Ok(Some(CredentialProtectionPolicy::UserVerificationRequired)),
+            _ => Err(PasskiError::InvalidAuthenticatorData),
+        }
     }
 
     /// Completes a passkey registration by verifying what the client returned.
@@ -298,6 +335,17 @@ impl Passki {
             return Err(PasskiError::UserVerificationRequired);
         }
 
+        // An authenticator may apply a stricter policy than requested, so only a weaker one fails.
+        let cred_protect = Self::cred_protect_output(&parsed.extensions)?;
+        if let Some(required) = state.required_cred_protect
+            && cred_protect.is_none_or(|applied| applied < required)
+        {
+            return Err(PasskiError::CredentialProtectionNotApplied {
+                required,
+                applied: cred_protect,
+            });
+        }
+
         // The signed authenticator data is authoritative; the ID the client sent alongside it must
         // agree.
         let credential_id = Self::base64_decode(&credential.credential_id)?;
@@ -327,6 +375,7 @@ impl Passki {
             transports: credential.transports.clone(),
             rk,
             large_blob_supported,
+            cred_protect,
             be: (parsed.flags & FLAG_BE) != 0,
             bs: (parsed.flags & FLAG_BS) != 0,
         })

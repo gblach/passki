@@ -144,6 +144,7 @@ fn test_finish_passkey_authentication_bs_without_be_rejected() {
         transports: Vec::new(),
         rk: None,
         large_blob_supported: None,
+        cred_protect: None,
         be: false,
         bs: false,
     };
@@ -201,6 +202,7 @@ fn test_stored_passkey_be_bs_roundtrip() {
         transports: Vec::new(),
         rk: None,
         large_blob_supported: None,
+        cred_protect: None,
         be: true,
         bs: true,
     };

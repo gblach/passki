@@ -77,6 +77,7 @@ fn test_stored_passkey_zero_aaguid_roundtrip() {
         transports: Vec::new(),
         rk: None,
         large_blob_supported: None,
+        cred_protect: None,
         be: false,
         bs: false,
     };
@@ -98,6 +99,7 @@ fn test_stored_passkey_aaguid_roundtrip() {
         transports: Vec::new(),
         rk: None,
         large_blob_supported: None,
+        cred_protect: None,
         be: false,
         bs: false,
     };
@@ -119,6 +121,7 @@ fn test_stored_passkey_zero_aaguid_is_serialized() {
         transports: Vec::new(),
         rk: None,
         large_blob_supported: None,
+        cred_protect: None,
         be: false,
         bs: false,
     };

@@ -261,9 +261,13 @@ impl Passki {
             return Err(PasskiError::InvalidBackupFlags);
         }
 
-        if state.user_verification == UserVerificationRequirement::Required
-            && (flags & FLAG_UV) == 0
-        {
+        // A credential protected at the strictest level is unusable without user verification,
+        // whatever this ceremony asked for, so an assertion lacking UV means its authenticator
+        // ignored its own policy.
+        let uv_required = state.user_verification == UserVerificationRequirement::Required
+            || stored_passkey.cred_protect
+                == Some(CredentialProtectionPolicy::UserVerificationRequired);
+        if uv_required && (flags & FLAG_UV) == 0 {
             return Err(PasskiError::UserVerificationRequired);
         }
 

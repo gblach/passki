@@ -69,6 +69,7 @@ fn make_stored_passkey(
         transports: Vec::new(),
         rk: None,
         large_blob_supported: None,
+        cred_protect: None,
         be: false,
         bs: false,
     }
