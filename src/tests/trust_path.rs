@@ -658,6 +658,7 @@ fn test_attestation_type_round_trips_through_json() {
         rk: None,
         large_blob_supported: None,
         cred_protect: None,
+        min_pin_length: None,
         be: false,
         bs: false,
     };

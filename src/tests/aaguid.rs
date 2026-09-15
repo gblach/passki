@@ -78,6 +78,7 @@ fn test_stored_passkey_zero_aaguid_roundtrip() {
         rk: None,
         large_blob_supported: None,
         cred_protect: None,
+        min_pin_length: None,
         be: false,
         bs: false,
     };
@@ -100,6 +101,7 @@ fn test_stored_passkey_aaguid_roundtrip() {
         rk: None,
         large_blob_supported: None,
         cred_protect: None,
+        min_pin_length: None,
         be: false,
         bs: false,
     };
@@ -122,6 +124,7 @@ fn test_stored_passkey_zero_aaguid_is_serialized() {
         rk: None,
         large_blob_supported: None,
         cred_protect: None,
+        min_pin_length: None,
         be: false,
         bs: false,
     };

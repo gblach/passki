@@ -295,6 +295,25 @@ impl Passki {
         }
     }
 
+    /// Reads the `minPinLength` value from the authenticator extension outputs.
+    fn min_pin_length_output(
+        extensions: &[(ciborium::Value, ciborium::Value)],
+    ) -> Result<Option<u8>> {
+        let Some((_, value)) = extensions
+            .iter()
+            .find(|(k, _)| k.as_text() == Some("minPinLength"))
+        else {
+            return Ok(None);
+        };
+
+        // CTAP caps a PIN at 63 bytes, so any length that does not fit a u8 is malformed.
+        value
+            .as_integer()
+            .and_then(|i| u8::try_from(i).ok())
+            .map(Some)
+            .ok_or(PasskiError::InvalidAuthenticatorData)
+    }
+
     /// Completes a passkey registration by verifying what the client returned.
     ///
     /// # Arguments
@@ -346,6 +365,8 @@ impl Passki {
             });
         }
 
+        let min_pin_length = Self::min_pin_length_output(&parsed.extensions)?;
+
         // The signed authenticator data is authoritative; the ID the client sent alongside it must
         // agree.
         let credential_id = Self::base64_decode(&credential.credential_id)?;
@@ -376,6 +397,7 @@ impl Passki {
             rk,
             large_blob_supported,
             cred_protect,
+            min_pin_length,
             be: (parsed.flags & FLAG_BE) != 0,
             bs: (parsed.flags & FLAG_BS) != 0,
         })

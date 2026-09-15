@@ -79,6 +79,7 @@ fn test_large_blob_and_cred_props_can_be_requested_together() {
                     }),
                     credential_protection_policy: None,
                     enforce_credential_protection_policy: None,
+                    min_pin_length: None,
                 }),
                 ..Default::default()
             },
@@ -282,6 +283,7 @@ fn authenticate_with_large_blob_result(
         rk: None,
         large_blob_supported: Some(true),
         cred_protect: None,
+        min_pin_length: None,
         be: false,
         bs: false,
     };

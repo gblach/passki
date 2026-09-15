@@ -30,6 +30,7 @@ fn test_start_passkey_authentication_returns_challenge() {
         rk: None,
         large_blob_supported: None,
         cred_protect: None,
+        min_pin_length: None,
         be: false,
         bs: false,
     }];
@@ -64,6 +65,7 @@ fn test_start_passkey_authentication_multiple_credentials() {
             rk: None,
             large_blob_supported: None,
             cred_protect: None,
+            min_pin_length: None,
             be: false,
             bs: false,
         },
@@ -78,6 +80,7 @@ fn test_start_passkey_authentication_multiple_credentials() {
             rk: None,
             large_blob_supported: None,
             cred_protect: None,
+            min_pin_length: None,
             be: false,
             bs: false,
         },
@@ -92,6 +95,7 @@ fn test_start_passkey_authentication_multiple_credentials() {
             rk: None,
             large_blob_supported: None,
             cred_protect: None,
+            min_pin_length: None,
             be: false,
             bs: false,
         },
@@ -152,6 +156,7 @@ fn test_start_passkey_authentication_generates_unique_challenges() {
         rk: None,
         large_blob_supported: None,
         cred_protect: None,
+        min_pin_length: None,
         be: false,
         bs: false,
     }];
@@ -182,6 +187,7 @@ fn test_start_passkey_authentication_with_different_settings() {
         rk: None,
         large_blob_supported: None,
         cred_protect: None,
+        min_pin_length: None,
         be: false,
         bs: false,
     }];
@@ -214,6 +220,7 @@ fn test_finish_passkey_authentication_success() {
         rk: None,
         large_blob_supported: None,
         cred_protect: None,
+        min_pin_length: None,
         be: false,
         bs: false,
     };
@@ -258,6 +265,7 @@ fn test_finish_passkey_authentication_wrong_credential_id() {
         rk: None,
         large_blob_supported: None,
         cred_protect: None,
+        min_pin_length: None,
         be: false,
         bs: false,
     };
@@ -305,6 +313,7 @@ fn test_finish_passkey_authentication_wrong_challenge() {
         rk: None,
         large_blob_supported: None,
         cred_protect: None,
+        min_pin_length: None,
         be: false,
         bs: false,
     };
@@ -353,6 +362,7 @@ fn test_finish_passkey_authentication_wrong_origin() {
         rk: None,
         large_blob_supported: None,
         cred_protect: None,
+        min_pin_length: None,
         be: false,
         bs: false,
     };
@@ -394,6 +404,7 @@ fn test_finish_passkey_authentication_invalid_counter() {
         rk: None,
         large_blob_supported: None,
         cred_protect: None,
+        min_pin_length: None,
         be: false,
         bs: false,
     };
@@ -436,6 +447,7 @@ fn test_finish_passkey_authentication_too_short_authenticator_data() {
         rk: None,
         large_blob_supported: None,
         cred_protect: None,
+        min_pin_length: None,
         be: false,
         bs: false,
     };
@@ -483,6 +495,7 @@ fn test_finish_passkey_authentication_uv_required_flag_set() {
         rk: None,
         large_blob_supported: None,
         cred_protect: None,
+        min_pin_length: None,
         be: false,
         bs: false,
     };
@@ -536,6 +549,7 @@ fn test_finish_passkey_authentication_uv_required_flag_not_set() {
         rk: None,
         large_blob_supported: None,
         cred_protect: None,
+        min_pin_length: None,
         be: false,
         bs: false,
     };
@@ -583,6 +597,7 @@ fn test_finish_passkey_authentication_uv_preferred_flag_not_set() {
         rk: None,
         large_blob_supported: None,
         cred_protect: None,
+        min_pin_length: None,
         be: false,
         bs: false,
     };
@@ -631,6 +646,7 @@ fn test_finish_passkey_authentication_up_flag_not_set() {
         rk: None,
         large_blob_supported: None,
         cred_protect: None,
+        min_pin_length: None,
         be: false,
         bs: false,
     };
@@ -675,6 +691,7 @@ fn test_finish_passkey_authentication_usernameless() {
         rk: None,
         large_blob_supported: None,
         cred_protect: None,
+        min_pin_length: None,
         be: false,
         bs: false,
     };

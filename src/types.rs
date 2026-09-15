@@ -464,6 +464,13 @@ pub struct StoredPasskey {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cred_protect: Option<CredentialProtectionPolicy>,
 
+    /// The shortest PIN the authenticator accepts, in Unicode code points, per the `minPinLength`
+    /// extension. Read from the signed authenticator data, and only reported at registration.
+    /// `None` if the authenticator reported none, which it does unless it was configured to
+    /// disclose the length to this `rp_id`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub min_pin_length: Option<u8>,
+
     /// BE flag: the credential may be synced across the user's devices.
     #[serde(default)]
     pub be: bool,
@@ -601,6 +608,10 @@ pub struct RegistrationExtensions {
         skip_serializing_if = "Option::is_none"
     )]
     pub enforce_credential_protection_policy: Option<bool>,
+    /// Ask the authenticator for its minimum PIN length. The answer lands
+    /// in [`StoredPasskey::min_pin_length`].
+    #[serde(rename = "minPinLength", skip_serializing_if = "Option::is_none")]
+    pub min_pin_length: Option<bool>,
 }
 
 /// Extensions included in an authentication challenge.

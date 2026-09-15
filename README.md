@@ -14,8 +14,8 @@ A simple and secure WebAuthn/Passkey implementation for Rust.
 - 🛡️ **Security First** - Built-in replay attack protection via signature counters
 - 📦 **Framework Agnostic** - No web framework lock-in, works with any HTTP server
 - 🔑 **Extensions** - Support for `credProps` (discoverable credential reporting), PRF (key
-  derivation / E2E encryption), `largeBlob` (blob storage on the authenticator) and `credProtect`
-  (user verification policy on security keys)
+  derivation / E2E encryption), `largeBlob` (blob storage on the authenticator), `credProtect`
+  (user verification policy on security keys) and `minPinLength` (PIN policy on managed keys)
 - 🌐 **Related Origins** - One passkey across several domains, with a helper for
   the `.well-known/webauthn` file
 - 📡 **Signal API** - Payloads that tell the browser when a passkey or a username changed,
@@ -279,6 +279,36 @@ satisfies it.
 A passkey stored with `UserVerificationRequired` must carry the UV flag in every later
 authentication. `finish_passkey_authentication` rejects one without it with
 `PasskiError::UserVerificationRequired`, even when the ceremony asked only for `Preferred`.
+
+### minPinLength
+
+The [`minPinLength`
+extension](https://fidoalliance.org/specs/fido-v2.1-ps-20210615/fido-client-to-authenticator-protocol-v2.1-ps-20210615.html#sctn-minpinlength-extension)
+(CTAP 2.1 §12.4) reports the shortest PIN a security key accepts, in Unicode code points.
+The key answers only relying parties on a list configured into it, so this is for organizations
+that provision their own keys and want to check the PIN policy still meets their requirements.
+Any other relying party gets no answer.
+
+```rust
+use passki::{RegistrationExtensions, RegistrationOptions};
+
+let mut extensions = RegistrationExtensions::default();
+extensions.min_pin_length = Some(true);
+
+let mut options = RegistrationOptions::default();
+options.extensions = Some(extensions);
+
+let (challenge, state) = passki.start_passkey_registration(
+    user_id, username, display_name, options,
+)?;
+
+let passkey = passki.finish_passkey_registration(&credential, &state)?;
+// passkey.min_pin_length == Some(8) → the key demands a PIN of at least 8 characters
+// Store it: the authenticator only reports this at registration
+```
+
+The length is read from the signed authenticator data. It can only grow afterwards, until the key
+is reset, which also wipes the credential.
 
 ## Related Origins
 
@@ -580,7 +610,9 @@ are not tied to a WebAuthn level:
 - [x] `credProtect` extension ([CTAP
   2.1](https://fidoalliance.org/specs/fido-v2.1-ps-20210615/fido-client-to-authenticator-protocol-v2.1-ps-20210615.html#sctn-credProtect-extension)
   §12.1)
-- [ ] `minPinLength` extension (CTAP 2.1 §12.4)
+- [x] `minPinLength` extension ([CTAP
+  2.1](https://fidoalliance.org/specs/fido-v2.1-ps-20210615/fido-client-to-authenticator-protocol-v2.1-ps-20210615.html#sctn-minpinlength-extension)
+  §12.4)
 - [ ] `payment` extension ([Secure Payment
   Confirmation](https://www.w3.org/TR/secure-payment-confirmation/) §5)
 

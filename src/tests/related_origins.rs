@@ -149,6 +149,7 @@ fn test_authentication_accepts_an_origin_other_than_the_one_registered_on() {
         rk: None,
         large_blob_supported: None,
         cred_protect: None,
+        min_pin_length: None,
         be: false,
         bs: false,
     };

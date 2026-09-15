@@ -343,6 +343,7 @@ fn authenticate(
         rk: None,
         large_blob_supported: None,
         cred_protect,
+        min_pin_length: None,
         be: false,
         bs: false,
     };

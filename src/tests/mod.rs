@@ -25,6 +25,7 @@ mod cred_props;
 mod cred_protect;
 mod extensions;
 mod large_blob;
+mod min_pin_length;
 mod prf;
 mod registration;
 mod related_origins;

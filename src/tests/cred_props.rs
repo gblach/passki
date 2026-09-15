@@ -70,6 +70,7 @@ fn test_cred_props_and_prf_can_be_requested_together() {
                     large_blob: None,
                     credential_protection_policy: None,
                     enforce_credential_protection_policy: None,
+                    min_pin_length: None,
                 }),
                 ..Default::default()
             },

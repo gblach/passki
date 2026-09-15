@@ -145,6 +145,7 @@ fn test_finish_passkey_authentication_bs_without_be_rejected() {
         rk: None,
         large_blob_supported: None,
         cred_protect: None,
+        min_pin_length: None,
         be: false,
         bs: false,
     };
@@ -203,6 +204,7 @@ fn test_stored_passkey_be_bs_roundtrip() {
         rk: None,
         large_blob_supported: None,
         cred_protect: None,
+        min_pin_length: None,
         be: true,
         bs: true,
     };
