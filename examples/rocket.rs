@@ -54,10 +54,9 @@ extern crate rocket;
 use passki::{
     AllAcceptedCredentialsSignal, AttestationConveyancePreference, AuthenticationChallenge,
     AuthenticationCredential, AuthenticationExtensions, AuthenticationOptions, AuthenticationState,
-    AuthenticatorAttachment, AuthenticatorTransport, ClientData, ClientExtensionResults,
-    CurrentUserDetailsSignal, Passki, PasskiError, PrfEval, PrfInput, RegistrationChallenge,
-    RegistrationCredential, RegistrationExtensions, RegistrationOptions, RegistrationState,
-    StoredPasskey, UnknownCredentialSignal,
+    ClientData, CurrentUserDetailsSignal, Passki, PasskiError, PrfEval, PrfInput,
+    RegistrationChallenge, RegistrationCredential, RegistrationExtensions, RegistrationOptions,
+    RegistrationState, StoredPasskey, UnknownCredentialSignal,
 };
 use rocket::http::Status;
 use rocket::response::content::RawHtml;
@@ -139,25 +138,6 @@ struct RegisterStartRequest {
     attestation: bool,
 }
 
-/// What the client posts back after `navigator.credentials.create()`.
-#[derive(Deserialize)]
-struct RegisterFinishRequest {
-    /// Base64url-encoded credential ID from the authenticator
-    credential_id: String,
-    /// Base64url-encoded attestation object, which carries the public key
-    public_key: String,
-    /// Base64url-encoded client data JSON
-    client_data_json: String,
-    /// Extension results from the browser (e.g., PRF support flag)
-    client_extension_results: Option<ClientExtensionResults>,
-    /// Whether the browser used a built-in or a separate authenticator
-    authenticator_attachment: Option<AuthenticatorAttachment>,
-    /// What `getTransports()` reported, stored so later ceremonies can tell the browser where this
-    /// credential lives
-    #[serde(default)]
-    transports: Vec<AuthenticatorTransport>,
-}
-
 /// Both fields are optional.
 #[derive(Deserialize, Default)]
 struct AuthStartRequest {
@@ -169,25 +149,6 @@ struct AuthStartRequest {
     /// a key from it.
     #[serde(default)]
     prf_salt: Option<String>,
-}
-
-/// What the client posts back after `navigator.credentials.get()`.
-#[derive(Deserialize)]
-struct AuthFinishRequest {
-    /// Base64url-encoded ID of the passkey that was used
-    credential_id: String,
-    /// Base64url-encoded authenticator data (contains flags and counter)
-    authenticator_data: String,
-    /// Base64url-encoded client data JSON
-    client_data_json: String,
-    /// Base64url-encoded signature over authenticator_data + hash(client_data_json)
-    signature: String,
-    /// Base64url-encoded user handle, returned only for discoverable credentials
-    user_handle: Option<String>,
-    /// Extension results from the browser (e.g., PRF outputs)
-    client_extension_results: Option<ClientExtensionResults>,
-    /// Whether the browser used a built-in or a separate authenticator
-    authenticator_attachment: Option<AuthenticatorAttachment>,
 }
 
 #[derive(Serialize, Default)]
@@ -271,7 +232,7 @@ fn register_start(
     // asks whether PRF is supported at all.
     let mut extensions = RegistrationExtensions::default();
     extensions.cred_props = Some(true);
-    extensions.prf = Some(PrfInput { eval: None });
+    extensions.prf = Some(PrfInput::default());
 
     let mut options = RegistrationOptions::default();
     options.attestation = if req.attestation {
@@ -303,16 +264,16 @@ fn register_start(
 ///
 /// Verifies the new credential, stores it, and reports whether the passkey supports
 /// the PRF extension.
-#[post("/register/finish", data = "<req>")]
+#[post("/register/finish", data = "<credential>")]
 fn register_finish(
     passki: &State<Passki>,
     store: &State<Store>,
-    req: Json<RegisterFinishRequest>,
+    credential: Json<RegistrationCredential>,
 ) -> AppResult<ApiResponse> {
-    let req = req.into_inner();
+    let credential = credential.into_inner();
 
     // The challenge says which pending ceremony this belongs to.
-    let client_data = ClientData::from_base64(&req.client_data_json)?;
+    let client_data = ClientData::from_base64(&credential.client_data_json)?;
 
     let reg_state = store
         .pending_registrations
@@ -321,21 +282,12 @@ fn register_finish(
         .remove(&client_data.challenge)
         .ok_or(AppError("No pending registration".into()))?;
 
-    let prf_supported = req
+    let prf_supported = credential
         .client_extension_results
         .as_ref()
         .and_then(|ext| ext.prf.as_ref())
         .and_then(|prf| prf.enabled)
         .unwrap_or(false);
-
-    let credential = RegistrationCredential {
-        credential_id: req.credential_id,
-        public_key: req.public_key,
-        client_data_json: req.client_data_json,
-        client_extension_results: req.client_extension_results,
-        authenticator_attachment: req.authenticator_attachment,
-        transports: req.transports,
-    };
 
     // Checks origin, challenge and attestation, and extracts the public key.
     let passkey = passki.finish_passkey_registration(&credential, &reg_state)?;
@@ -418,12 +370,12 @@ fn auth_start(
 
     let extensions = req.prf_salt.clone().map(|salt| {
         let mut extensions = AuthenticationExtensions::default();
-        extensions.prf = Some(PrfInput {
-            eval: Some(PrfEval {
-                first: salt,
-                second: None,
-            }),
+        let mut prf = PrfInput::default();
+        prf.eval = Some(PrfEval {
+            first: salt,
+            second: None,
         });
+        extensions.prf = Some(prf);
         extensions
     });
 
@@ -446,16 +398,16 @@ fn auth_start(
 ///
 /// Verifies the signature and, when a PRF salt was sent, returns the derived key hex-encoded
 /// in `prf_output`.
-#[post("/auth/finish", data = "<req>")]
+#[post("/auth/finish", data = "<credential>")]
 fn auth_finish(
     passki: &State<Passki>,
     store: &State<Store>,
-    req: Json<AuthFinishRequest>,
+    credential: Json<AuthenticationCredential>,
 ) -> AppResult<ApiResponse> {
-    let req = req.into_inner();
+    let credential = credential.into_inner();
 
     // The challenge says which pending ceremony this belongs to.
-    let client_data = ClientData::from_base64(&req.client_data_json)?;
+    let client_data = ClientData::from_base64(&credential.client_data_json)?;
 
     let auth_state = store
         .pending_authentications
@@ -464,12 +416,12 @@ fn auth_finish(
         .remove(&client_data.challenge)
         .ok_or(AppError("No pending authentication".into()))?;
 
-    let credential_id = Passki::base64_decode(&req.credential_id)?;
+    let credential_id = Passki::base64_decode(&credential.credential_id)?;
 
     // The user handle gives a direct lookup; without it, scan every user for a matching credential
     // ID.
     let mut users = store.users.lock().unwrap();
-    let found = match req.user_handle.as_deref() {
+    let found = match credential.user_handle.as_deref() {
         Some(handle) => {
             let user_id = Uuid::from_slice(&Passki::base64_decode(handle)?)?;
             users
@@ -502,16 +454,6 @@ fn auth_finish(
             }),
             ..Default::default()
         }));
-    };
-
-    let credential = AuthenticationCredential {
-        credential_id: req.credential_id,
-        authenticator_data: req.authenticator_data,
-        client_data_json: req.client_data_json,
-        signature: req.signature,
-        user_handle: req.user_handle,
-        client_extension_results: req.client_extension_results,
-        authenticator_attachment: req.authenticator_attachment,
     };
 
     // Checks origin, challenge, signature and counter.

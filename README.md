@@ -148,7 +148,7 @@ use passki::{
 
 // During registration, probe for PRF support
 let mut extensions = RegistrationExtensions::default();
-extensions.prf = Some(PrfInput { eval: None });
+extensions.prf = Some(PrfInput::default());
 
 let mut options = RegistrationOptions::default();
 options.extensions = Some(extensions);
@@ -161,12 +161,12 @@ let (challenge, state) = passki.start_passkey_registration(
 
 // During authentication, request a PRF derivation for a given context
 let mut extensions = AuthenticationExtensions::default();
-extensions.prf = Some(PrfInput {
-    eval: Some(PrfEval {
-        first: Passki::base64_encode(b"my-app-encryption-key-context"),
-        second: None,
-    }),
+let mut prf = PrfInput::default();
+prf.eval = Some(PrfEval {
+    first: Passki::base64_encode(b"my-app-encryption-key-context"),
+    second: None,
 });
+extensions.prf = Some(prf);
 
 let mut options = AuthenticationOptions::default();
 options.extensions = Some(extensions);

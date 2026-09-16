@@ -25,6 +25,7 @@ use crate::types::*;
 ///
 /// Serialize this to JSON and hand it to `navigator.credentials.create()`.
 #[derive(Serialize, Debug)]
+#[non_exhaustive]
 pub struct RegistrationChallenge {
     /// Information about the relying party.
     pub rp: RelyingParty,
@@ -63,6 +64,7 @@ pub struct RegistrationChallenge {
 ///
 /// Keep it in a session or cache between the two steps; without it the response cannot be verified.
 #[derive(Clone, Serialize, Deserialize, Debug)]
+#[non_exhaustive]
 pub struct RegistrationState {
     /// The challenge that was sent to the client.
     pub challenge: Vec<u8>,
@@ -81,7 +83,11 @@ pub struct RegistrationState {
 }
 
 /// What the client sends back after `navigator.credentials.create()`.
+///
+/// Deserialize the request body into it rather than building it field by field, since the type
+/// is `#[non_exhaustive]`.
 #[derive(Deserialize)]
+#[non_exhaustive]
 pub struct RegistrationCredential {
     /// The credential ID (base64url-encoded).
     pub credential_id: String,

@@ -30,6 +30,7 @@ use crate::types::*;
 ///
 /// Serialize this to JSON and hand it to `navigator.credentials.get()`.
 #[derive(Serialize, Debug)]
+#[non_exhaustive]
 pub struct AuthenticationChallenge {
     /// The challenge value (base64url-encoded).
     pub challenge: String,
@@ -59,6 +60,7 @@ pub struct AuthenticationChallenge {
 ///
 /// Keep it in a session or cache between the two steps; without it the response cannot be verified.
 #[derive(Clone, Serialize, Deserialize, Debug)]
+#[non_exhaustive]
 pub struct AuthenticationState {
     /// The challenge that was sent to the client.
     pub challenge: Vec<u8>,
@@ -73,7 +75,11 @@ pub struct AuthenticationState {
 }
 
 /// What the client sends back after `navigator.credentials.get()`.
+///
+/// Deserialize the request body into it rather than building it field by field, since the type
+/// is `#[non_exhaustive]`.
 #[derive(Deserialize)]
+#[non_exhaustive]
 pub struct AuthenticationCredential {
     /// The credential ID that was used (base64url-encoded).
     pub credential_id: String,

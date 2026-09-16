@@ -24,6 +24,7 @@ use crate::types::{PasskiError, Result};
 
 /// The type of WebAuthn operation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum ClientDataType {
     /// Registration operation ("webauthn.create").
     Create,
@@ -61,6 +62,7 @@ impl fmt::Display for ClientDataType {
 
 /// The client data JSON the browser sent, parsed.
 #[derive(Debug)]
+#[non_exhaustive]
 pub struct ClientData {
     /// The type of operation (Create for registration, Get for authentication).
     pub type_: ClientDataType,

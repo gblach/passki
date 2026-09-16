@@ -245,6 +245,7 @@ pub enum AttestationConveyancePreference {
 /// other variant leaves it a claim.
 #[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Debug, Default)]
 #[serde(rename_all = "kebab-case")]
+#[non_exhaustive]
 pub enum AttestationType {
     /// No statement at all, which is what [`AttestationConveyancePreference::None`] asks for.
     /// Nothing is known about the authenticator model.
@@ -416,7 +417,12 @@ pub enum UserVerificationRequirement {
 ///
 /// Everything needed to verify this credential's future authentications. All `#[serde(default)]`
 /// fields read as their default for passkeys serialized before that field existed.
-#[derive(Clone, Serialize, Deserialize, Debug)]
+///
+/// Normally returned by [`crate::Passki::finish_passkey_registration`] or read back from the
+/// database. To build one by hand, start from [`Default`] and assign the fields, since the type
+/// is `#[non_exhaustive]`.
+#[derive(Clone, Serialize, Deserialize, Debug, Default)]
+#[non_exhaustive]
 pub struct StoredPasskey {
     /// The unique identifier for this credential.
     pub credential_id: Vec<u8>,
@@ -630,6 +636,7 @@ pub struct AuthenticationExtensions {
 /// always yield the same secret, which makes it usable as an encryption key that never leaves
 /// the user's devices.
 #[derive(Serialize, Debug, Default)]
+#[non_exhaustive]
 pub struct PrfInput {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub eval: Option<PrfEval>,
@@ -714,6 +721,7 @@ pub struct ClientExtensionResults {
 
 /// Credential properties returned by the browser after registration.
 #[derive(Deserialize, Debug)]
+#[non_exhaustive]
 pub struct CredPropsResult {
     /// Whether a discoverable (resident) credential was created.
     pub rk: Option<bool>,
