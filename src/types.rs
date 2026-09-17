@@ -76,6 +76,11 @@ pub enum PasskiError {
     #[error("Cross-origin requests are not allowed")]
     CrossOriginNotAllowed,
 
+    /// The request came from an iframe embedded on a page that is not on the allowlist installed
+    /// with [`crate::Passki::with_embedding_origins`].
+    #[error("Invalid top origin: expected one of {expected:?}, got {got}")]
+    TopOriginMismatch { expected: Vec<String>, got: String },
+
     /// The authenticator data was truncated or otherwise malformed.
     #[error("Invalid authenticator data")]
     InvalidAuthenticatorData,

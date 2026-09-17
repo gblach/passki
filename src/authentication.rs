@@ -245,7 +245,12 @@ impl Passki {
 
         let client_data_bytes = Self::base64_decode(&credential.client_data_json)?;
         let client_data = ClientData::from_bytes(&client_data_bytes)?;
-        client_data.verify(ClientDataType::Get, &state.challenge, &self.rp_origins)?;
+        client_data.verify_embedded(
+            ClientDataType::Get,
+            &state.challenge,
+            &self.rp_origins,
+            &self.embedding_origins,
+        )?;
 
         let authenticator_data = Self::base64_decode(&credential.authenticator_data)?;
         if authenticator_data.len() < 37 {

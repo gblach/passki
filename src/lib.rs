@@ -134,6 +134,10 @@ pub struct Passki {
 
     /// How strictly attestation certificate chains are checked.
     pub(crate) attestation_policy: AttestationTrustPolicy,
+
+    /// Origins allowed to embed a ceremony in an iframe. Private for the same reason as
+    /// the attestation fields; install them with [`Passki::with_embedding_origins`].
+    pub(crate) embedding_origins: Vec<String>,
 }
 
 impl Passki {
@@ -162,6 +166,7 @@ impl Passki {
             rp_name: rp_name.to_string(),
             attestation_anchors: Vec::new(),
             attestation_policy: AttestationTrustPolicy::Ignore,
+            embedding_origins: Vec::new(),
         }
     }
 
@@ -209,6 +214,38 @@ impl Passki {
             .collect::<types::Result<Vec<_>>>()?;
         self.attestation_policy = policy;
         Ok(self)
+    }
+
+    /// Allows ceremonies run in an iframe, as long as the page embedding the iframe is one
+    /// of `origins`.
+    ///
+    /// Without this, a ceremony whose client data carries `crossOrigin` is refused outright, which
+    /// is the right default: a frame on someone else's site asking for a passkey is the shape
+    /// of a clickjacking attack. Name the embedding origins here only if you know which sites
+    /// embed you and why.
+    ///
+    /// The embedding page also has to grant the frame the `publickey-credentials-get` or
+    /// `publickey-credentials-create` permissions policy, and `create()` additionally needs
+    /// the user to have interacted with the frame. Browsers enforce both; what this adds is
+    /// the server-side check that the embedding page is one you expected, since a permissions
+    /// policy is the embedder's decision alone.
+    ///
+    /// The frame's own origin still has to be one of the origins given to [`Passki::new`].
+    ///
+    /// # Arguments
+    ///
+    /// * `origins` - The origins allowed to embed a ceremony (e.g., `https://partner.example`)
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use passki::Passki;
+    /// let passki = Passki::new("example.com", &["https://example.com"], "Example Corp")
+    ///     .with_embedding_origins(&["https://partner.example"]);
+    /// ```
+    pub fn with_embedding_origins(mut self, origins: &[impl AsRef<str>]) -> Self {
+        self.embedding_origins = origins.iter().map(|o| o.as_ref().to_string()).collect();
+        self
     }
 
     /// Whether an origin is already usable under `rp_id` alone, because its host is the `rp_id`

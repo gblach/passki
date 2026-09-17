@@ -345,7 +345,12 @@ impl Passki {
     ) -> Result<StoredPasskey> {
         let client_data_bytes = Self::base64_decode(&credential.client_data_json)?;
         let client_data = ClientData::from_bytes(&client_data_bytes)?;
-        client_data.verify(ClientDataType::Create, &state.challenge, &self.rp_origins)?;
+        client_data.verify_embedded(
+            ClientDataType::Create,
+            &state.challenge,
+            &self.rp_origins,
+            &self.embedding_origins,
+        )?;
         let client_data_hash = digest::digest(&SHA256, &client_data_bytes);
 
         let attestation_bytes = Self::base64_decode(&credential.public_key)?;

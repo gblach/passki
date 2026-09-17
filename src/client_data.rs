@@ -75,6 +75,10 @@ pub struct ClientData {
 
     /// Whether the request came from a cross-origin iframe.
     pub cross_origin: bool,
+
+    /// The origin of the page the iframe was embedded in. Browsers send it only when
+    /// `cross_origin` is set.
+    pub top_origin: Option<String>,
 }
 
 impl ClientData {
@@ -104,11 +108,14 @@ impl ClientData {
 
         let cross_origin = json["crossOrigin"].as_bool().unwrap_or(false);
 
+        let top_origin = json["topOrigin"].as_str().map(str::to_string);
+
         Ok(ClientData {
             type_,
             challenge,
             origin,
             cross_origin,
+            top_origin,
         })
     }
 
@@ -139,23 +146,31 @@ impl ClientData {
     }
 
     #[allow(rustdoc::bare_urls)]
-    /// Checks the operation type, that the challenge is the one that was issued, that the origin
-    /// is accepted, and that no cross-origin iframe was involved.
+    /// Checks the operation type, the challenge and the origin as [`ClientData::verify`] does, but
+    /// allows a ceremony run in an iframe when the page embedding it is on
+    /// `allowed_top_origins`.
+    ///
+    /// Pass an empty slice to refuse every cross-origin ceremony, which is what
+    /// [`ClientData::verify`] does.
     ///
     /// # Arguments
     ///
     /// * `expected_type` - The expected type (Create or Get)
     /// * `expected_challenge` - The challenge bytes this ceremony issued
     /// * `expected_origins` - The accepted origins (e.g., "https://example.com")
+    /// * `allowed_top_origins` - The origins allowed to embed a ceremony (e.g.,
+    ///   "https://partner.example")
     ///
     /// # Errors
     ///
-    /// Returns an error if any of the values don't match.
-    pub fn verify(
+    /// Returns an error if any of the values don't match, or if the request came from an iframe
+    /// whose embedding page is not allowed.
+    pub fn verify_embedded(
         &self,
         expected_type: ClientDataType,
         expected_challenge: &[u8],
         expected_origins: &[impl AsRef<str>],
+        allowed_top_origins: &[impl AsRef<str>],
     ) -> Result<()> {
         if self.type_ != expected_type {
             return Err(PasskiError::ClientDataTypeMismatch {
@@ -179,10 +194,57 @@ impl ClientData {
             });
         }
 
-        if self.cross_origin {
+        if !self.cross_origin {
+            return Ok(());
+        }
+
+        if allowed_top_origins.is_empty() {
             return Err(PasskiError::CrossOriginNotAllowed);
         }
 
+        let top_origin = self
+            .top_origin
+            .as_deref()
+            .ok_or_else(|| PasskiError::MissingClientDataField("topOrigin".to_string()))?;
+
+        if !allowed_top_origins.iter().any(|o| o.as_ref() == top_origin) {
+            return Err(PasskiError::TopOriginMismatch {
+                expected: allowed_top_origins
+                    .iter()
+                    .map(|o| o.as_ref().to_string())
+                    .collect(),
+                got: top_origin.to_string(),
+            });
+        }
+
         Ok(())
+    }
+
+    #[allow(rustdoc::bare_urls)]
+    /// Checks the operation type, that the challenge is the one that was issued, that the origin
+    /// is accepted, and that no cross-origin iframe was involved.
+    ///
+    /// # Arguments
+    ///
+    /// * `expected_type` - The expected type (Create or Get)
+    /// * `expected_challenge` - The challenge bytes this ceremony issued
+    /// * `expected_origins` - The accepted origins (e.g., "https://example.com")
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any of the values don't match.
+    #[inline]
+    pub fn verify(
+        &self,
+        expected_type: ClientDataType,
+        expected_challenge: &[u8],
+        expected_origins: &[impl AsRef<str>],
+    ) -> Result<()> {
+        self.verify_embedded(
+            expected_type,
+            expected_challenge,
+            expected_origins,
+            &[] as &[&str],
+        )
     }
 }

@@ -23,6 +23,7 @@ mod base64;
 mod client_data;
 mod cred_props;
 mod cred_protect;
+mod cross_origin;
 mod extensions;
 mod large_blob;
 mod min_pin_length;
