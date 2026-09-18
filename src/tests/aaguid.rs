@@ -35,12 +35,14 @@ fn register(passki: &Passki, aaguid: [u8; 16]) -> StoredPasskey {
     let client_data_json = create_test_client_data_json(&state.challenge, "http://localhost:3000");
 
     let credential = RegistrationCredential {
-        credential_id: Passki::base64_encode(&[1u8; 16]),
-        public_key: Passki::base64_encode(&attestation_obj),
-        client_data_json: Passki::base64_encode(&client_data_json),
+        raw_id: Passki::base64_encode(&[1u8; 16]),
+        response: RegistrationResponse {
+            client_data_json: Passki::base64_encode(&client_data_json),
+            attestation_object: Passki::base64_encode(&attestation_obj),
+            transports: Vec::new(),
+        },
         client_extension_results: None,
         authenticator_attachment: None,
-        transports: Vec::new(),
     };
 
     passki

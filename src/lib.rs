@@ -104,12 +104,13 @@ use aws_lc_rs::rand::{SecureRandom, SystemRandom};
 use x509_cert::Certificate;
 
 pub use authentication::{
-    AuthenticationChallenge, AuthenticationCredential, AuthenticationOptions, AuthenticationResult,
-    AuthenticationState,
+    AuthenticationChallenge, AuthenticationCredential, AuthenticationOptions,
+    AuthenticationResponse, AuthenticationResult, AuthenticationState,
 };
 pub use client_data::{ClientData, ClientDataType};
 pub use registration::{
-    RegistrationChallenge, RegistrationCredential, RegistrationOptions, RegistrationState,
+    RegistrationChallenge, RegistrationCredential, RegistrationOptions, RegistrationResponse,
+    RegistrationState,
 };
 pub use types::*;
 

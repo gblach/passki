@@ -84,26 +84,43 @@ pub struct RegistrationState {
 
 /// What the client sends back after `navigator.credentials.create()`.
 ///
+/// This is the spec's `RegistrationResponseJSON`, so a front end can post
+/// `credential.toJSON()` unchanged. Members passki does not verify - `id`, `type`, and
+/// the response's `publicKey` and `publicKeyAlgorithm` - are accepted and ignored.
+///
 /// Deserialize the request body into it rather than building it field by field, since the type
 /// is `#[non_exhaustive]`.
 #[derive(Deserialize)]
 #[non_exhaustive]
 pub struct RegistrationCredential {
     /// The credential ID (base64url-encoded).
-    pub credential_id: String,
+    #[serde(rename = "rawId")]
+    pub raw_id: String,
 
-    /// The attestation object, which carries the new public key (base64url-encoded).
-    pub public_key: String,
-
-    /// The client data JSON (base64url-encoded).
-    pub client_data_json: String,
+    /// The authenticator's response.
+    pub response: RegistrationResponse,
 
     /// Extension results from the client (e.g., PRF support flag).
+    #[serde(rename = "clientExtensionResults")]
     pub client_extension_results: Option<ClientExtensionResults>,
 
     /// Whether the client used a built-in or a separate authenticator. `None` when
     /// it did not report.
+    #[serde(rename = "authenticatorAttachment")]
     pub authenticator_attachment: Option<AuthenticatorAttachment>,
+}
+
+/// The `response` member of a [`RegistrationCredential`].
+#[derive(Deserialize)]
+#[non_exhaustive]
+pub struct RegistrationResponse {
+    /// The client data JSON (base64url-encoded).
+    #[serde(rename = "clientDataJSON")]
+    pub client_data_json: String,
+
+    /// The attestation object, which carries the new public key (base64url-encoded).
+    #[serde(rename = "attestationObject")]
+    pub attestation_object: String,
 
     /// What `getTransports()` reported. Empty when the client sent nothing, and also when the front
     /// end simply does not forward the list.
@@ -343,7 +360,7 @@ impl Passki {
         credential: &RegistrationCredential,
         state: &RegistrationState,
     ) -> Result<StoredPasskey> {
-        let client_data_bytes = Self::base64_decode(&credential.client_data_json)?;
+        let client_data_bytes = Self::base64_decode(&credential.response.client_data_json)?;
         let client_data = ClientData::from_bytes(&client_data_bytes)?;
         client_data.verify_embedded(
             ClientDataType::Create,
@@ -353,7 +370,7 @@ impl Passki {
         )?;
         let client_data_hash = digest::digest(&SHA256, &client_data_bytes);
 
-        let attestation_bytes = Self::base64_decode(&credential.public_key)?;
+        let attestation_bytes = Self::base64_decode(&credential.response.attestation_object)?;
         let parsed = self.verify_attestation(&attestation_bytes, client_data_hash.as_ref())?;
 
         if (parsed.flags & FLAG_UP) == 0 {
@@ -380,7 +397,7 @@ impl Passki {
 
         // The signed authenticator data is authoritative; the ID the client sent alongside it must
         // agree.
-        let credential_id = Self::base64_decode(&credential.credential_id)?;
+        let credential_id = Self::base64_decode(&credential.raw_id)?;
         if credential_id != parsed.credential_id {
             return Err(PasskiError::CredentialIdMismatch);
         }
@@ -404,7 +421,7 @@ impl Passki {
             algorithm: parsed.algorithm,
             aaguid: parsed.aaguid,
             attestation_type: parsed.attestation_type,
-            transports: credential.transports.clone(),
+            transports: credential.response.transports.clone(),
             rk,
             large_blob_supported,
             cred_protect,

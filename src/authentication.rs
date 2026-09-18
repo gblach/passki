@@ -76,34 +76,52 @@ pub struct AuthenticationState {
 
 /// What the client sends back after `navigator.credentials.get()`.
 ///
+/// This is the spec's `AuthenticationResponseJSON`, so a front end can post
+/// `credential.toJSON()` unchanged. Members passki does not verify - `id` and `type` - are
+/// accepted and ignored.
+///
 /// Deserialize the request body into it rather than building it field by field, since the type
 /// is `#[non_exhaustive]`.
 #[derive(Deserialize)]
 #[non_exhaustive]
 pub struct AuthenticationCredential {
     /// The credential ID that was used (base64url-encoded).
-    pub credential_id: String,
+    #[serde(rename = "rawId")]
+    pub raw_id: String,
+
+    /// The authenticator's response.
+    pub response: AuthenticationResponse,
+
+    /// Extension results from the client (e.g., PRF outputs).
+    #[serde(rename = "clientExtensionResults")]
+    pub client_extension_results: Option<ClientExtensionResults>,
+
+    /// Whether the client used a built-in or a separate authenticator. A credential registered
+    /// as `Platform` reporting `CrossPlatform` here was used from another device. `None` when
+    /// the client did not report.
+    #[serde(rename = "authenticatorAttachment")]
+    pub authenticator_attachment: Option<AuthenticatorAttachment>,
+}
+
+/// The `response` member of an [`AuthenticationCredential`].
+#[derive(Deserialize)]
+#[non_exhaustive]
+pub struct AuthenticationResponse {
+    /// The client data JSON (base64url-encoded).
+    #[serde(rename = "clientDataJSON")]
+    pub client_data_json: String,
 
     /// The authenticator data (base64url-encoded).
+    #[serde(rename = "authenticatorData")]
     pub authenticator_data: String,
-
-    /// The client data JSON (base64url-encoded).
-    pub client_data_json: String,
 
     /// The signature over the authenticator data and client data hash (base64url-encoded).
     pub signature: String,
 
     /// The `user_id` from registration, base64url-encoded. Only returned for discoverable
     /// credentials, where it is how the server learns who is logging in.
+    #[serde(rename = "userHandle")]
     pub user_handle: Option<String>,
-
-    /// Extension results from the client (e.g., PRF outputs).
-    pub client_extension_results: Option<ClientExtensionResults>,
-
-    /// Whether the client used a built-in or a separate authenticator. A credential registered
-    /// as `Platform` reporting `CrossPlatform` here was used from another device. `None` when
-    /// the client did not report.
-    pub authenticator_attachment: Option<AuthenticatorAttachment>,
 }
 
 /// Result of a successful authentication.
@@ -236,14 +254,14 @@ impl Passki {
         stored_passkey: &StoredPasskey,
     ) -> Result<AuthenticationResult> {
         // An empty list means the caller accepted any discoverable credential.
-        let credential_id = Self::base64_decode(&credential.credential_id)?;
+        let credential_id = Self::base64_decode(&credential.raw_id)?;
         if !state.allowed_credentials.is_empty()
             && !state.allowed_credentials.contains(&credential_id)
         {
             return Err(PasskiError::CredentialNotAllowed);
         }
 
-        let client_data_bytes = Self::base64_decode(&credential.client_data_json)?;
+        let client_data_bytes = Self::base64_decode(&credential.response.client_data_json)?;
         let client_data = ClientData::from_bytes(&client_data_bytes)?;
         client_data.verify_embedded(
             ClientDataType::Get,
@@ -252,7 +270,7 @@ impl Passki {
             &self.embedding_origins,
         )?;
 
-        let authenticator_data = Self::base64_decode(&credential.authenticator_data)?;
+        let authenticator_data = Self::base64_decode(&credential.response.authenticator_data)?;
         if authenticator_data.len() < 37 {
             return Err(PasskiError::InvalidAuthenticatorData);
         }
@@ -295,7 +313,7 @@ impl Passki {
             return Err(PasskiError::CounterRegression);
         }
 
-        let signature = Self::base64_decode(&credential.signature)?;
+        let signature = Self::base64_decode(&credential.response.signature)?;
         let client_data_hash = digest::digest(&SHA256, &client_data_bytes);
 
         // The authenticator signed authData || SHA-256(clientDataJSON).
@@ -336,6 +354,7 @@ impl Passki {
         let large_blob_written = large_blob_result.and_then(|lb| lb.written);
 
         let user_handle = credential
+            .response
             .user_handle
             .as_deref()
             .map(Self::base64_decode)

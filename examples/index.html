@@ -619,32 +619,6 @@
                 return bufferToBase64url(new TextEncoder().encode(text).buffer);
             }
 
-            // Serialize clientExtensionResults to a plain JSON-safe object.
-            // ArrayBuffer values (PRF outputs) are base64url-encoded.
-            function serializeExtensionResults(extResults) {
-                const out = {};
-                if (extResults.credProps !== undefined) {
-                    out.credProps = extResults.credProps;
-                }
-                if (extResults.prf) {
-                    const prf = {};
-                    if (extResults.prf.enabled !== undefined) {
-                        prf.enabled = extResults.prf.enabled;
-                    }
-                    if (extResults.prf.results) {
-                        prf.results = {};
-                        if (extResults.prf.results.first) {
-                            prf.results.first = bufferToBase64url(extResults.prf.results.first);
-                        }
-                        if (extResults.prf.results.second) {
-                            prf.results.second = bufferToBase64url(extResults.prf.results.second);
-                        }
-                    }
-                    out.prf = prf;
-                }
-                return Object.keys(out).length ? out : null;
-            }
-
             // Hand each payload to the browser, which hides or relabels passkeys to match
             // the server. Firefox implements none of these methods, and a signal is advisory,
             // so every call is feature-detected and a rejection is only logged.
@@ -710,29 +684,11 @@
                             ),
                     });
 
-                    const clientExtensionResults = serializeExtensionResults(
-                        credential.getClientExtensionResults()
-                    );
-
                     // Finish registration
                     const finishRes = await fetch("/register/finish", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                            username,
-                            credential_id: bufferToBase64url(credential.rawId),
-                            public_key: bufferToBase64url(
-                                credential.response.attestationObject,
-                            ),
-                            client_data_json: bufferToBase64url(
-                                credential.response.clientDataJSON,
-                            ),
-                            client_extension_results: clientExtensionResults,
-                            authenticator_attachment:
-                                credential.authenticatorAttachment,
-                            transports:
-                                credential.response.getTransports?.() ?? [],
-                        }),
+                        body: JSON.stringify(credential.toJSON()),
                     });
 
                     if (!finishRes.ok)
@@ -828,32 +784,10 @@
                         PublicKeyCredential.parseRequestOptionsFromJSON(options),
                 });
 
-                const clientExtensionResults = serializeExtensionResults(
-                    credential.getClientExtensionResults()
-                );
-
                 const finishRes = await fetch("/auth/finish", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        ...startBody,
-                        credential_id: bufferToBase64url(credential.rawId),
-                        authenticator_data: bufferToBase64url(
-                            credential.response.authenticatorData,
-                        ),
-                        client_data_json: bufferToBase64url(
-                            credential.response.clientDataJSON,
-                        ),
-                        signature: bufferToBase64url(
-                            credential.response.signature,
-                        ),
-                        user_handle: credential.response.userHandle
-                            ? bufferToBase64url(credential.response.userHandle)
-                            : null,
-                        client_extension_results: clientExtensionResults,
-                        authenticator_attachment:
-                            credential.authenticatorAttachment,
-                    }),
+                    body: JSON.stringify(credential.toJSON()),
                 });
 
                 if (!finishRes.ok)
@@ -887,25 +821,10 @@
                         publicKey: PublicKeyCredential.parseRequestOptionsFromJSON(options),
                     });
 
-                    const clientExtensionResults = serializeExtensionResults(
-                        credential.getClientExtensionResults()
-                    );
-
                     const finishRes = await fetch("/auth/finish", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                            credential_id: bufferToBase64url(credential.rawId),
-                            authenticator_data: bufferToBase64url(credential.response.authenticatorData),
-                            client_data_json: bufferToBase64url(credential.response.clientDataJSON),
-                            signature: bufferToBase64url(credential.response.signature),
-                            user_handle: credential.response.userHandle
-                                ? bufferToBase64url(credential.response.userHandle)
-                                : null,
-                            client_extension_results: clientExtensionResults,
-                            authenticator_attachment:
-                                credential.authenticatorAttachment,
-                        }),
+                        body: JSON.stringify(credential.toJSON()),
                     });
 
                     if (!finishRes.ok) {

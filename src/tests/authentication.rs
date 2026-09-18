@@ -234,11 +234,13 @@ fn test_finish_passkey_authentication_success() {
         create_test_auth_client_data_json(&state.challenge, "http://localhost:3000");
 
     let credential = AuthenticationCredential {
-        credential_id: Passki::base64_encode(&[1u8; 16]),
-        authenticator_data: Passki::base64_encode(&authenticator_data),
-        client_data_json: Passki::base64_encode(&client_data_json),
-        signature: Passki::base64_encode(&[9u8; 64]),
-        user_handle: None,
+        raw_id: Passki::base64_encode(&[1u8; 16]),
+        response: AuthenticationResponse {
+            client_data_json: Passki::base64_encode(&client_data_json),
+            authenticator_data: Passki::base64_encode(&authenticator_data),
+            signature: Passki::base64_encode(&[9u8; 64]),
+            user_handle: None,
+        },
         client_extension_results: None,
         authenticator_attachment: None,
     };
@@ -279,11 +281,13 @@ fn test_finish_passkey_authentication_wrong_credential_id() {
         create_test_auth_client_data_json(&state.challenge, "http://localhost:3000");
 
     let credential = AuthenticationCredential {
-        credential_id: Passki::base64_encode(&[99u8; 16]), // Wrong credential ID
-        authenticator_data: Passki::base64_encode(&authenticator_data),
-        client_data_json: Passki::base64_encode(&client_data_json),
-        signature: Passki::base64_encode(&[9u8; 64]),
-        user_handle: None,
+        raw_id: Passki::base64_encode(&[99u8; 16]), // Wrong credential ID
+        response: AuthenticationResponse {
+            client_data_json: Passki::base64_encode(&client_data_json),
+            authenticator_data: Passki::base64_encode(&authenticator_data),
+            signature: Passki::base64_encode(&[9u8; 64]),
+            user_handle: None,
+        },
         client_extension_results: None,
         authenticator_attachment: None,
     };
@@ -328,11 +332,13 @@ fn test_finish_passkey_authentication_wrong_challenge() {
         create_test_auth_client_data_json(&wrong_challenge, "http://localhost:3000");
 
     let credential = AuthenticationCredential {
-        credential_id: Passki::base64_encode(&[1u8; 16]),
-        authenticator_data: Passki::base64_encode(&authenticator_data),
-        client_data_json: Passki::base64_encode(&client_data_json),
-        signature: Passki::base64_encode(&[9u8; 64]),
-        user_handle: None,
+        raw_id: Passki::base64_encode(&[1u8; 16]),
+        response: AuthenticationResponse {
+            client_data_json: Passki::base64_encode(&client_data_json),
+            authenticator_data: Passki::base64_encode(&authenticator_data),
+            signature: Passki::base64_encode(&[9u8; 64]),
+            user_handle: None,
+        },
         client_extension_results: None,
         authenticator_attachment: None,
     };
@@ -375,11 +381,13 @@ fn test_finish_passkey_authentication_wrong_origin() {
     let client_data_json = create_test_auth_client_data_json(&state.challenge, "https://evil.com");
 
     let credential = AuthenticationCredential {
-        credential_id: Passki::base64_encode(&[1u8; 16]),
-        authenticator_data: Passki::base64_encode(&authenticator_data),
-        client_data_json: Passki::base64_encode(&client_data_json),
-        signature: Passki::base64_encode(&[9u8; 64]),
-        user_handle: None,
+        raw_id: Passki::base64_encode(&[1u8; 16]),
+        response: AuthenticationResponse {
+            client_data_json: Passki::base64_encode(&client_data_json),
+            authenticator_data: Passki::base64_encode(&authenticator_data),
+            signature: Passki::base64_encode(&[9u8; 64]),
+            user_handle: None,
+        },
         client_extension_results: None,
         authenticator_attachment: None,
     };
@@ -418,11 +426,13 @@ fn test_finish_passkey_authentication_invalid_counter() {
         create_test_auth_client_data_json(&state.challenge, "http://localhost:3000");
 
     let credential = AuthenticationCredential {
-        credential_id: Passki::base64_encode(&[1u8; 16]),
-        authenticator_data: Passki::base64_encode(&authenticator_data),
-        client_data_json: Passki::base64_encode(&client_data_json),
-        signature: Passki::base64_encode(&[9u8; 64]),
-        user_handle: None,
+        raw_id: Passki::base64_encode(&[1u8; 16]),
+        response: AuthenticationResponse {
+            client_data_json: Passki::base64_encode(&client_data_json),
+            authenticator_data: Passki::base64_encode(&authenticator_data),
+            signature: Passki::base64_encode(&[9u8; 64]),
+            user_handle: None,
+        },
         client_extension_results: None,
         authenticator_attachment: None,
     };
@@ -461,11 +471,13 @@ fn test_finish_passkey_authentication_too_short_authenticator_data() {
         create_test_auth_client_data_json(&state.challenge, "http://localhost:3000");
 
     let credential = AuthenticationCredential {
-        credential_id: Passki::base64_encode(&[1u8; 16]),
-        authenticator_data: Passki::base64_encode(&authenticator_data),
-        client_data_json: Passki::base64_encode(&client_data_json),
-        signature: Passki::base64_encode(&[9u8; 64]),
-        user_handle: None,
+        raw_id: Passki::base64_encode(&[1u8; 16]),
+        response: AuthenticationResponse {
+            client_data_json: Passki::base64_encode(&client_data_json),
+            authenticator_data: Passki::base64_encode(&authenticator_data),
+            signature: Passki::base64_encode(&[9u8; 64]),
+            user_handle: None,
+        },
         client_extension_results: None,
         authenticator_attachment: None,
     };
@@ -514,11 +526,13 @@ fn test_finish_passkey_authentication_uv_required_flag_set() {
     let client_data_json =
         create_test_auth_client_data_json(&state.challenge, "http://localhost:3000");
     let credential = AuthenticationCredential {
-        credential_id: Passki::base64_encode(&[1u8; 16]),
-        authenticator_data: Passki::base64_encode(&authenticator_data),
-        client_data_json: Passki::base64_encode(&client_data_json),
-        signature: Passki::base64_encode(&[9u8; 64]),
-        user_handle: None,
+        raw_id: Passki::base64_encode(&[1u8; 16]),
+        response: AuthenticationResponse {
+            client_data_json: Passki::base64_encode(&client_data_json),
+            authenticator_data: Passki::base64_encode(&authenticator_data),
+            signature: Passki::base64_encode(&[9u8; 64]),
+            user_handle: None,
+        },
         client_extension_results: None,
         authenticator_attachment: None,
     };
@@ -568,11 +582,13 @@ fn test_finish_passkey_authentication_uv_required_flag_not_set() {
     let client_data_json =
         create_test_auth_client_data_json(&state.challenge, "http://localhost:3000");
     let credential = AuthenticationCredential {
-        credential_id: Passki::base64_encode(&[1u8; 16]),
-        authenticator_data: Passki::base64_encode(&authenticator_data),
-        client_data_json: Passki::base64_encode(&client_data_json),
-        signature: Passki::base64_encode(&[9u8; 64]),
-        user_handle: None,
+        raw_id: Passki::base64_encode(&[1u8; 16]),
+        response: AuthenticationResponse {
+            client_data_json: Passki::base64_encode(&client_data_json),
+            authenticator_data: Passki::base64_encode(&authenticator_data),
+            signature: Passki::base64_encode(&[9u8; 64]),
+            user_handle: None,
+        },
         client_extension_results: None,
         authenticator_attachment: None,
     };
@@ -611,11 +627,13 @@ fn test_finish_passkey_authentication_uv_preferred_flag_not_set() {
     let client_data_json =
         create_test_auth_client_data_json(&state.challenge, "http://localhost:3000");
     let credential = AuthenticationCredential {
-        credential_id: Passki::base64_encode(&[1u8; 16]),
-        authenticator_data: Passki::base64_encode(&authenticator_data),
-        client_data_json: Passki::base64_encode(&client_data_json),
-        signature: Passki::base64_encode(&[9u8; 64]),
-        user_handle: None,
+        raw_id: Passki::base64_encode(&[1u8; 16]),
+        response: AuthenticationResponse {
+            client_data_json: Passki::base64_encode(&client_data_json),
+            authenticator_data: Passki::base64_encode(&authenticator_data),
+            signature: Passki::base64_encode(&[9u8; 64]),
+            user_handle: None,
+        },
         client_extension_results: None,
         authenticator_attachment: None,
     };
@@ -661,11 +679,13 @@ fn test_finish_passkey_authentication_up_flag_not_set() {
         create_test_auth_client_data_json(&state.challenge, "http://localhost:3000");
 
     let credential = AuthenticationCredential {
-        credential_id: Passki::base64_encode(&[1u8; 16]),
-        authenticator_data: Passki::base64_encode(&authenticator_data),
-        client_data_json: Passki::base64_encode(&client_data_json),
-        signature: Passki::base64_encode(&[9u8; 64]),
-        user_handle: None,
+        raw_id: Passki::base64_encode(&[1u8; 16]),
+        response: AuthenticationResponse {
+            client_data_json: Passki::base64_encode(&client_data_json),
+            authenticator_data: Passki::base64_encode(&authenticator_data),
+            signature: Passki::base64_encode(&[9u8; 64]),
+            user_handle: None,
+        },
         client_extension_results: None,
         authenticator_attachment: None,
     };
@@ -708,11 +728,13 @@ fn test_finish_passkey_authentication_usernameless() {
         create_test_auth_client_data_json(&state.challenge, "http://localhost:3000");
 
     let credential = AuthenticationCredential {
-        credential_id: Passki::base64_encode(&stored_passkey.credential_id),
-        authenticator_data: Passki::base64_encode(&authenticator_data),
-        client_data_json: Passki::base64_encode(&client_data_json),
-        signature: Passki::base64_encode(&[9u8; 64]),
-        user_handle: None,
+        raw_id: Passki::base64_encode(&stored_passkey.credential_id),
+        response: AuthenticationResponse {
+            client_data_json: Passki::base64_encode(&client_data_json),
+            authenticator_data: Passki::base64_encode(&authenticator_data),
+            signature: Passki::base64_encode(&[9u8; 64]),
+            user_handle: None,
+        },
         client_extension_results: None,
         authenticator_attachment: None,
     };

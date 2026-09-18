@@ -273,7 +273,7 @@ fn register_finish(
     let credential = credential.into_inner();
 
     // The challenge says which pending ceremony this belongs to.
-    let client_data = ClientData::from_base64(&credential.client_data_json)?;
+    let client_data = ClientData::from_base64(&credential.response.client_data_json)?;
 
     let reg_state = store
         .pending_registrations
@@ -407,7 +407,7 @@ fn auth_finish(
     let credential = credential.into_inner();
 
     // The challenge says which pending ceremony this belongs to.
-    let client_data = ClientData::from_base64(&credential.client_data_json)?;
+    let client_data = ClientData::from_base64(&credential.response.client_data_json)?;
 
     let auth_state = store
         .pending_authentications
@@ -416,12 +416,12 @@ fn auth_finish(
         .remove(&client_data.challenge)
         .ok_or(AppError("No pending authentication".into()))?;
 
-    let credential_id = Passki::base64_decode(&credential.credential_id)?;
+    let credential_id = Passki::base64_decode(&credential.raw_id)?;
 
     // The user handle gives a direct lookup; without it, scan every user for a matching credential
     // ID.
     let mut users = store.users.lock().unwrap();
-    let found = match credential.user_handle.as_deref() {
+    let found = match credential.response.user_handle.as_deref() {
         Some(handle) => {
             let user_id = Uuid::from_slice(&Passki::base64_decode(handle)?)?;
             users

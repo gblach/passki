@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use super::helpers::rp_id_hash;
-use crate::{AttestationTrustPolicy, AttestationType, Passki, PasskiError};
+use crate::{AttestationTrustPolicy, AttestationType, Passki, PasskiError, RegistrationResponse};
 use aws_lc_rs::digest::{SHA256, digest};
 use aws_lc_rs::rand::SystemRandom;
 use aws_lc_rs::signature::{ECDSA_P256_SHA256_ASN1_SIGNING, EcdsaKeyPair, KeyPair};
@@ -629,12 +629,14 @@ fn test_registration_stores_the_attestation_type() {
     let attestation_obj = packed_attestation_over(&[&leaf], &client_data_hash);
 
     let credential = RegistrationCredential {
-        credential_id: Passki::base64_encode(&[1u8; 16]),
-        public_key: Passki::base64_encode(&attestation_obj),
-        client_data_json: Passki::base64_encode(&client_data_json),
+        raw_id: Passki::base64_encode(&[1u8; 16]),
+        response: RegistrationResponse {
+            client_data_json: Passki::base64_encode(&client_data_json),
+            attestation_object: Passki::base64_encode(&attestation_obj),
+            transports: Vec::new(),
+        },
         client_extension_results: None,
         authenticator_attachment: None,
-        transports: Vec::new(),
     };
 
     let stored = passki

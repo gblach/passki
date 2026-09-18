@@ -49,15 +49,17 @@ fn register_from(origin: &str) -> Result<StoredPasskey> {
     let attestation_obj =
         create_test_attestation_object_for_rp(RP_ID, -7, FLAGS, 0, [0u8; 16], &[]);
     let credential = RegistrationCredential {
-        credential_id: Passki::base64_encode(&[1u8; 16]),
-        public_key: Passki::base64_encode(&attestation_obj),
-        client_data_json: Passki::base64_encode(&create_test_client_data_json(
-            &state.challenge,
-            origin,
-        )),
+        raw_id: Passki::base64_encode(&[1u8; 16]),
+        response: RegistrationResponse {
+            client_data_json: Passki::base64_encode(&create_test_client_data_json(
+                &state.challenge,
+                origin,
+            )),
+            attestation_object: Passki::base64_encode(&attestation_obj),
+            transports: Vec::new(),
+        },
         client_extension_results: None,
         authenticator_attachment: None,
-        transports: Vec::new(),
     };
 
     passki.finish_passkey_registration(&credential, &state)
@@ -167,11 +169,13 @@ fn test_authentication_accepts_an_origin_other_than_the_one_registered_on() {
     let signature = key_pair.sign(&signed_data);
 
     let credential = AuthenticationCredential {
-        credential_id: Passki::base64_encode(&[7u8; 16]),
-        authenticator_data: Passki::base64_encode(&auth_data),
-        client_data_json: Passki::base64_encode(&client_data_json),
-        signature: Passki::base64_encode(signature.as_ref()),
-        user_handle: None,
+        raw_id: Passki::base64_encode(&[7u8; 16]),
+        response: AuthenticationResponse {
+            client_data_json: Passki::base64_encode(&client_data_json),
+            authenticator_data: Passki::base64_encode(&auth_data),
+            signature: Passki::base64_encode(signature.as_ref()),
+            user_handle: None,
+        },
         client_extension_results: None,
         authenticator_attachment: None,
     };

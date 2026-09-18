@@ -69,10 +69,12 @@ fn test_challenge_omits_attachment_by_default() {
 #[test]
 fn test_registration_credential_captures_reported_attachment() {
     let json = serde_json::json!({
-        "credential_id": "AAAA",
-        "public_key": "AAAA",
-        "client_data_json": "AAAA",
-        "authenticator_attachment": "cross-platform"
+        "rawId": "AAAA",
+        "response": {
+            "clientDataJSON": "AAAA",
+            "attestationObject": "AAAA"
+        },
+        "authenticatorAttachment": "cross-platform"
     });
 
     let credential: RegistrationCredential = serde_json::from_value(json).unwrap();
@@ -85,9 +87,11 @@ fn test_registration_credential_captures_reported_attachment() {
 #[test]
 fn test_registration_credential_without_reported_attachment() {
     let json = serde_json::json!({
-        "credential_id": "AAAA",
-        "public_key": "AAAA",
-        "client_data_json": "AAAA"
+        "rawId": "AAAA",
+        "response": {
+            "clientDataJSON": "AAAA",
+            "attestationObject": "AAAA"
+        }
     });
 
     let credential: RegistrationCredential = serde_json::from_value(json).unwrap();
@@ -97,11 +101,13 @@ fn test_registration_credential_without_reported_attachment() {
 #[test]
 fn test_authentication_credential_captures_reported_attachment() {
     let json = serde_json::json!({
-        "credential_id": "AAAA",
-        "authenticator_data": "AAAA",
-        "client_data_json": "AAAA",
-        "signature": "AAAA",
-        "authenticator_attachment": "platform"
+        "rawId": "AAAA",
+        "response": {
+            "clientDataJSON": "AAAA",
+            "authenticatorData": "AAAA",
+            "signature": "AAAA"
+        },
+        "authenticatorAttachment": "platform"
     });
 
     let credential: AuthenticationCredential = serde_json::from_value(json).unwrap();
@@ -114,10 +120,12 @@ fn test_authentication_credential_captures_reported_attachment() {
 #[test]
 fn test_authentication_credential_without_reported_attachment() {
     let json = serde_json::json!({
-        "credential_id": "AAAA",
-        "authenticator_data": "AAAA",
-        "client_data_json": "AAAA",
-        "signature": "AAAA"
+        "rawId": "AAAA",
+        "response": {
+            "clientDataJSON": "AAAA",
+            "authenticatorData": "AAAA",
+            "signature": "AAAA"
+        }
     });
 
     let credential: AuthenticationCredential = serde_json::from_value(json).unwrap();

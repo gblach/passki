@@ -13,6 +13,8 @@ A simple and secure WebAuthn/Passkey implementation for Rust.
   and RS256/RS384 (RSA)
 - 🛡️ **Security First** - Built-in replay attack protection via signature counters
 - 📦 **Framework Agnostic** - No web framework lock-in, works with any HTTP server
+- 📨 **Spec JSON Shapes** - Both ceremonies take `credential.toJSON()` as the browser produces it,
+  so the front end remaps nothing
 - 🔑 **Extensions** - Support for `credProps` (discoverable credential reporting), PRF (key
   derivation / E2E encryption), `largeBlob` (blob storage on the authenticator), `credProtect`
   (user verification policy on security keys) and `minPinLength` (PIN policy on managed keys)
@@ -633,7 +635,7 @@ filling in:
 - [x] PRF extension (`prf`)
 - [x] BE/BS flags (backup eligibility/state)
 - [x] Related origin requests
-- [ ] `RegistrationResponseJSON` and `AuthenticationResponseJSON` request shapes
+- [x] `RegistrationResponseJSON` and `AuthenticationResponseJSON` request shapes
 - [x] Signal API
 - [ ] `hints` (`security-key` / `client-device` / `hybrid`)
 - [ ] `attestationFormats`

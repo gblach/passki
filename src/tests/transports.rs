@@ -17,10 +17,12 @@ use crate::*;
 
 fn credential_with_transports(transports: serde_json::Value) -> RegistrationCredential {
     let json = serde_json::json!({
-        "credential_id": "AAAA",
-        "public_key": "AAAA",
-        "client_data_json": "AAAA",
-        "transports": transports,
+        "rawId": "AAAA",
+        "response": {
+            "clientDataJSON": "AAAA",
+            "attestationObject": "AAAA",
+            "transports": transports,
+        },
     });
 
     serde_json::from_value(json).unwrap()
@@ -56,7 +58,7 @@ fn test_credential_reads_every_defined_transport() {
     ]));
 
     assert_eq!(
-        credential.transports,
+        credential.response.transports,
         vec![
             AuthenticatorTransport::Usb,
             AuthenticatorTransport::Nfc,
@@ -74,14 +76,20 @@ fn test_credential_tolerates_unknown_transports() {
     // about; that must not fail the whole registration.
     let credential = credential_with_transports(serde_json::json!(["usb", "quantum-tunnel"]));
 
-    assert_eq!(credential.transports, vec![AuthenticatorTransport::Usb]);
+    assert_eq!(
+        credential.response.transports,
+        vec![AuthenticatorTransport::Usb]
+    );
 }
 
 #[test]
 fn test_credential_normalizes_legacy_cable_transport() {
     let credential = credential_with_transports(serde_json::json!(["cable"]));
 
-    assert_eq!(credential.transports, vec![AuthenticatorTransport::Hybrid]);
+    assert_eq!(
+        credential.response.transports,
+        vec![AuthenticatorTransport::Hybrid]
+    );
 }
 
 #[test]
@@ -90,26 +98,31 @@ fn test_credential_deduplicates_cable_and_hybrid() {
     // is a set.
     let credential = credential_with_transports(serde_json::json!(["cable", "hybrid"]));
 
-    assert_eq!(credential.transports, vec![AuthenticatorTransport::Hybrid]);
+    assert_eq!(
+        credential.response.transports,
+        vec![AuthenticatorTransport::Hybrid]
+    );
 }
 
 #[test]
 fn test_credential_without_transports() {
     let json = serde_json::json!({
-        "credential_id": "AAAA",
-        "public_key": "AAAA",
-        "client_data_json": "AAAA"
+        "rawId": "AAAA",
+        "response": {
+            "clientDataJSON": "AAAA",
+            "attestationObject": "AAAA"
+        }
     });
 
     let credential: RegistrationCredential = serde_json::from_value(json).unwrap();
-    assert!(credential.transports.is_empty());
+    assert!(credential.response.transports.is_empty());
 }
 
 #[test]
 fn test_credential_with_null_transports() {
     let credential = credential_with_transports(serde_json::Value::Null);
 
-    assert!(credential.transports.is_empty());
+    assert!(credential.response.transports.is_empty());
 }
 
 #[test]
@@ -128,12 +141,14 @@ fn test_registration_stores_the_reported_transports() {
     let client_data_json = create_test_client_data_json(&state.challenge, "http://localhost:3000");
 
     let credential = RegistrationCredential {
-        credential_id: Passki::base64_encode(&[1u8; 16]),
-        public_key: Passki::base64_encode(&attestation_obj),
-        client_data_json: Passki::base64_encode(&client_data_json),
+        raw_id: Passki::base64_encode(&[1u8; 16]),
+        response: RegistrationResponse {
+            client_data_json: Passki::base64_encode(&client_data_json),
+            attestation_object: Passki::base64_encode(&attestation_obj),
+            transports: vec![AuthenticatorTransport::Usb, AuthenticatorTransport::Nfc],
+        },
         client_extension_results: None,
         authenticator_attachment: None,
-        transports: vec![AuthenticatorTransport::Usb, AuthenticatorTransport::Nfc],
     };
 
     let passkey = passki

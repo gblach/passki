@@ -38,11 +38,13 @@ fn signed_auth_credential(
     let signature = key_pair.sign(&signed_data);
 
     AuthenticationCredential {
-        credential_id: Passki::base64_encode(credential_id),
-        authenticator_data: Passki::base64_encode(&auth_data),
-        client_data_json: Passki::base64_encode(&client_data_json),
-        signature: Passki::base64_encode(signature.as_ref()),
-        user_handle,
+        raw_id: Passki::base64_encode(credential_id),
+        response: AuthenticationResponse {
+            client_data_json: Passki::base64_encode(&client_data_json),
+            authenticator_data: Passki::base64_encode(&auth_data),
+            signature: Passki::base64_encode(signature.as_ref()),
+            user_handle,
+        },
         client_extension_results: None,
         authenticator_attachment: None,
     }

@@ -272,7 +272,7 @@ async fn register_finish(
     credential: RegistrationCredential,
 ) -> Result<impl Reply, warp::Rejection> {
     // The challenge says which pending ceremony this belongs to.
-    let client_data = ClientData::from_base64(&credential.client_data_json)
+    let client_data = ClientData::from_base64(&credential.response.client_data_json)
         .map_err(|e| warp::reject::custom(AppError(e.to_string())))?;
 
     let reg_state = state
@@ -409,7 +409,7 @@ async fn auth_finish(
     credential: AuthenticationCredential,
 ) -> Result<impl Reply, warp::Rejection> {
     // The challenge says which pending ceremony this belongs to.
-    let client_data = ClientData::from_base64(&credential.client_data_json)
+    let client_data = ClientData::from_base64(&credential.response.client_data_json)
         .map_err(|e| warp::reject::custom(AppError(e.to_string())))?;
 
     let auth_state = state
@@ -420,13 +420,13 @@ async fn auth_finish(
         .remove(&client_data.challenge)
         .ok_or_else(|| warp::reject::custom(AppError("No pending authentication".into())))?;
 
-    let credential_id = Passki::base64_decode(&credential.credential_id)
+    let credential_id = Passki::base64_decode(&credential.raw_id)
         .map_err(|e| warp::reject::custom(AppError(e.to_string())))?;
 
     // The user handle gives a direct lookup; without it, scan every user for a matching credential
     // ID.
     let mut users = state.store.users.lock().unwrap();
-    let found = match credential.user_handle.as_deref() {
+    let found = match credential.response.user_handle.as_deref() {
         Some(handle) => {
             let handle_bytes = Passki::base64_decode(handle)
                 .map_err(|e| warp::reject::custom(AppError(e.to_string())))?;

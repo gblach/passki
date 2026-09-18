@@ -355,12 +355,14 @@ fn test_finish_passkey_registration_success() {
     let client_data_json = create_test_client_data_json(&state.challenge, "http://localhost:3000");
 
     let credential = RegistrationCredential {
-        credential_id: Passki::base64_encode(&[1u8; 16]),
-        public_key: Passki::base64_encode(&attestation_obj),
-        client_data_json: Passki::base64_encode(&client_data_json),
+        raw_id: Passki::base64_encode(&[1u8; 16]),
+        response: RegistrationResponse {
+            client_data_json: Passki::base64_encode(&client_data_json),
+            attestation_object: Passki::base64_encode(&attestation_obj),
+            transports: Vec::new(),
+        },
         client_extension_results: None,
         authenticator_attachment: None,
-        transports: Vec::new(),
     };
 
     let result = passki.finish_passkey_registration(&credential, &state);
@@ -391,12 +393,14 @@ fn test_finish_passkey_registration_stores_initial_counter() {
     let client_data_json = create_test_client_data_json(&state.challenge, "http://localhost:3000");
 
     let credential = RegistrationCredential {
-        credential_id: Passki::base64_encode(&[1u8; 16]),
-        public_key: Passki::base64_encode(&attestation_obj),
-        client_data_json: Passki::base64_encode(&client_data_json),
+        raw_id: Passki::base64_encode(&[1u8; 16]),
+        response: RegistrationResponse {
+            client_data_json: Passki::base64_encode(&client_data_json),
+            attestation_object: Passki::base64_encode(&attestation_obj),
+            transports: Vec::new(),
+        },
         client_extension_results: None,
         authenticator_attachment: None,
-        transports: Vec::new(),
     };
 
     let passkey = passki
@@ -427,12 +431,14 @@ fn test_finish_passkey_registration_wrong_challenge() {
     let client_data_json = create_test_client_data_json(&wrong_challenge, "http://localhost:3000");
 
     let credential = RegistrationCredential {
-        credential_id: Passki::base64_encode(&[1u8; 16]),
-        public_key: Passki::base64_encode(&attestation_obj),
-        client_data_json: Passki::base64_encode(&client_data_json),
+        raw_id: Passki::base64_encode(&[1u8; 16]),
+        response: RegistrationResponse {
+            client_data_json: Passki::base64_encode(&client_data_json),
+            attestation_object: Passki::base64_encode(&attestation_obj),
+            transports: Vec::new(),
+        },
         client_extension_results: None,
         authenticator_attachment: None,
-        transports: Vec::new(),
     };
 
     let result = passki.finish_passkey_registration(&credential, &state);
@@ -463,12 +469,14 @@ fn test_finish_passkey_registration_wrong_origin() {
     let client_data_json = create_test_client_data_json(&state.challenge, "https://evil.com");
 
     let credential = RegistrationCredential {
-        credential_id: Passki::base64_encode(&[1u8; 16]),
-        public_key: Passki::base64_encode(&attestation_obj),
-        client_data_json: Passki::base64_encode(&client_data_json),
+        raw_id: Passki::base64_encode(&[1u8; 16]),
+        response: RegistrationResponse {
+            client_data_json: Passki::base64_encode(&client_data_json),
+            attestation_object: Passki::base64_encode(&attestation_obj),
+            transports: Vec::new(),
+        },
         client_extension_results: None,
         authenticator_attachment: None,
-        transports: Vec::new(),
     };
 
     let result = passki.finish_passkey_registration(&credential, &state);
@@ -497,12 +505,14 @@ fn test_finish_passkey_registration_uv_required_flag_set() {
     let attestation_obj = create_test_attestation_object(-7, 0x45);
     let client_data_json = create_test_client_data_json(&state.challenge, "http://localhost:3000");
     let credential = RegistrationCredential {
-        credential_id: Passki::base64_encode(&[1u8; 16]),
-        public_key: Passki::base64_encode(&attestation_obj),
-        client_data_json: Passki::base64_encode(&client_data_json),
+        raw_id: Passki::base64_encode(&[1u8; 16]),
+        response: RegistrationResponse {
+            client_data_json: Passki::base64_encode(&client_data_json),
+            attestation_object: Passki::base64_encode(&attestation_obj),
+            transports: Vec::new(),
+        },
         client_extension_results: None,
         authenticator_attachment: None,
-        transports: Vec::new(),
     };
 
     assert!(
@@ -533,12 +543,14 @@ fn test_finish_passkey_registration_uv_required_flag_not_set() {
     let attestation_obj = create_test_attestation_object(-7, 0x41);
     let client_data_json = create_test_client_data_json(&state.challenge, "http://localhost:3000");
     let credential = RegistrationCredential {
-        credential_id: Passki::base64_encode(&[1u8; 16]),
-        public_key: Passki::base64_encode(&attestation_obj),
-        client_data_json: Passki::base64_encode(&client_data_json),
+        raw_id: Passki::base64_encode(&[1u8; 16]),
+        response: RegistrationResponse {
+            client_data_json: Passki::base64_encode(&client_data_json),
+            attestation_object: Passki::base64_encode(&attestation_obj),
+            transports: Vec::new(),
+        },
         client_extension_results: None,
         authenticator_attachment: None,
-        transports: Vec::new(),
     };
 
     let result = passki.finish_passkey_registration(&credential, &state);
@@ -564,12 +576,14 @@ fn test_finish_passkey_registration_uv_preferred_flag_not_set() {
     let attestation_obj = create_test_attestation_object(-7, 0x41);
     let client_data_json = create_test_client_data_json(&state.challenge, "http://localhost:3000");
     let credential = RegistrationCredential {
-        credential_id: Passki::base64_encode(&[1u8; 16]),
-        public_key: Passki::base64_encode(&attestation_obj),
-        client_data_json: Passki::base64_encode(&client_data_json),
+        raw_id: Passki::base64_encode(&[1u8; 16]),
+        response: RegistrationResponse {
+            client_data_json: Passki::base64_encode(&client_data_json),
+            attestation_object: Passki::base64_encode(&attestation_obj),
+            transports: Vec::new(),
+        },
         client_extension_results: None,
         authenticator_attachment: None,
-        transports: Vec::new(),
     };
 
     assert!(
@@ -598,12 +612,14 @@ fn test_finish_passkey_registration_up_flag_not_set() {
     let client_data_json = create_test_client_data_json(&state.challenge, "http://localhost:3000");
 
     let credential = RegistrationCredential {
-        credential_id: Passki::base64_encode(&[1u8; 16]),
-        public_key: Passki::base64_encode(&attestation_obj),
-        client_data_json: Passki::base64_encode(&client_data_json),
+        raw_id: Passki::base64_encode(&[1u8; 16]),
+        response: RegistrationResponse {
+            client_data_json: Passki::base64_encode(&client_data_json),
+            attestation_object: Passki::base64_encode(&attestation_obj),
+            transports: Vec::new(),
+        },
         client_extension_results: None,
         authenticator_attachment: None,
-        transports: Vec::new(),
     };
 
     let result = passki.finish_passkey_registration(&credential, &state);
@@ -629,12 +645,14 @@ fn test_finish_passkey_registration_eddsa_algorithm() {
     let client_data_json = create_test_client_data_json(&state.challenge, "http://localhost:3000");
 
     let credential = RegistrationCredential {
-        credential_id: Passki::base64_encode(&[1u8; 16]),
-        public_key: Passki::base64_encode(&attestation_obj),
-        client_data_json: Passki::base64_encode(&client_data_json),
+        raw_id: Passki::base64_encode(&[1u8; 16]),
+        response: RegistrationResponse {
+            client_data_json: Passki::base64_encode(&client_data_json),
+            attestation_object: Passki::base64_encode(&attestation_obj),
+            transports: Vec::new(),
+        },
         client_extension_results: None,
         authenticator_attachment: None,
-        transports: Vec::new(),
     };
 
     let result = passki.finish_passkey_registration(&credential, &state);
@@ -663,12 +681,14 @@ fn test_finish_passkey_registration_credential_id_mismatch() {
     let client_data_json = create_test_client_data_json(&state.challenge, "http://localhost:3000");
 
     let credential = RegistrationCredential {
-        credential_id: Passki::base64_encode(&[2u8; 16]),
-        public_key: Passki::base64_encode(&attestation_obj),
-        client_data_json: Passki::base64_encode(&client_data_json),
+        raw_id: Passki::base64_encode(&[2u8; 16]),
+        response: RegistrationResponse {
+            client_data_json: Passki::base64_encode(&client_data_json),
+            attestation_object: Passki::base64_encode(&attestation_obj),
+            transports: Vec::new(),
+        },
         client_extension_results: None,
         authenticator_attachment: None,
-        transports: Vec::new(),
     };
 
     let result = passki.finish_passkey_registration(&credential, &state);
