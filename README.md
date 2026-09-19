@@ -676,7 +676,6 @@ filling in:
 - [x] `hints` (`security-key` / `client-device` / `hybrid`)
 - [ ] `attestationFormats`
 - [ ] `evalByCredential` in the `prf` extension
-- [ ] `authenticatorDisplayName` in the `credProps` extension
 - [ ] `compound` attestation statement format
 - [x] Cross-origin ceremonies in iframes, verifying `topOrigin`
 
