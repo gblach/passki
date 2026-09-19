@@ -389,6 +389,24 @@ pub enum CredentialProtectionPolicy {
     UserVerificationRequired,
 }
 
+/// What kind of authenticator the relying party expects, so the client can drop UI for the rest.
+///
+/// Purely advisory: a client may ignore the list, and one that honours it still accepts an
+/// authenticator of another kind. List them most preferred first.
+///
+/// This is not a filter. [`AuthenticatorSelection::authenticator_attachment`] is, and it wins
+/// where the two disagree, so the spec advises setting hints alone rather than both.
+#[derive(Serialize, Clone, Copy, PartialEq, Debug)]
+#[serde(rename_all = "kebab-case")]
+pub enum PublicKeyCredentialHint {
+    /// A separate portable authenticator, such as a USB or NFC security key.
+    SecurityKey,
+    /// The authenticator built into the device the user is already on.
+    ClientDevice,
+    /// A phone or tablet, reached from the client device over Bluetooth and the network.
+    Hybrid,
+}
+
 /// Whether the authenticator should store the credential itself.
 ///
 /// A resident (discoverable) credential can be picked from a list without the user typing

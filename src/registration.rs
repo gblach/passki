@@ -55,6 +55,10 @@ pub struct RegistrationChallenge {
     #[serde(rename = "excludeCredentials")]
     pub exclude_credentials: Vec<ExcludeCredential>,
 
+    /// Non-binding guidance about the kind of authenticator to expect. Omitted when empty.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub hints: Vec<PublicKeyCredentialHint>,
+
     /// WebAuthn extensions to request from the authenticator.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub extensions: Option<RegistrationExtensions>,
@@ -154,6 +158,10 @@ pub struct RegistrationOptions<'a> {
     /// Existing credentials to exclude from registration.
     pub exclude_credentials: Option<&'a [StoredPasskey]>,
 
+    /// Kinds of authenticator to steer the client's UI toward, most preferred first. Empty leaves
+    /// the choice to the client.
+    pub hints: Vec<PublicKeyCredentialHint>,
+
     /// WebAuthn extensions to request from the authenticator.
     pub extensions: Option<RegistrationExtensions>,
 }
@@ -167,6 +175,7 @@ impl Default for RegistrationOptions<'_> {
             user_verification: UserVerificationRequirement::Preferred,
             authenticator_attachment: None,
             exclude_credentials: None,
+            hints: Vec::new(),
             extensions: None,
         }
     }
@@ -281,6 +290,7 @@ impl Passki {
                 user_verification: options.user_verification,
             },
             exclude_credentials,
+            hints: options.hints,
             extensions: options.extensions,
         };
 

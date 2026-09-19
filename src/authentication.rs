@@ -51,6 +51,10 @@ pub struct AuthenticationChallenge {
     #[serde(rename = "userVerification")]
     pub user_verification: UserVerificationRequirement,
 
+    /// Non-binding guidance about the kind of authenticator to expect. Omitted when empty.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub hints: Vec<PublicKeyCredentialHint>,
+
     /// WebAuthn extensions to request from the authenticator.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub extensions: Option<AuthenticationExtensions>,
@@ -166,6 +170,10 @@ pub struct AuthenticationOptions {
     /// User verification requirement.
     pub user_verification: UserVerificationRequirement,
 
+    /// Kinds of authenticator to steer the client's UI toward, most preferred first. Empty leaves
+    /// the choice to the client.
+    pub hints: Vec<PublicKeyCredentialHint>,
+
     /// WebAuthn extensions to request from the authenticator.
     pub extensions: Option<AuthenticationExtensions>,
 }
@@ -175,6 +183,7 @@ impl Default for AuthenticationOptions {
         Self {
             timeout: 60000,
             user_verification: UserVerificationRequirement::Preferred,
+            hints: Vec::new(),
             extensions: None,
         }
     }
@@ -213,6 +222,7 @@ impl Passki {
                 })
                 .collect(),
             user_verification: options.user_verification,
+            hints: options.hints,
             extensions: options.extensions,
         };
 

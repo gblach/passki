@@ -25,6 +25,7 @@ mod cred_props;
 mod cred_protect;
 mod cross_origin;
 mod extensions;
+mod hints;
 mod large_blob;
 mod min_pin_length;
 mod prf;
