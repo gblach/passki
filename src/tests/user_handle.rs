@@ -75,7 +75,9 @@ fn authenticate_with_user_handle(user_handle: Option<String>) -> AuthenticationR
     };
 
     // With no allowed credentials, the handle is all the server has to go on.
-    let (_, state) = passki.start_passkey_authentication(&[], AuthenticationOptions::default());
+    let (_, state) = passki
+        .start_passkey_authentication(&[], AuthenticationOptions::default())
+        .unwrap();
 
     let credential = signed_auth_credential(
         &cred_id,
@@ -128,10 +130,12 @@ fn test_user_handle_invalid_base64_returns_error() {
         be: false,
         bs: false,
     };
-    let (_, state) = passki.start_passkey_authentication(
-        std::slice::from_ref(&stored),
-        AuthenticationOptions::default(),
-    );
+    let (_, state) = passki
+        .start_passkey_authentication(
+            std::slice::from_ref(&stored),
+            AuthenticationOptions::default(),
+        )
+        .unwrap();
 
     let credential = signed_auth_credential(
         &cred_id,

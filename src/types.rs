@@ -14,6 +14,8 @@
 
 //! Data structures and error types for WebAuthn/Passkey operations.
 
+use std::collections::BTreeMap;
+
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -32,6 +34,16 @@ pub enum PasskiError {
     /// `user_id` passed to [`crate::Passki::start_passkey_registration`] was too short.
     #[error("user_id must be at least 16 bytes")]
     UserIdTooShort,
+
+    /// A [`PrfAuthenticationInput::eval_by_credential`] key named a credential that was not among
+    /// the passkeys the ceremony offers.
+    #[error("evalByCredential names a credential that is not offered: {id}")]
+    PrfEvalByCredentialUnknownKey { id: String },
+
+    /// [`PrfAuthenticationInput::eval_by_credential`] was given for a ceremony that offers
+    /// no credentials, where there is nothing for its keys to name.
+    #[error("evalByCredential requires a non-empty allowCredentials")]
+    PrfEvalByCredentialWithoutAllowCredentials,
 
     /// Base64url decoding failed.
     #[error("Base64 decode error: {0}")]
@@ -619,7 +631,7 @@ pub struct RegistrationExtensions {
     #[serde(rename = "credProps", skip_serializing_if = "Option::is_none")]
     pub cred_props: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub prf: Option<PrfInput>,
+    pub prf: Option<PrfRegistrationInput>,
     #[serde(rename = "largeBlob", skip_serializing_if = "Option::is_none")]
     pub large_blob: Option<LargeBlobRegistrationInput>,
     /// The `credProtect` policy to ask the authenticator for. The one it applied lands
@@ -648,21 +660,52 @@ pub struct RegistrationExtensions {
 #[non_exhaustive]
 pub struct AuthenticationExtensions {
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub prf: Option<PrfInput>,
+    pub prf: Option<PrfAuthenticationInput>,
     #[serde(rename = "largeBlob", skip_serializing_if = "Option::is_none")]
     pub large_blob: Option<LargeBlobAuthenticationInput>,
 }
 
-/// `prf` extension input included in challenges.
+/// `prf` extension input included in registration challenges.
+///
+/// The authenticator derives a secret from the credential and the inputs below. The same inputs
+/// always yield the same secret, which makes it usable as an encryption key that never leaves
+/// the user's devices.
+///
+/// A default value asks whether the authenticator supports PRF at all, without requesting
+/// a derivation. Per-credential inputs live on [`PrfAuthenticationInput`]; the spec forbids them
+/// here, where no credential has been created yet.
+#[derive(Serialize, Debug, Default)]
+#[non_exhaustive]
+pub struct PrfRegistrationInput {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub eval: Option<PrfEval>,
+}
+
+/// `prf` extension input included in authentication challenges.
 ///
 /// The authenticator derives a secret from the credential and the inputs below. The same inputs
 /// always yield the same secret, which makes it usable as an encryption key that never leaves
 /// the user's devices.
 #[derive(Serialize, Debug, Default)]
 #[non_exhaustive]
-pub struct PrfInput {
+pub struct PrfAuthenticationInput {
+    /// The input for every credential [`eval_by_credential`](Self::eval_by_credential) does
+    /// not name.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub eval: Option<PrfEval>,
+
+    /// Per-credential inputs, keyed by base64url-encoded credential ID as
+    /// [`crate::Passki::base64_encode`] produces it. The entry naming the credential the user picks
+    /// wins, and a credential with no entry falls back to `eval`. Omitted when empty.
+    ///
+    /// Every key must name one of the passkeys passed
+    /// to [`crate::Passki::start_passkey_authentication`], which rejects the ceremony otherwise,
+    /// as the client would.
+    #[serde(
+        rename = "evalByCredential",
+        skip_serializing_if = "BTreeMap::is_empty"
+    )]
+    pub eval_by_credential: BTreeMap<String, PrfEval>,
 }
 
 /// The inputs the authenticator derives its PRF outputs from.

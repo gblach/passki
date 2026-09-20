@@ -51,9 +51,9 @@
 use passki::{
     AllAcceptedCredentialsSignal, AttestationConveyancePreference, AuthenticationChallenge,
     AuthenticationCredential, AuthenticationExtensions, AuthenticationOptions, AuthenticationState,
-    ClientData, CurrentUserDetailsSignal, Passki, PrfEval, PrfInput, RegistrationChallenge,
-    RegistrationCredential, RegistrationExtensions, RegistrationOptions, RegistrationState,
-    StoredPasskey, UnknownCredentialSignal,
+    ClientData, CurrentUserDetailsSignal, Passki, PrfAuthenticationInput, PrfEval,
+    PrfRegistrationInput, RegistrationChallenge, RegistrationCredential, RegistrationExtensions,
+    RegistrationOptions, RegistrationState, StoredPasskey, UnknownCredentialSignal,
 };
 use poem::{
     EndpointExt, Route, Server, get, handler,
@@ -213,7 +213,7 @@ async fn register_start(
     // PRF at authentication time (e.g. YubiKey 5 series).
     let mut extensions = RegistrationExtensions::default();
     extensions.cred_props = Some(true);
-    extensions.prf = Some(PrfInput::default());
+    extensions.prf = Some(PrfRegistrationInput::default());
 
     let mut options = RegistrationOptions::default();
     options.attestation = if req.attestation {
@@ -352,7 +352,7 @@ async fn auth_start(
 
     let extensions = req.prf_salt.map(|salt| {
         let mut extensions = AuthenticationExtensions::default();
-        let mut prf = PrfInput::default();
+        let mut prf = PrfAuthenticationInput::default();
         prf.eval = Some(PrfEval {
             first: salt,
             second: None,
@@ -364,7 +364,9 @@ async fn auth_start(
     let mut options = AuthenticationOptions::default();
     options.extensions = extensions;
 
-    let (challenge, state) = passki.start_passkey_authentication(&passkeys, options);
+    let (challenge, state) = passki
+        .start_passkey_authentication(&passkeys, options)
+        .map_err(err)?;
 
     // Keyed by the challenge, which is what the finish call brings back.
     store

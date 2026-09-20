@@ -155,10 +155,12 @@ fn test_authentication_accepts_an_origin_other_than_the_one_registered_on() {
         be: false,
         bs: false,
     };
-    let (_, state) = passki.start_passkey_authentication(
-        std::slice::from_ref(&stored),
-        AuthenticationOptions::default(),
-    );
+    let (_, state) = passki
+        .start_passkey_authentication(
+            std::slice::from_ref(&stored),
+            AuthenticationOptions::default(),
+        )
+        .unwrap();
 
     // The same credential asserting from the second origin, under the one shared rp_id.
     let auth_data = create_test_authenticator_data_for_rp(RP_ID, 1, 0x01);

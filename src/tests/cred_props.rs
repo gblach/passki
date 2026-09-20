@@ -66,7 +66,7 @@ fn test_cred_props_and_prf_can_be_requested_together() {
             RegistrationOptions {
                 extensions: Some(RegistrationExtensions {
                     cred_props: Some(true),
-                    prf: Some(PrfInput { eval: None }),
+                    prf: Some(PrfRegistrationInput::default()),
                     large_blob: None,
                     credential_protection_policy: None,
                     enforce_credential_protection_policy: None,

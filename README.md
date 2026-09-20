@@ -73,7 +73,7 @@ let mut stored_passkey = passki.finish_passkey_registration(
 let (authentication_challenge, authentication_state) = passki.start_passkey_authentication(
     &user_passkeys,
     AuthenticationOptions::default(),
-);
+)?;
 
 // Authentication step 2: verify the signature
 let result = passki.finish_passkey_authentication(
@@ -148,13 +148,13 @@ secret tied to a specific passkey. Passki passes the outputs through without pro
 
 ```rust
 use passki::{
-    AuthenticationExtensions, AuthenticationOptions, Passki, PrfEval, PrfInput,
-    RegistrationExtensions, RegistrationOptions,
+    AuthenticationExtensions, AuthenticationOptions, Passki, PrfAuthenticationInput, PrfEval,
+    PrfRegistrationInput, RegistrationExtensions, RegistrationOptions,
 };
 
 // During registration, probe for PRF support
 let mut extensions = RegistrationExtensions::default();
-extensions.prf = Some(PrfInput::default());
+extensions.prf = Some(PrfRegistrationInput::default());
 
 let mut options = RegistrationOptions::default();
 options.extensions = Some(extensions);
@@ -167,7 +167,7 @@ let (challenge, state) = passki.start_passkey_registration(
 
 // During authentication, request a PRF derivation for a given context
 let mut extensions = AuthenticationExtensions::default();
-let mut prf = PrfInput::default();
+let mut prf = PrfAuthenticationInput::default();
 prf.eval = Some(PrfEval {
     first: Passki::base64_encode(b"my-app-encryption-key-context"),
     second: None,
@@ -177,11 +177,53 @@ extensions.prf = Some(prf);
 let mut options = AuthenticationOptions::default();
 options.extensions = Some(extensions);
 
-let (challenge, state) = passki.start_passkey_authentication(&user_passkeys, options);
+let (challenge, state) = passki.start_passkey_authentication(&user_passkeys, options)?;
 
 // result.prf_first contains the derived key bytes (32 bytes)
 // The same passkey + same context always yields the same bytes
 ```
+
+A user with passkeys on several devices gets several credentials in `allowCredentials`, and `eval`
+alone cannot say which input belongs to which. `eval_by_credential` maps a credential ID to its own
+inputs; the entry naming the credential the user picks wins, and a credential with no entry falls
+back to `eval`.
+
+```rust
+use passki::{
+    AuthenticationExtensions, AuthenticationOptions, Passki, PrfAuthenticationInput, PrfEval,
+};
+
+// salt_for is your own lookup: the context this credential's data was encrypted under.
+let mut prf = PrfAuthenticationInput::default();
+prf.eval_by_credential = user_passkeys
+    .iter()
+    .map(|passkey| {
+        let eval = PrfEval {
+            first: Passki::base64_encode(&salt_for(&passkey.credential_id)),
+            second: None,
+        };
+        (Passki::base64_encode(&passkey.credential_id), eval)
+    })
+    .collect();
+
+let mut extensions = AuthenticationExtensions::default();
+extensions.prf = Some(prf);
+
+let mut options = AuthenticationOptions::default();
+options.extensions = Some(extensions);
+
+let (challenge, state) = passki.start_passkey_authentication(&user_passkeys, options)?;
+```
+
+Keys are base64url credential IDs, as `Passki::base64_encode` produces them, and each one must name
+a credential in the same `passkeys` list. `start_passkey_authentication` returns
+`PrfEvalByCredentialUnknownKey` for a key that names no offered credential and
+`PrfEvalByCredentialWithoutAllowCredentials` when the list is empty, which is what the client
+would refuse to run. The spec's third rule needs no check: `RegistrationExtensions` takes
+`PrfRegistrationInput`, which has no `eval_by_credential` to set.
+
+**Browser support**: PRF itself is Chrome 132+ and Safari 18+. Support for this member specifically
+was not confirmed against a real authenticator, so check the outputs before relying on it.
 
 ### largeBlob
 
@@ -226,7 +268,7 @@ extensions.large_blob = Some(LargeBlobAuthenticationInput::Write(
 let mut options = AuthenticationOptions::default();
 options.extensions = Some(extensions);
 
-let (challenge, state) = passki.start_passkey_authentication(&user_passkeys, options);
+let (challenge, state) = passki.start_passkey_authentication(&user_passkeys, options)?;
 // result.large_blob_written == Some(true) → the blob was stored
 
 // A later ceremony reads it back
@@ -675,7 +717,7 @@ filling in:
 - [x] Signal API
 - [x] `hints` (`security-key` / `client-device` / `hybrid`)
 - [ ] `attestationFormats`
-- [ ] `evalByCredential` in the `prf` extension
+- [x] `evalByCredential` in the `prf` extension
 - [ ] `compound` attestation statement format
 - [x] Cross-origin ceremonies in iframes, verifying `topOrigin`
 

@@ -67,7 +67,7 @@
 //! let (authentication_challenge, authentication_state) = passki.start_passkey_authentication(
 //!     &user_passkeys,
 //!     AuthenticationOptions::default(),
-//! );
+//! ).expect("default options carry no per-credential PRF inputs to check");
 //!
 //! // Authentication step 2: verify the signature
 //! # /*

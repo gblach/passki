@@ -195,16 +195,18 @@ fn test_stored_passkey_without_large_blob_supported_deserializes() {
 
 fn authentication_challenge(large_blob: Option<LargeBlobAuthenticationInput>) -> serde_json::Value {
     let passki = Passki::new("localhost", &["http://localhost:3000"], "Test");
-    let (challenge, _) = passki.start_passkey_authentication(
-        &[],
-        AuthenticationOptions {
-            extensions: Some(AuthenticationExtensions {
-                large_blob,
+    let (challenge, _) = passki
+        .start_passkey_authentication(
+            &[],
+            AuthenticationOptions {
+                extensions: Some(AuthenticationExtensions {
+                    large_blob,
+                    ..Default::default()
+                }),
                 ..Default::default()
-            }),
-            ..Default::default()
-        },
-    );
+            },
+        )
+        .unwrap();
 
     serde_json::to_value(&challenge).unwrap()
 }
@@ -291,16 +293,18 @@ fn authenticate_with_large_blob_result(
         be: false,
         bs: false,
     };
-    let (_, state) = passki.start_passkey_authentication(
-        std::slice::from_ref(&stored),
-        AuthenticationOptions {
-            extensions: Some(AuthenticationExtensions {
-                large_blob: Some(LargeBlobAuthenticationInput::Read),
+    let (_, state) = passki
+        .start_passkey_authentication(
+            std::slice::from_ref(&stored),
+            AuthenticationOptions {
+                extensions: Some(AuthenticationExtensions {
+                    large_blob: Some(LargeBlobAuthenticationInput::Read),
+                    ..Default::default()
+                }),
                 ..Default::default()
-            }),
-            ..Default::default()
-        },
-    );
+            },
+        )
+        .unwrap();
 
     let credential = signed_auth_credential(&cred_id, &state.challenge, &key_pair, large_blob);
     passki.finish_passkey_authentication(&credential, &state, &stored)

@@ -247,10 +247,12 @@ fn test_authentication_accepts_a_listed_embedding_origin() {
         algorithm: -8,
         ..StoredPasskey::default()
     };
-    let (_, state) = passki.start_passkey_authentication(
-        std::slice::from_ref(&stored),
-        AuthenticationOptions::default(),
-    );
+    let (_, state) = passki
+        .start_passkey_authentication(
+            std::slice::from_ref(&stored),
+            AuthenticationOptions::default(),
+        )
+        .unwrap();
 
     let auth_data = create_test_authenticator_data_for_rp(RP_ID, 1, 0x01);
     let client_data_json =

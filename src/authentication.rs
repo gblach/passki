@@ -14,6 +14,8 @@
 
 //! Passkey authentication functionality.
 
+use std::collections::BTreeMap;
+
 use aws_lc_rs::digest::{self, SHA256};
 use aws_lc_rs::signature::{
     ECDSA_P256_SHA256_ASN1, ECDSA_P384_SHA384_ASN1, ED25519, EcdsaVerificationAlgorithm,
@@ -190,6 +192,29 @@ impl Default for AuthenticationOptions {
 }
 
 impl Passki {
+    /// Checks the `prf` extension's per-credential inputs against the credentials the ceremony
+    /// offers, which is what the client does before it will run the ceremony.
+    fn verify_eval_by_credential(
+        eval_by_credential: &BTreeMap<String, PrfEval>,
+        allow_credentials: &[AllowCredential],
+    ) -> Result<()> {
+        if eval_by_credential.is_empty() {
+            return Ok(());
+        }
+
+        if allow_credentials.is_empty() {
+            return Err(PasskiError::PrfEvalByCredentialWithoutAllowCredentials);
+        }
+
+        for id in eval_by_credential.keys() {
+            if !allow_credentials.iter().any(|cred| &cred.id == id) {
+                return Err(PasskiError::PrfEvalByCredentialUnknownKey { id: id.clone() });
+            }
+        }
+
+        Ok(())
+    }
+
     /// Starts a passkey authentication: generates a random challenge and returns it alongside
     /// the state needed to finish.
     ///
@@ -202,25 +227,36 @@ impl Passki {
     /// # Returns
     ///
     /// The challenge to send to the client, and the state to keep on the server.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if [`PrfAuthenticationInput::eval_by_credential`] names a credential
+    /// that is not among `passkeys`, or is given at all when `passkeys` is empty.
     pub fn start_passkey_authentication(
         &self,
         passkeys: &[StoredPasskey],
         options: AuthenticationOptions,
-    ) -> (AuthenticationChallenge, AuthenticationState) {
+    ) -> Result<(AuthenticationChallenge, AuthenticationState)> {
+        let allow_credentials: Vec<AllowCredential> = passkeys
+            .iter()
+            .map(|pk| AllowCredential {
+                id: Self::base64_encode(&pk.credential_id),
+                type_: "public-key",
+                transports: pk.transports.clone(),
+            })
+            .collect();
+
+        if let Some(prf) = options.extensions.as_ref().and_then(|ext| ext.prf.as_ref()) {
+            Self::verify_eval_by_credential(&prf.eval_by_credential, &allow_credentials)?;
+        }
+
         let challenge = Self::generate_challenge();
 
         let challenge_response = AuthenticationChallenge {
             challenge: Self::base64_encode(&challenge),
             timeout: options.timeout,
             rp_id: self.rp_id.clone(),
-            allow_credentials: passkeys
-                .iter()
-                .map(|pk| AllowCredential {
-                    id: Self::base64_encode(&pk.credential_id),
-                    type_: "public-key",
-                    transports: pk.transports.clone(),
-                })
-                .collect(),
+            allow_credentials,
             user_verification: options.user_verification,
             hints: options.hints,
             extensions: options.extensions,
@@ -232,7 +268,7 @@ impl Passki {
             user_verification: options.user_verification,
         };
 
-        (challenge_response, state)
+        Ok((challenge_response, state))
     }
 
     /// Completes a passkey authentication by verifying the signature and authenticator data

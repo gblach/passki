@@ -159,8 +159,9 @@ fn test_finish_passkey_authentication_bs_without_be_rejected() {
     };
 
     let passkeys = vec![stored_passkey.clone()];
-    let (_challenge, state) =
-        passki.start_passkey_authentication(&passkeys, AuthenticationOptions::default());
+    let (_challenge, state) = passki
+        .start_passkey_authentication(&passkeys, AuthenticationOptions::default())
+        .unwrap();
 
     // flags: UP | BS (no BE)
     let authenticator_data = create_test_authenticator_data(6, 0x01 | 0x10);

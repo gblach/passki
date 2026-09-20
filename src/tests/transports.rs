@@ -168,8 +168,9 @@ fn test_allow_credentials_carry_the_transports() {
         AuthenticatorTransport::Internal,
     ])];
 
-    let (challenge, _) =
-        passki.start_passkey_authentication(&passkeys, AuthenticationOptions::default());
+    let (challenge, _) = passki
+        .start_passkey_authentication(&passkeys, AuthenticationOptions::default())
+        .unwrap();
     let json = serde_json::to_value(&challenge).unwrap();
 
     assert_eq!(json["allowCredentials"][0]["transports"][0], "internal");
@@ -204,8 +205,9 @@ fn test_descriptors_omit_empty_transports() {
     let passki = Passki::new("localhost", &["http://localhost:3000"], "Test App");
     let passkeys = vec![passkey_with_transports(Vec::new())];
 
-    let (challenge, _) =
-        passki.start_passkey_authentication(&passkeys, AuthenticationOptions::default());
+    let (challenge, _) = passki
+        .start_passkey_authentication(&passkeys, AuthenticationOptions::default())
+        .unwrap();
     let json = serde_json::to_value(&challenge).unwrap();
 
     // An absent member means "no hint"; an empty array tells the client the credential is reachable

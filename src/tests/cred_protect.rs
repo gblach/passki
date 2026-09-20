@@ -349,13 +349,15 @@ fn authenticate(
         be: false,
         bs: false,
     };
-    let (_, state) = passki().start_passkey_authentication(
-        std::slice::from_ref(&stored),
-        AuthenticationOptions {
-            user_verification: UserVerificationRequirement::Preferred,
-            ..Default::default()
-        },
-    );
+    let (_, state) = passki()
+        .start_passkey_authentication(
+            std::slice::from_ref(&stored),
+            AuthenticationOptions {
+                user_verification: UserVerificationRequirement::Preferred,
+                ..Default::default()
+            },
+        )
+        .unwrap();
 
     let auth_data = create_test_authenticator_data(1, flags);
     let client_data_json =

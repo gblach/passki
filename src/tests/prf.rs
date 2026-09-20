@@ -19,6 +19,7 @@ use crate::*;
 use aws_lc_rs::digest::{self, SHA256};
 use aws_lc_rs::rand::SystemRandom;
 use aws_lc_rs::signature::{Ed25519KeyPair, KeyPair};
+use std::collections::BTreeMap;
 
 // A properly signed credential, using a real Ed25519 key pair. PRF outputs are only extracted once
 // the signature has verified, so these tests cannot use dummy signatures.
@@ -103,11 +104,12 @@ fn test_registration_challenge_omits_extensions_when_prf_none() {
 fn test_registration_challenge_includes_extensions_when_prf_some() {
     let passki = Passki::new("localhost", &["http://localhost:3000"], "Test");
     let extensions = Some(RegistrationExtensions {
-        prf: Some(PrfInput {
+        prf: Some(PrfRegistrationInput {
             eval: Some(PrfEval {
                 first: Passki::base64_encode(b"salt-one"),
                 second: None,
             }),
+            ..Default::default()
         }),
         ..Default::default()
     });
@@ -135,11 +137,12 @@ fn test_registration_challenge_extensions_json_shape() {
     let passki = Passki::new("localhost", &["http://localhost:3000"], "Test");
     let salt = b"my-salt-bytes";
     let extensions = Some(RegistrationExtensions {
-        prf: Some(PrfInput {
+        prf: Some(PrfRegistrationInput {
             eval: Some(PrfEval {
                 first: Passki::base64_encode(salt),
                 second: None,
             }),
+            ..Default::default()
         }),
         ..Default::default()
     });
@@ -168,11 +171,12 @@ fn test_registration_challenge_extensions_json_shape() {
 fn test_registration_challenge_extensions_includes_second_input() {
     let passki = Passki::new("localhost", &["http://localhost:3000"], "Test");
     let extensions = Some(RegistrationExtensions {
-        prf: Some(PrfInput {
+        prf: Some(PrfRegistrationInput {
             eval: Some(PrfEval {
                 first: Passki::base64_encode(b"first-salt"),
                 second: Some(Passki::base64_encode(b"second-salt")),
             }),
+            ..Default::default()
         }),
         ..Default::default()
     });
@@ -197,10 +201,10 @@ fn test_registration_challenge_extensions_includes_second_input() {
 #[test]
 fn test_registration_challenge_probe_only_has_no_eval() {
     let passki = Passki::new("localhost", &["http://localhost:3000"], "Test");
-    // An eval-less PrfInput serializes to `{}`, which asks whether PRF is supported without
+    // An eval-less PrfRegistrationInput serializes to `{}`, which asks whether PRF is supported without
     // requesting a derivation.
     let extensions = Some(RegistrationExtensions {
-        prf: Some(PrfInput { eval: None }),
+        prf: Some(PrfRegistrationInput::default()),
         ..Default::default()
     });
     let (challenge, _) = passki
@@ -229,7 +233,9 @@ fn test_registration_challenge_probe_only_has_no_eval() {
 #[test]
 fn test_authentication_challenge_omits_extensions_when_prf_none() {
     let passki = Passki::new("localhost", &["http://localhost:3000"], "Test");
-    let (challenge, _) = passki.start_passkey_authentication(&[], AuthenticationOptions::default());
+    let (challenge, _) = passki
+        .start_passkey_authentication(&[], AuthenticationOptions::default())
+        .unwrap();
 
     let json = serde_json::to_value(&challenge).unwrap();
     assert!(
@@ -251,13 +257,15 @@ fn test_authentication_challenge_omits_prf_when_only_another_extension_is_set() 
         prf: None,
         large_blob: Some(LargeBlobAuthenticationInput::Read),
     });
-    let (challenge, _) = passki.start_passkey_authentication(
-        &[],
-        AuthenticationOptions {
-            extensions,
-            ..Default::default()
-        },
-    );
+    let (challenge, _) = passki
+        .start_passkey_authentication(
+            &[],
+            AuthenticationOptions {
+                extensions,
+                ..Default::default()
+            },
+        )
+        .unwrap();
 
     let json = serde_json::to_value(&challenge).unwrap();
     assert!(
@@ -271,21 +279,24 @@ fn test_authentication_challenge_omits_prf_when_only_another_extension_is_set() 
 fn test_authentication_challenge_includes_extensions_when_prf_some() {
     let passki = Passki::new("localhost", &["http://localhost:3000"], "Test");
     let extensions = Some(AuthenticationExtensions {
-        prf: Some(PrfInput {
+        prf: Some(PrfAuthenticationInput {
             eval: Some(PrfEval {
                 first: Passki::base64_encode(b"salt"),
                 second: None,
             }),
+            ..Default::default()
         }),
         large_blob: None,
     });
-    let (challenge, _) = passki.start_passkey_authentication(
-        &[],
-        AuthenticationOptions {
-            extensions,
-            ..Default::default()
-        },
-    );
+    let (challenge, _) = passki
+        .start_passkey_authentication(
+            &[],
+            AuthenticationOptions {
+                extensions,
+                ..Default::default()
+            },
+        )
+        .unwrap();
 
     let json = serde_json::to_value(&challenge).unwrap();
     assert!(
@@ -299,21 +310,24 @@ fn test_authentication_challenge_extensions_json_shape() {
     let passki = Passki::new("localhost", &["http://localhost:3000"], "Test");
     let salt = b"app-context-v1";
     let extensions = Some(AuthenticationExtensions {
-        prf: Some(PrfInput {
+        prf: Some(PrfAuthenticationInput {
             eval: Some(PrfEval {
                 first: Passki::base64_encode(salt),
                 second: None,
             }),
+            ..Default::default()
         }),
         large_blob: None,
     });
-    let (challenge, _) = passki.start_passkey_authentication(
-        &[],
-        AuthenticationOptions {
-            extensions,
-            ..Default::default()
-        },
-    );
+    let (challenge, _) = passki
+        .start_passkey_authentication(
+            &[],
+            AuthenticationOptions {
+                extensions,
+                ..Default::default()
+            },
+        )
+        .unwrap();
 
     let json = serde_json::to_value(&challenge).unwrap();
     let eval = &json["extensions"]["prf"]["eval"];
@@ -328,25 +342,226 @@ fn test_authentication_challenge_extensions_json_shape() {
 fn test_authentication_challenge_extensions_includes_second_input() {
     let passki = Passki::new("localhost", &["http://localhost:3000"], "Test");
     let extensions = Some(AuthenticationExtensions {
-        prf: Some(PrfInput {
+        prf: Some(PrfAuthenticationInput {
             eval: Some(PrfEval {
                 first: Passki::base64_encode(b"first"),
                 second: Some(Passki::base64_encode(b"second")),
             }),
+            ..Default::default()
         }),
         large_blob: None,
     });
-    let (challenge, _) = passki.start_passkey_authentication(
-        &[],
-        AuthenticationOptions {
-            extensions,
-            ..Default::default()
-        },
-    );
+    let (challenge, _) = passki
+        .start_passkey_authentication(
+            &[],
+            AuthenticationOptions {
+                extensions,
+                ..Default::default()
+            },
+        )
+        .unwrap();
 
     let json = serde_json::to_value(&challenge).unwrap();
     let eval = &json["extensions"]["prf"]["eval"];
     assert_eq!(eval["second"], Passki::base64_encode(b"second"));
+}
+
+#[test]
+fn test_authentication_challenge_omits_eval_by_credential_when_empty() {
+    let passki = Passki::new("localhost", &["http://localhost:3000"], "Test");
+    let extensions = Some(AuthenticationExtensions {
+        prf: Some(PrfAuthenticationInput {
+            eval: Some(PrfEval {
+                first: Passki::base64_encode(b"salt"),
+                second: None,
+            }),
+            ..Default::default()
+        }),
+        large_blob: None,
+    });
+    let (challenge, _) = passki
+        .start_passkey_authentication(
+            &[],
+            AuthenticationOptions {
+                extensions,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+    let json = serde_json::to_value(&challenge).unwrap();
+    assert!(
+        json["extensions"]["prf"].get("evalByCredential").is_none(),
+        "evalByCredential must be absent when no per-credential input was given"
+    );
+}
+
+#[test]
+fn test_authentication_challenge_carries_eval_by_credential() {
+    let passki = Passki::new("localhost", &["http://localhost:3000"], "Test");
+    let phone = make_stored_passkey(&[1u8; 16], &[0u8; 32], 0);
+    let laptop = make_stored_passkey(&[2u8; 16], &[0u8; 32], 0);
+    let eval_by_credential = BTreeMap::from([
+        (
+            Passki::base64_encode(&phone.credential_id),
+            PrfEval {
+                first: Passki::base64_encode(b"phone-salt"),
+                second: None,
+            },
+        ),
+        (
+            Passki::base64_encode(&laptop.credential_id),
+            PrfEval {
+                first: Passki::base64_encode(b"laptop-first"),
+                second: Some(Passki::base64_encode(b"laptop-second")),
+            },
+        ),
+    ]);
+    let extensions = Some(AuthenticationExtensions {
+        prf: Some(PrfAuthenticationInput {
+            eval: None,
+            eval_by_credential,
+        }),
+        large_blob: None,
+    });
+    let (challenge, _) = passki
+        .start_passkey_authentication(
+            &[phone, laptop],
+            AuthenticationOptions {
+                extensions,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+    let json = serde_json::to_value(&challenge).unwrap();
+    let by_credential = &json["extensions"]["prf"]["evalByCredential"];
+    let phone_id = json["allowCredentials"][0]["id"].as_str().unwrap();
+    let laptop_id = json["allowCredentials"][1]["id"].as_str().unwrap();
+
+    // The keys are the ids the client sees in allowCredentials, or it rejects the ceremony.
+    assert_eq!(
+        by_credential[phone_id]["first"],
+        Passki::base64_encode(b"phone-salt")
+    );
+    assert!(by_credential[phone_id].get("second").is_none());
+    assert_eq!(
+        by_credential[laptop_id]["second"],
+        Passki::base64_encode(b"laptop-second")
+    );
+}
+
+#[test]
+fn test_eval_by_credential_sits_beside_eval() {
+    let passki = Passki::new("localhost", &["http://localhost:3000"], "Test");
+    let phone = make_stored_passkey(&[1u8; 16], &[0u8; 32], 0);
+    let laptop = make_stored_passkey(&[2u8; 16], &[0u8; 32], 0);
+    let extensions = Some(AuthenticationExtensions {
+        prf: Some(PrfAuthenticationInput {
+            eval: Some(PrfEval {
+                first: Passki::base64_encode(b"fallback-salt"),
+                second: None,
+            }),
+            eval_by_credential: BTreeMap::from([(
+                Passki::base64_encode(&phone.credential_id),
+                PrfEval {
+                    first: Passki::base64_encode(b"phone-salt"),
+                    second: None,
+                },
+            )]),
+        }),
+        large_blob: None,
+    });
+    let (challenge, _) = passki
+        .start_passkey_authentication(
+            &[phone, laptop.clone()],
+            AuthenticationOptions {
+                extensions,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+    // eval stays as the input for every credential the map does not name, here the laptop.
+    let json = serde_json::to_value(&challenge).unwrap();
+    let prf = &json["extensions"]["prf"];
+    assert_eq!(
+        prf["eval"]["first"],
+        Passki::base64_encode(b"fallback-salt")
+    );
+    let laptop_id = Passki::base64_encode(&laptop.credential_id);
+    assert!(prf["evalByCredential"].get(laptop_id).is_none());
+}
+
+#[test]
+fn test_eval_by_credential_unknown_key_rejected() {
+    let passki = Passki::new("localhost", &["http://localhost:3000"], "Test");
+    let phone = make_stored_passkey(&[1u8; 16], &[0u8; 32], 0);
+    let laptop = make_stored_passkey(&[2u8; 16], &[0u8; 32], 0);
+    let stranger = Passki::base64_encode(&laptop.credential_id);
+    let extensions = Some(AuthenticationExtensions {
+        prf: Some(PrfAuthenticationInput {
+            eval: None,
+            eval_by_credential: BTreeMap::from([(
+                stranger.clone(),
+                PrfEval {
+                    first: Passki::base64_encode(b"laptop-salt"),
+                    second: None,
+                },
+            )]),
+        }),
+        large_blob: None,
+    });
+
+    // The laptop is not offered, so the client would refuse the ceremony.
+    let err = passki
+        .start_passkey_authentication(
+            &[phone],
+            AuthenticationOptions {
+                extensions,
+                ..Default::default()
+            },
+        )
+        .unwrap_err();
+
+    assert!(matches!(
+        err,
+        PasskiError::PrfEvalByCredentialUnknownKey { id } if id == stranger
+    ));
+}
+
+#[test]
+fn test_eval_by_credential_without_allow_credentials_rejected() {
+    let passki = Passki::new("localhost", &["http://localhost:3000"], "Test");
+    let phone = make_stored_passkey(&[1u8; 16], &[0u8; 32], 0);
+    let extensions = Some(AuthenticationExtensions {
+        prf: Some(PrfAuthenticationInput {
+            eval: None,
+            eval_by_credential: BTreeMap::from([(
+                Passki::base64_encode(&phone.credential_id),
+                PrfEval {
+                    first: Passki::base64_encode(b"phone-salt"),
+                    second: None,
+                },
+            )]),
+        }),
+        large_blob: None,
+    });
+
+    let err = passki
+        .start_passkey_authentication(
+            &[],
+            AuthenticationOptions {
+                extensions,
+                ..Default::default()
+            },
+        )
+        .unwrap_err();
+
+    assert!(matches!(
+        err,
+        PasskiError::PrfEvalByCredentialWithoutAllowCredentials
+    ));
 }
 
 // PRF outputs in AuthenticationResult
@@ -361,10 +576,12 @@ fn test_prf_outputs_none_when_no_extension_results() {
 
     let passki = Passki::new("localhost", &["http://localhost:3000"], "Test");
     let stored = make_stored_passkey(&cred_id, pub_key, 0);
-    let (_, state) = passki.start_passkey_authentication(
-        std::slice::from_ref(&stored),
-        AuthenticationOptions::default(),
-    );
+    let (_, state) = passki
+        .start_passkey_authentication(
+            std::slice::from_ref(&stored),
+            AuthenticationOptions::default(),
+        )
+        .unwrap();
 
     let credential = signed_auth_credential(
         &cred_id,
@@ -392,10 +609,12 @@ fn test_prf_outputs_none_when_results_absent_in_extension() {
 
     let passki = Passki::new("localhost", &["http://localhost:3000"], "Test");
     let stored = make_stored_passkey(&cred_id, pub_key, 0);
-    let (_, state) = passki.start_passkey_authentication(
-        std::slice::from_ref(&stored),
-        AuthenticationOptions::default(),
-    );
+    let (_, state) = passki
+        .start_passkey_authentication(
+            std::slice::from_ref(&stored),
+            AuthenticationOptions::default(),
+        )
+        .unwrap();
 
     // What a registration probe answers: supported, but nothing derived.
     let ext = PrfExtensionResult {
@@ -428,10 +647,12 @@ fn test_prf_first_output_decoded() {
 
     let passki = Passki::new("localhost", &["http://localhost:3000"], "Test");
     let stored = make_stored_passkey(&cred_id, pub_key, 0);
-    let (_, state) = passki.start_passkey_authentication(
-        std::slice::from_ref(&stored),
-        AuthenticationOptions::default(),
-    );
+    let (_, state) = passki
+        .start_passkey_authentication(
+            std::slice::from_ref(&stored),
+            AuthenticationOptions::default(),
+        )
+        .unwrap();
 
     let prf_bytes = vec![0xABu8; 32];
     let ext = PrfExtensionResult {
@@ -467,10 +688,12 @@ fn test_prf_both_outputs_decoded() {
 
     let passki = Passki::new("localhost", &["http://localhost:3000"], "Test");
     let stored = make_stored_passkey(&cred_id, pub_key, 0);
-    let (_, state) = passki.start_passkey_authentication(
-        std::slice::from_ref(&stored),
-        AuthenticationOptions::default(),
-    );
+    let (_, state) = passki
+        .start_passkey_authentication(
+            std::slice::from_ref(&stored),
+            AuthenticationOptions::default(),
+        )
+        .unwrap();
 
     let first_bytes = vec![0x11u8; 32];
     let second_bytes = vec![0x22u8; 32];
@@ -507,10 +730,12 @@ fn test_prf_invalid_base64_first_returns_error() {
 
     let passki = Passki::new("localhost", &["http://localhost:3000"], "Test");
     let stored = make_stored_passkey(&cred_id, pub_key, 0);
-    let (_, state) = passki.start_passkey_authentication(
-        std::slice::from_ref(&stored),
-        AuthenticationOptions::default(),
-    );
+    let (_, state) = passki
+        .start_passkey_authentication(
+            std::slice::from_ref(&stored),
+            AuthenticationOptions::default(),
+        )
+        .unwrap();
 
     let ext = PrfExtensionResult {
         enabled: None,
@@ -548,10 +773,12 @@ fn test_prf_invalid_base64_second_returns_error() {
 
     let passki = Passki::new("localhost", &["http://localhost:3000"], "Test");
     let stored = make_stored_passkey(&cred_id, pub_key, 0);
-    let (_, state) = passki.start_passkey_authentication(
-        std::slice::from_ref(&stored),
-        AuthenticationOptions::default(),
-    );
+    let (_, state) = passki
+        .start_passkey_authentication(
+            std::slice::from_ref(&stored),
+            AuthenticationOptions::default(),
+        )
+        .unwrap();
 
     let ext = PrfExtensionResult {
         enabled: None,

@@ -35,13 +35,15 @@ fn start_registration(hints: Vec<PublicKeyCredentialHint>) -> serde_json::Value 
 }
 
 fn start_authentication(hints: Vec<PublicKeyCredentialHint>) -> serde_json::Value {
-    let (challenge, _) = passki().start_passkey_authentication(
-        &[],
-        AuthenticationOptions {
-            hints,
-            ..Default::default()
-        },
-    );
+    let (challenge, _) = passki()
+        .start_passkey_authentication(
+            &[],
+            AuthenticationOptions {
+                hints,
+                ..Default::default()
+            },
+        )
+        .unwrap();
 
     serde_json::to_value(&challenge).unwrap()
 }
