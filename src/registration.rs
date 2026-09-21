@@ -328,7 +328,6 @@ impl Passki {
         }
     }
 
-    /// Reads the `minPinLength` value from the authenticator extension outputs.
     fn min_pin_length_output(
         extensions: &[(ciborium::Value, ciborium::Value)],
     ) -> Result<Option<u8>> {

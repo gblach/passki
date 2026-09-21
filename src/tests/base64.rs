@@ -23,7 +23,6 @@ fn test_generate_challenge_multiple_unique() {
         challenges.push(Passki::generate_challenge());
     }
 
-    // Every challenge must differ.
     for i in 0..challenges.len() {
         for j in (i + 1)..challenges.len() {
             assert_ne!(
@@ -56,7 +55,6 @@ fn test_base64_encode_simple() {
     let data = b"hello";
     let encoded = Passki::base64_encode(data);
 
-    // URL-safe base64 without padding: "hello" -> "aGVsbG8"
     assert_eq!(encoded, "aGVsbG8");
 }
 
@@ -65,7 +63,6 @@ fn test_base64_encode_with_padding() {
     let data = b"hi";
     let encoded = Passki::base64_encode(data);
 
-    // No padding.
     assert!(!encoded.contains('='), "Should not contain padding");
     assert_eq!(encoded, "aGk");
 }
@@ -75,7 +72,6 @@ fn test_base64_encode_binary_data() {
     let data = vec![0x00, 0x01, 0x02, 0xFF, 0xFE];
     let encoded = Passki::base64_encode(&data);
 
-    // Only A-Z, a-z, 0-9, - and _ may appear.
     for ch in encoded.chars() {
         assert!(
             ch.is_alphanumeric() || ch == '-' || ch == '_',
@@ -91,7 +87,6 @@ fn test_base64_encode_url_safe() {
     let data = vec![0xFB, 0xFF];
     let encoded = Passki::base64_encode(&data);
 
-    // - and _ replace + and /.
     assert!(!encoded.contains('+'), "Should not contain +");
     assert!(!encoded.contains('/'), "Should not contain /");
 }
@@ -225,9 +220,8 @@ fn test_base64_encode_decode_consistency() {
 
 #[test]
 fn test_base64_decode_case_sensitive() {
-    // Base64 is case-sensitive
     let encoded1 = "YWJj"; // "abc"
-    let encoded2 = "YWJJ"; // different
+    let encoded2 = "YWJJ"; // "abI"
 
     let decoded1 = Passki::base64_decode(encoded1).unwrap();
     let decoded2 = Passki::base64_decode(encoded2);

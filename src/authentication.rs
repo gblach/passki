@@ -484,7 +484,6 @@ impl Passki {
             .ok_or_else(|| PasskiError::InvalidCoseKey(format!("Missing {}", name)))
     }
 
-    /// Verifies that an integer field in a COSE key map has the expected value.
     fn cose_expect(
         cose_map: &[(ciborium::Value, ciborium::Value)],
         label: i64,

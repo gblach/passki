@@ -63,7 +63,6 @@ fn cose_alg_for_signature_oid(oid: &ObjectIdentifier) -> Result<i32> {
     }
 }
 
-/// Returns a certificate's public key as encoded in its `SubjectPublicKeyInfo`.
 fn spki_bytes(cert: &Certificate) -> Result<&[u8]> {
     cert.tbs_certificate()
         .subject_public_key_info()
@@ -94,7 +93,6 @@ fn check_issued_by(der: &[u8], cert: &Certificate, issuer: &Certificate) -> Resu
         .map_err(|_| PasskiError::InvalidCertificateChain("broken signature link".to_string()))
 }
 
-/// Returns an error unless `now` falls inside the certificate's validity period.
 fn check_validity(cert: &Certificate, now: Duration) -> Result<()> {
     let validity = cert.tbs_certificate().validity();
 
@@ -155,7 +153,6 @@ fn check_can_issue(cert: &Certificate, intermediates_below: usize) -> Result<()>
     Ok(())
 }
 
-/// The current time as a duration since the Unix epoch.
 fn now() -> Duration {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)

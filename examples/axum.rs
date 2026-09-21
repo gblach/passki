@@ -286,7 +286,6 @@ async fn register_finish(
         .and_then(|prf| prf.enabled)
         .unwrap_or(false);
 
-    // Checks origin, challenge and attestation, and extracts the public key.
     let passkey = state
         .passki
         .finish_passkey_registration(&credential, &reg_state)?;
@@ -300,7 +299,6 @@ async fn register_finish(
     let user_id_bytes = Passki::base64_decode(&reg_state.user.id)?;
     let user_id = Uuid::from_slice(&user_id_bytes)?;
 
-    // Store the passkey so it can be used to log in.
     let mut users = state.store.users.lock().unwrap();
     let user = users
         .entry(reg_state.user.name.clone())
@@ -356,7 +354,6 @@ async fn auth_start(
     Json(req): Json<AuthStartRequest>,
 ) -> AppResult<AuthenticationChallenge> {
     let passkeys = if let Some(ref username) = req.username {
-        // Named user: offer only their credentials.
         let users = state.store.users.lock().unwrap();
         let user = users
             .get(username)
@@ -455,7 +452,6 @@ async fn auth_finish(
         }));
     };
 
-    // Checks origin, challenge, signature and counter.
     let result = state
         .passki
         .finish_passkey_authentication(&credential, &auth_state, passkey)?;

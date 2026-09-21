@@ -173,7 +173,6 @@ fn test_start_passkey_authentication_generates_unique_challenges() {
         .start_passkey_authentication(&passkeys, AuthenticationOptions::default())
         .unwrap();
 
-    // Every challenge must differ.
     assert_ne!(challenge1.challenge, challenge2.challenge);
     assert_ne!(state1.challenge, state2.challenge);
 }

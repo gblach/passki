@@ -128,7 +128,6 @@ fn test_verify_packed_self_attestation_algorithm_mismatch() {
 #[test]
 fn test_verify_attestation_unsupported_format() {
     let attestation_obj = create_test_attestation_object(-7, 0x45);
-    // Rewrite fmt from "none" to an unknown value.
     let mut value: Value = ciborium::from_reader(&attestation_obj[..]).unwrap();
     if let Value::Map(entries) = &mut value {
         for (k, v) in entries.iter_mut() {

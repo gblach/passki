@@ -348,14 +348,12 @@ fn verify_tpm(
 
 // attStmt accessors
 
-/// Returns the entries of an `attStmt` CBOR map.
 fn att_map(att_stmt: &Value) -> Result<&Vec<(Value, Value)>> {
     att_stmt
         .as_map()
         .ok_or_else(|| PasskiError::InvalidAttestationObject("attStmt is not a map".to_string()))
 }
 
-/// Looks up a text-keyed byte-string field in an `attStmt` map.
 fn att_bytes<'a>(map: &'a [(Value, Value)], key: &str) -> Result<&'a [u8]> {
     map.iter()
         .find(|(k, _)| k.as_text() == Some(key))
@@ -364,7 +362,6 @@ fn att_bytes<'a>(map: &'a [(Value, Value)], key: &str) -> Result<&'a [u8]> {
         .ok_or_else(|| PasskiError::MissingAttStmtField(key.to_string()))
 }
 
-/// Looks up a text-keyed integer field in an `attStmt` map.
 fn att_int(map: &[(Value, Value)], key: &str) -> Result<i64> {
     map.iter()
         .find(|(k, _)| k.as_text() == Some(key))
@@ -373,7 +370,6 @@ fn att_int(map: &[(Value, Value)], key: &str) -> Result<i64> {
         .ok_or_else(|| PasskiError::MissingAttStmtField(key.to_string()))
 }
 
-/// Looks up a text-keyed text field in an `attStmt` map.
 fn att_text<'a>(map: &'a [(Value, Value)], key: &str) -> Result<&'a str> {
     map.iter()
         .find(|(k, _)| k.as_text() == Some(key))
@@ -438,8 +434,6 @@ pub(crate) fn cert_extension<'a>(
         .map(|ext| ext.extn_value.as_bytes())
 }
 
-/// Verifies a signature over `signed_data` using the certificate's public key and the given COSE
-/// algorithm.
 fn verify_cert_signature(
     cert: &Certificate,
     alg: i32,
@@ -490,7 +484,6 @@ pub(crate) fn verify_with_key(
     }
 }
 
-/// Returns an error unless the certificate is X.509 v3.
 fn check_cert_version_3(cert: &Certificate) -> Result<()> {
     if cert.tbs_certificate().version() != Version::V3 {
         return Err(PasskiError::InvalidCertificate("not version 3".to_string()));
@@ -545,7 +538,6 @@ fn check_aaguid_extension(cert: &Certificate, aaguid: &[u8; 16]) -> Result<()> {
     Ok(())
 }
 
-/// Returns whether the certificate's public key matches the given key.
 fn cert_key_matches(cert: &Certificate, key: &PublicKey) -> Result<bool> {
     let cert_key = cert
         .tbs_certificate()
@@ -573,7 +565,6 @@ fn cert_key_matches(cert: &Certificate, key: &PublicKey) -> Result<bool> {
 
 // COSE / public key helpers
 
-/// Extracts the public key parameters from a COSE key.
 fn cose_public_key(cose_key_bytes: &[u8]) -> Result<PublicKey> {
     let map = Passki::cose_parse(cose_key_bytes)?;
     let kty = map
@@ -598,7 +589,6 @@ fn cose_public_key(cose_key_bytes: &[u8]) -> Result<PublicKey> {
     }
 }
 
-/// Returns whether a TPM key matches a COSE public key.
 fn public_keys_match(tpm_key: &PublicKey, cose_key: &PublicKey) -> bool {
     match (tpm_key, cose_key) {
         (PublicKey::Rsa { n, e }, PublicKey::Rsa { n: cn, e: ce }) => be_eq(n, cn) && be_eq(e, ce),
@@ -607,7 +597,6 @@ fn public_keys_match(tpm_key: &PublicKey, cose_key: &PublicKey) -> bool {
     }
 }
 
-/// Computes the digest of `data` using the hash paired with the given COSE algorithm.
 fn digest_for_alg(alg: i32, data: &[u8]) -> Result<Vec<u8>> {
     let algorithm = match alg {
         ALG_ES256 | ALG_RS256 => &SHA256,
@@ -622,7 +611,6 @@ fn be_eq(a: &[u8], b: &[u8]) -> bool {
     strip_leading_zeros(a) == strip_leading_zeros(b)
 }
 
-/// Strips leading zero bytes from a big-endian integer.
 fn strip_leading_zeros(bytes: &[u8]) -> &[u8] {
     let start = bytes.iter().take_while(|&&b| b == 0).count();
     &bytes[start..]
@@ -690,7 +678,6 @@ const KM_ORIGIN_GENERATED: i64 = 0;
 /// The key may sign.
 const KM_PURPOSE_SIGN: i64 = 2;
 
-/// Returns whether an AuthorizationList contains the `allApplications` field.
 fn authz_has_all_applications(list: &[u8]) -> Result<bool> {
     let mut reader = DerReader::new(list);
     while let Some((tag, _)) = reader.next_context_field()? {
@@ -922,12 +909,10 @@ impl<'a> DerReader<'a> {
         Ok(&self.bytes[start..self.pos])
     }
 
-    /// Reads a `SEQUENCE` and returns a reader over its content.
     fn read_sequence(&mut self) -> Result<DerReader<'a>> {
         Ok(DerReader::new(self.read_sequence_bytes()?))
     }
 
-    /// Reads a `SEQUENCE` and returns its content bytes.
     fn read_sequence_bytes(&mut self) -> Result<&'a [u8]> {
         let (class, constructed, tag, content) = self.read_tlv()?;
         if class != 0x00 || !constructed || tag != 0x10 {
@@ -938,7 +923,6 @@ impl<'a> DerReader<'a> {
         Ok(content)
     }
 
-    /// Reads a `SET` and returns a reader over its content.
     fn read_set(&mut self) -> Result<DerReader<'a>> {
         let (class, constructed, tag, content) = self.read_tlv()?;
         if class != 0x00 || !constructed || tag != 0x11 {
@@ -949,7 +933,6 @@ impl<'a> DerReader<'a> {
         Ok(DerReader::new(content))
     }
 
-    /// Reads an `INTEGER` and returns its raw content bytes.
     fn read_integer(&mut self) -> Result<&'a [u8]> {
         let (class, constructed, tag, content) = self.read_tlv()?;
         if class != 0x00 || constructed || tag != 0x02 {
@@ -960,7 +943,6 @@ impl<'a> DerReader<'a> {
         Ok(content)
     }
 
-    /// Reads an `INTEGER` and returns its value as an `i64`.
     fn read_integer_value(&mut self) -> Result<i64> {
         let content = self.read_integer()?;
         if content.is_empty() || content.len() > 8 {
@@ -975,7 +957,6 @@ impl<'a> DerReader<'a> {
         Ok(value)
     }
 
-    /// Reads an `OCTET STRING` and returns its content bytes.
     fn read_octet_string(&mut self) -> Result<&'a [u8]> {
         let (class, constructed, tag, content) = self.read_tlv()?;
         if class != 0x00 || constructed || tag != 0x04 {
@@ -986,7 +967,6 @@ impl<'a> DerReader<'a> {
         Ok(content)
     }
 
-    /// Skips the next element.
     fn skip(&mut self) -> Result<()> {
         self.read_tlv()?;
         Ok(())
@@ -1004,7 +984,6 @@ impl<'a> DerReader<'a> {
         Ok(None)
     }
 
-    /// Returns the next `INTEGER` value in the buffer, or `None` at the end.
     fn next_integer_value(&mut self) -> Result<Option<i64>> {
         if self.pos >= self.bytes.len() {
             return Ok(None);

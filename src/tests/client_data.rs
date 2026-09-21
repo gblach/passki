@@ -311,7 +311,7 @@ fn test_verify_type_case_sensitive() {
     let origin = "http://localhost:3000";
 
     let client_data_json = serde_json::json!({
-        "type": "WEBAUTHN.CREATE", // Wrong case
+        "type": "WEBAUTHN.CREATE",
         "challenge": Passki::base64_encode(&challenge),
         "origin": origin,
         "crossOrigin": false

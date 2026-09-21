@@ -664,7 +664,6 @@
                 setStatus("Waiting for the authenticator…");
 
                 try {
-                    // Start registration
                     const startRes = await fetch("/register/start", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
@@ -676,7 +675,6 @@
 
                     const options = await startRes.json();
 
-                    // Parse creation options using WebAuthn JSON API
                     const credential = await navigator.credentials.create({
                         publicKey:
                             PublicKeyCredential.parseCreationOptionsFromJSON(
@@ -684,7 +682,6 @@
                             ),
                     });
 
-                    // Finish registration
                     const finishRes = await fetch("/register/finish", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },

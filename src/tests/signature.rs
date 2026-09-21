@@ -58,7 +58,6 @@ fn test_verify_eddsa_invalid_signature() {
     let pub_key: &[u8; 32] = key_pair.public_key().as_ref().try_into().unwrap();
     let cose_key_bytes = create_eddsa_cose_key(pub_key);
 
-    // A different message must not verify.
     let wrong_message = b"different message";
     let result = Passki::verify_eddsa(&cose_key_bytes, wrong_message, signature.as_ref());
 
@@ -99,7 +98,7 @@ fn test_verify_eddsa_corrupted_signature() {
 
 #[test]
 fn test_verify_eddsa_invalid_public_key() {
-    let invalid_key = [0xFF; 32]; // Invalid public key
+    let invalid_key = [0xFF; 32];
     let cose_key_bytes = create_eddsa_cose_key(&invalid_key);
 
     let message = b"test message";
@@ -122,7 +121,6 @@ fn test_verify_eddsa_invalid_public_key() {
 fn test_verify_eddsa_wrong_key_length() {
     use ciborium::Value;
 
-    // x is the wrong length.
     let cose_key = vec![
         (Value::Integer(1.into()), Value::Integer(1.into())),
         (Value::Integer(3.into()), Value::Integer((-8).into())),
@@ -151,7 +149,6 @@ fn test_verify_eddsa_wrong_key_length() {
 fn test_verify_eddsa_missing_x_coordinate() {
     use ciborium::Value;
 
-    // No x coordinate.
     let cose_key = vec![
         (Value::Integer(1.into()), Value::Integer(1.into())),
         (Value::Integer(3.into()), Value::Integer((-8).into())),
@@ -193,7 +190,6 @@ fn test_verify_eddsa_invalid_cbor() {
 fn test_verify_eddsa_cose_key_not_map() {
     use ciborium::Value;
 
-    // An array where a map is required.
     let cose_key = Value::Array(vec![Value::Integer(1.into())]);
     let mut cose_key_bytes = Vec::new();
     ciborium::into_writer(&cose_key, &mut cose_key_bytes).unwrap();
@@ -249,7 +245,6 @@ fn test_verify_es256_invalid_signature() {
 
     let cose_key_bytes = create_es256_cose_key(x, y);
 
-    // A different message must not verify.
     let wrong_message = b"different message";
     let result = Passki::verify_signature(
         &cose_key_bytes,
@@ -287,7 +282,7 @@ fn test_verify_es256_corrupted_signature() {
     let cose_key_bytes = create_es256_cose_key(x, y);
 
     let mut corrupted_sig = signature.as_ref().to_vec();
-    corrupted_sig[8] ^= 0xFF; // Corrupt a byte in the DER-encoded signature
+    corrupted_sig[8] ^= 0xFF;
 
     let result = Passki::verify_signature(&cose_key_bytes, ALG_ES256, message, &corrupted_sig);
 
@@ -301,7 +296,6 @@ fn test_verify_es256_corrupted_signature() {
 fn test_verify_es256_missing_x_coordinate() {
     use ciborium::Value;
 
-    // No x coordinate.
     let cose_key = vec![
         (Value::Integer(1.into()), Value::Integer(2.into())),
         (Value::Integer(3.into()), Value::Integer((-7).into())),
@@ -330,7 +324,6 @@ fn test_verify_es256_missing_x_coordinate() {
 fn test_verify_es256_missing_y_coordinate() {
     use ciborium::Value;
 
-    // No y coordinate.
     let cose_key = vec![
         (Value::Integer(1.into()), Value::Integer(2.into())),
         (Value::Integer(3.into()), Value::Integer((-7).into())),
@@ -498,7 +491,6 @@ fn test_verify_rs256_invalid_signature() {
 
     let cose_key_bytes = create_rs256_cose_key(&n, &e);
 
-    // A different message must not verify.
     let wrong_message = b"different message";
     let result = Passki::verify_signature(&cose_key_bytes, ALG_RS256, wrong_message, &signature);
 
@@ -542,7 +534,6 @@ fn test_verify_rs256_corrupted_signature() {
 fn test_verify_rs256_missing_modulus() {
     use ciborium::Value;
 
-    // No modulus.
     let cose_key = vec![
         (Value::Integer(1.into()), Value::Integer(3.into())),
         (Value::Integer(3.into()), Value::Integer((-257).into())),
@@ -570,7 +561,6 @@ fn test_verify_rs256_missing_modulus() {
 fn test_verify_rs256_missing_exponent() {
     use ciborium::Value;
 
-    // No exponent.
     let cose_key = vec![
         (Value::Integer(1.into()), Value::Integer(3.into())),
         (Value::Integer(3.into()), Value::Integer((-257).into())),
@@ -596,7 +586,6 @@ fn test_verify_rs256_missing_exponent() {
 
 #[test]
 fn test_verify_rs256_invalid_public_key() {
-    // The modulus is far too small.
     let n = vec![1u8; 32]; // Too small for RSA
     let e = vec![1, 0, 1]; // Standard exponent 65537
 
@@ -700,7 +689,6 @@ fn test_verify_rs384_dispatch() {
 fn test_verify_eddsa_wrong_kty() {
     use ciborium::Value;
 
-    // kty EC2 where OKP is required.
     let cose_key = vec![
         (Value::Integer(1.into()), Value::Integer(2.into())), // kty: EC2 (wrong)
         (Value::Integer(3.into()), Value::Integer((-8).into())), // alg: EdDSA
@@ -720,7 +708,6 @@ fn test_verify_eddsa_wrong_kty() {
 fn test_verify_eddsa_wrong_crv() {
     use ciborium::Value;
 
-    // crv P-256 where Ed25519 is required.
     let cose_key = vec![
         (Value::Integer(1.into()), Value::Integer(1.into())), // kty: OKP
         (Value::Integer(3.into()), Value::Integer((-8).into())), // alg: EdDSA
@@ -740,7 +727,6 @@ fn test_verify_eddsa_wrong_crv() {
 fn test_verify_eddsa_missing_kty() {
     use ciborium::Value;
 
-    // No kty.
     let cose_key = vec![
         (Value::Integer(3.into()), Value::Integer((-8).into())), // alg: EdDSA
         (Value::Integer((-1).into()), Value::Integer(6.into())), // crv: Ed25519
@@ -759,7 +745,6 @@ fn test_verify_eddsa_missing_kty() {
 fn test_verify_es256_wrong_crv() {
     use ciborium::Value;
 
-    // crv P-384, verified as ES256.
     let cose_key = vec![
         (Value::Integer(1.into()), Value::Integer(2.into())), // kty: EC2
         (Value::Integer(3.into()), Value::Integer((-7).into())), // alg: ES256
@@ -780,7 +765,6 @@ fn test_verify_es256_wrong_crv() {
 fn test_verify_es384_wrong_crv() {
     use ciborium::Value;
 
-    // crv P-256, verified as ES384.
     let cose_key = vec![
         (Value::Integer(1.into()), Value::Integer(2.into())), // kty: EC2
         (Value::Integer(3.into()), Value::Integer((-35).into())), // alg: ES384
@@ -801,7 +785,6 @@ fn test_verify_es384_wrong_crv() {
 fn test_verify_rs256_wrong_kty() {
     use ciborium::Value;
 
-    // kty OKP where RSA is required.
     let cose_key = vec![
         (Value::Integer(1.into()), Value::Integer(1.into())), // kty: OKP (wrong)
         (Value::Integer(3.into()), Value::Integer((-257).into())), // alg: RS256

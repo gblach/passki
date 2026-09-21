@@ -289,7 +289,6 @@ fn register_finish(
         .and_then(|prf| prf.enabled)
         .unwrap_or(false);
 
-    // Checks origin, challenge and attestation, and extracts the public key.
     let passkey = passki.finish_passkey_registration(&credential, &reg_state)?;
     let resident_key = passkey.rk;
     let backup_eligible = passkey.be;
@@ -301,7 +300,6 @@ fn register_finish(
     let user_id_bytes = Passki::base64_decode(&reg_state.user.id)?;
     let user_id = Uuid::from_slice(&user_id_bytes)?;
 
-    // Store the passkey so it can be used to log in.
     let mut users = store.users.lock().unwrap();
     let user = users
         .entry(reg_state.user.name.clone())
@@ -357,7 +355,6 @@ fn auth_start(
     req: Json<AuthStartRequest>,
 ) -> AppResult<AuthenticationChallenge> {
     let passkeys = if let Some(ref username) = req.username {
-        // Named user: offer only their credentials.
         let users = store.users.lock().unwrap();
         let user = users
             .get(username)
@@ -456,7 +453,6 @@ fn auth_finish(
         }));
     };
 
-    // Checks origin, challenge, signature and counter.
     let result = passki.finish_passkey_authentication(&credential, &auth_state, passkey)?;
 
     // Must be stored: if the next login reports a counter that did not grow, the credential
