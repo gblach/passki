@@ -355,32 +355,29 @@ fn att_map(att_stmt: &Value) -> Result<&Vec<(Value, Value)>> {
 }
 
 fn att_bytes<'a>(map: &'a [(Value, Value)], key: &str) -> Result<&'a [u8]> {
-    map.iter()
-        .find(|(k, _)| k.as_text() == Some(key))
-        .and_then(|(_, v)| v.as_bytes())
+    cbor_text(map, key)
+        .and_then(Value::as_bytes)
         .map(Vec::as_slice)
         .ok_or_else(|| PasskiError::MissingAttStmtField(key.to_string()))
 }
 
 fn att_int(map: &[(Value, Value)], key: &str) -> Result<i64> {
-    map.iter()
-        .find(|(k, _)| k.as_text() == Some(key))
-        .and_then(|(_, v)| v.as_integer())
+    cbor_text(map, key)
+        .and_then(Value::as_integer)
         .and_then(|i| i.try_into().ok())
         .ok_or_else(|| PasskiError::MissingAttStmtField(key.to_string()))
 }
 
 fn att_text<'a>(map: &'a [(Value, Value)], key: &str) -> Result<&'a str> {
-    map.iter()
-        .find(|(k, _)| k.as_text() == Some(key))
-        .and_then(|(_, v)| v.as_text())
+    cbor_text(map, key)
+        .and_then(Value::as_text)
         .ok_or_else(|| PasskiError::MissingAttStmtField(key.to_string()))
 }
 
 /// Returns the `x5c` certificate chain from an `attStmt` map, if present and non-empty.
 fn att_x5c(map: &[(Value, Value)]) -> Result<Option<Vec<Vec<u8>>>> {
-    let array = match map.iter().find(|(k, _)| k.as_text() == Some("x5c")) {
-        Some((_, v)) => v
+    let array = match cbor_text(map, "x5c") {
+        Some(value) => value
             .as_array()
             .ok_or_else(|| PasskiError::InvalidAttestation("x5c is not an array".to_string()))?,
         None => return Ok(None),
@@ -567,12 +564,7 @@ fn cert_key_matches(cert: &Certificate, key: &PublicKey) -> Result<bool> {
 
 fn cose_public_key(cose_key_bytes: &[u8]) -> Result<PublicKey> {
     let map = Passki::cose_parse(cose_key_bytes)?;
-    let kty = map
-        .iter()
-        .find(|(k, _)| k.as_integer() == Some(1.into()))
-        .and_then(|(_, v)| v.as_integer())
-        .and_then(|i| i.try_into().ok())
-        .ok_or_else(|| PasskiError::InvalidCoseKey("Missing kty".to_string()))?;
+    let kty = Passki::cose_int(&map, 1, "kty")?;
 
     match kty {
         KTY_EC2 => Ok(PublicKey::Ec {

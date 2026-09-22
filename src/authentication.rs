@@ -317,23 +317,10 @@ impl Passki {
         )?;
 
         let authenticator_data = Self::base64_decode(&credential.response.authenticator_data)?;
-        if authenticator_data.len() < 37 {
-            return Err(PasskiError::InvalidAuthenticatorData);
-        }
+        let (flags, counter) = self.parse_auth_data_header(&authenticator_data)?;
 
-        // Bytes 0-31 bind the assertion to our domain.
-        let rp_id_hash = digest::digest(&SHA256, self.rp_id.as_bytes());
-        if &authenticator_data[..32] != rp_id_hash.as_ref() {
-            return Err(PasskiError::RpIdHashMismatch);
-        }
-
-        let flags = authenticator_data[32];
         if (flags & FLAG_UP) == 0 {
             return Err(PasskiError::UserNotPresent);
-        }
-
-        if (flags & FLAG_BS) != 0 && (flags & FLAG_BE) == 0 {
-            return Err(PasskiError::InvalidBackupFlags);
         }
 
         // A credential protected at the strictest level is unusable without user verification,
@@ -345,13 +332,6 @@ impl Passki {
         if uv_required && (flags & FLAG_UV) == 0 {
             return Err(PasskiError::UserVerificationRequired);
         }
-
-        let counter = u32::from_be_bytes([
-            authenticator_data[33],
-            authenticator_data[34],
-            authenticator_data[35],
-            authenticator_data[36],
-        ]);
 
         // Two zeros mean the authenticator does not count at all, which the spec allows and synced
         // passkeys (e.g. Google Password Manager) do.
@@ -476,11 +456,21 @@ impl Passki {
         label: i64,
         name: &str,
     ) -> Result<&'a [u8]> {
-        cose_map
-            .iter()
-            .find(|(k, _)| k.as_integer() == Some(label.into()))
-            .and_then(|(_, v)| v.as_bytes())
+        cbor_int(cose_map, label)
+            .and_then(ciborium::Value::as_bytes)
             .map(Vec::as_slice)
+            .ok_or_else(|| PasskiError::InvalidCoseKey(format!("Missing {}", name)))
+    }
+
+    /// Looks up an integer field in a COSE key map by its integer label.
+    pub(crate) fn cose_int(
+        cose_map: &[(ciborium::Value, ciborium::Value)],
+        label: i64,
+        name: &str,
+    ) -> Result<i64> {
+        cbor_int(cose_map, label)
+            .and_then(ciborium::Value::as_integer)
+            .and_then(|i| i.try_into().ok())
             .ok_or_else(|| PasskiError::InvalidCoseKey(format!("Missing {}", name)))
     }
 
@@ -490,12 +480,7 @@ impl Passki {
         name: &str,
         expected: i64,
     ) -> Result<()> {
-        let value: i64 = cose_map
-            .iter()
-            .find(|(k, _)| k.as_integer() == Some(label.into()))
-            .and_then(|(_, v)| v.as_integer())
-            .and_then(|i| i.try_into().ok())
-            .ok_or_else(|| PasskiError::InvalidCoseKey(format!("Missing {}", name)))?;
+        let value = Self::cose_int(cose_map, label, name)?;
 
         if value != expected {
             return Err(PasskiError::InvalidCoseKey(format!(

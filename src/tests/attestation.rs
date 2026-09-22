@@ -16,6 +16,7 @@ use super::helpers::{
     create_test_attestation_object, create_test_attestation_object_with_counter, rp_id_hash,
 };
 use crate::Passki;
+use crate::types::cbor_int;
 use aws_lc_rs::digest::{SHA256, digest};
 use aws_lc_rs::rand::SystemRandom;
 use aws_lc_rs::signature::{ECDSA_P256_SHA256_ASN1_SIGNING, EcdsaKeyPair, KeyPair};
@@ -379,22 +380,10 @@ fn test_parse_attestation_object_extracts_correct_cose_key() {
     let cose_key_value: ciborium::Value = ciborium::from_reader(&parsed.public_key[..]).unwrap();
     let cose_map = cose_key_value.as_map().unwrap();
 
-    let alg_value = cose_map
-        .iter()
-        .find(|(k, _)| k.as_integer() == Some(3.into()))
-        .map(|(_, v)| v)
-        .unwrap();
+    let alg = cbor_int(cose_map, 3).and_then(ciborium::Value::as_integer);
+    assert_eq!(alg, Some((-7).into()));
 
-    if let ciborium::Value::Integer(i) = alg_value {
-        assert_eq!(*i, (-7).into());
-    } else {
-        panic!("Algorithm is not an integer");
-    }
-
-    let x = cose_map
-        .iter()
-        .find(|(k, _)| k.as_integer() == Some((-2).into()))
-        .and_then(|(_, v)| v.as_bytes());
+    let x = cbor_int(cose_map, -2).and_then(ciborium::Value::as_bytes);
     assert!(x.is_some());
     assert_eq!(x.unwrap().len(), 32);
 }

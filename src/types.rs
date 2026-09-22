@@ -238,6 +238,32 @@ pub(crate) const CRV_P384: i64 = 2;
 /// Ed25519 curve.
 pub(crate) const CRV_ED25519: i64 = 6;
 
+// CBOR map lookups
+//
+// A map ciborium decoded is a list of key/value pairs rather than a map type, so every field
+// access is a scan for the key.
+
+/// Returns the value of the entry with the given text key, as attestation objects and
+/// authenticator extension outputs are keyed.
+pub(crate) fn cbor_text<'a>(
+    map: &'a [(ciborium::Value, ciborium::Value)],
+    key: &str,
+) -> Option<&'a ciborium::Value> {
+    map.iter()
+        .find(|(k, _)| k.as_text() == Some(key))
+        .map(|(_, v)| v)
+}
+
+/// Returns the value of the entry with the given integer key, as COSE keys are keyed.
+pub(crate) fn cbor_int(
+    map: &[(ciborium::Value, ciborium::Value)],
+    key: i64,
+) -> Option<&ciborium::Value> {
+    map.iter()
+        .find(|(k, _)| k.as_integer() == Some(key.into()))
+        .map(|(_, v)| v)
+}
+
 /// How much the relying party wants to learn about the authenticator hardware at registration.
 ///
 /// Attestation is the authenticator's signed claim about what model it is. Synced passkeys usually

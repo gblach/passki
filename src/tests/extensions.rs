@@ -56,18 +56,10 @@ fn test_parse_auth_data_reads_extension_outputs() {
         .parse_attestation_object(&attestation_object(FLAGS_ED, &block))
         .unwrap();
 
-    let cred_protect = parsed
-        .extensions
-        .iter()
-        .find(|(k, _)| k.as_text() == Some("credProtect"))
-        .and_then(|(_, v)| v.as_integer());
+    let cred_protect = cbor_text(&parsed.extensions, "credProtect").and_then(Value::as_integer);
     assert_eq!(cred_protect, Some(2.into()));
 
-    let min_pin_length = parsed
-        .extensions
-        .iter()
-        .find(|(k, _)| k.as_text() == Some("minPinLength"))
-        .and_then(|(_, v)| v.as_integer());
+    let min_pin_length = cbor_text(&parsed.extensions, "minPinLength").and_then(Value::as_integer);
     assert_eq!(min_pin_length, Some(6.into()));
 }
 

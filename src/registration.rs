@@ -304,6 +304,25 @@ impl Passki {
         Ok((challenge_response, state))
     }
 
+    /// Reads an authenticator extension output that is a small unsigned integer.
+    ///
+    /// Both outputs read this way - a `credProtect` level and a PIN length, which CTAP caps
+    /// at 63 - are well under 256, so a value that does not fit a u8 is malformed.
+    fn extension_u8(
+        extensions: &[(ciborium::Value, ciborium::Value)],
+        name: &str,
+    ) -> Result<Option<u8>> {
+        let Some(value) = cbor_text(extensions, name) else {
+            return Ok(None);
+        };
+
+        value
+            .as_integer()
+            .and_then(|i| u8::try_from(i).ok())
+            .map(Some)
+            .ok_or(PasskiError::InvalidAuthenticatorData)
+    }
+
     /// Reads the `credProtect` level from the authenticator extension outputs.
     ///
     /// It can be there even when the relying party asked for nothing, since Chrome requests
@@ -311,14 +330,8 @@ impl Passki {
     fn cred_protect_output(
         extensions: &[(ciborium::Value, ciborium::Value)],
     ) -> Result<Option<CredentialProtectionPolicy>> {
-        let Some((_, value)) = extensions
-            .iter()
-            .find(|(k, _)| k.as_text() == Some("credProtect"))
-        else {
-            return Ok(None);
-        };
-
-        match value.as_integer().and_then(|i| u8::try_from(i).ok()) {
+        match Self::extension_u8(extensions, "credProtect")? {
+            None => Ok(None),
             Some(1) => Ok(Some(CredentialProtectionPolicy::UserVerificationOptional)),
             Some(2) => Ok(Some(
                 CredentialProtectionPolicy::UserVerificationOptionalWithCredentialIdList,
@@ -326,24 +339,6 @@ impl Passki {
             Some(3) => Ok(Some(CredentialProtectionPolicy::UserVerificationRequired)),
             _ => Err(PasskiError::InvalidAuthenticatorData),
         }
-    }
-
-    fn min_pin_length_output(
-        extensions: &[(ciborium::Value, ciborium::Value)],
-    ) -> Result<Option<u8>> {
-        let Some((_, value)) = extensions
-            .iter()
-            .find(|(k, _)| k.as_text() == Some("minPinLength"))
-        else {
-            return Ok(None);
-        };
-
-        // CTAP caps a PIN at 63 bytes, so any length that does not fit a u8 is malformed.
-        value
-            .as_integer()
-            .and_then(|i| u8::try_from(i).ok())
-            .map(Some)
-            .ok_or(PasskiError::InvalidAuthenticatorData)
     }
 
     /// Completes a passkey registration by verifying what the client returned.
@@ -402,7 +397,7 @@ impl Passki {
             });
         }
 
-        let min_pin_length = Self::min_pin_length_output(&parsed.extensions)?;
+        let min_pin_length = Self::extension_u8(&parsed.extensions, "minPinLength")?;
 
         // The signed authenticator data is authoritative; the ID the client sent alongside it must
         // agree.
@@ -450,23 +445,17 @@ impl Passki {
             .as_map()
             .ok_or_else(|| PasskiError::InvalidAttestationObject("not a map".to_string()))?;
 
-        let auth_data = map
-            .iter()
-            .find(|(k, _)| k.as_text() == Some("authData"))
-            .and_then(|(_, v)| v.as_bytes())
+        let auth_data = cbor_text(map, "authData")
+            .and_then(ciborium::Value::as_bytes)
             .ok_or_else(|| PasskiError::InvalidAttestationObject("Missing authData".to_string()))?
             .to_vec();
 
-        let fmt = map
-            .iter()
-            .find(|(k, _)| k.as_text() == Some("fmt"))
-            .and_then(|(_, v)| v.as_text())
+        let fmt = cbor_text(map, "fmt")
+            .and_then(ciborium::Value::as_text)
             .map(str::to_string);
 
-        let att_stmt = map
-            .iter()
-            .find(|(k, _)| k.as_text() == Some("attStmt"))
-            .map(|(_, v)| v.clone())
+        let att_stmt = cbor_text(map, "attStmt")
+            .cloned()
             .unwrap_or_else(|| ciborium::Value::Map(Vec::new()));
 
         Ok((fmt, auth_data, att_stmt))
@@ -512,9 +501,11 @@ impl Passki {
         }
     }
 
-    /// Parses authenticator data, whose layout is a fixed 37-byte header (rpIdHash, flags, counter)
-    /// followed by the attested credential data and then the authenticator extension outputs.
-    pub(crate) fn parse_auth_data(&self, auth_data_bytes: &[u8]) -> Result<ParsedAttestation> {
+    /// Checks and decodes the fixed 37-byte header every authenticator data blob starts with,
+    /// returning the flags byte and the signature counter.
+    ///
+    /// Shared with authentication, which sees the same header without anything after it.
+    pub(crate) fn parse_auth_data_header(&self, auth_data_bytes: &[u8]) -> Result<(u8, u32)> {
         if auth_data_bytes.len() < 37 {
             return Err(PasskiError::InvalidAuthenticatorData);
         }
@@ -537,6 +528,14 @@ impl Passki {
             auth_data_bytes[35],
             auth_data_bytes[36],
         ]);
+
+        Ok((flags, counter))
+    }
+
+    /// Parses authenticator data, whose layout is a fixed 37-byte header (rpIdHash, flags, counter)
+    /// followed by the attested credential data and then the authenticator extension outputs.
+    pub(crate) fn parse_auth_data(&self, auth_data_bytes: &[u8]) -> Result<ParsedAttestation> {
+        let (flags, counter) = self.parse_auth_data_header(auth_data_bytes)?;
 
         if (flags & FLAG_AT) == 0 {
             return Err(PasskiError::NoAttestedCredentialData);
@@ -566,8 +565,8 @@ impl Passki {
 
         let algorithm = cose_key_value
             .as_map()
-            .and_then(|m| m.iter().find(|(k, _)| k.as_integer() == Some(3.into())))
-            .and_then(|(_, v)| v.as_integer())
+            .and_then(|map| cbor_int(map, 3))
+            .and_then(ciborium::Value::as_integer)
             .and_then(|i| i.try_into().ok())
             .ok_or_else(|| {
                 PasskiError::InvalidCoseKey("Missing or invalid algorithm".to_string())
