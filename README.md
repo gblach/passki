@@ -103,12 +103,12 @@ stored_passkey.counter = result.counter;
 The `examples/` directory has complete registration and authentication flows for several
 web frameworks: [Actix-web](examples/actix-web.rs) | [Axum](examples/axum.rs)
 | [Poem](examples/poem.rs)
-| [Rocket](examples/rocket.rs) | [Warp](examples/warp.rs)
+| [Rocket](examples/rocket.rs) | [Salvo](examples/salvo.rs) | [Warp](examples/warp.rs)
 
 Each one also demonstrates `credProps`, PRF key derivation and the Signal API.
 
 ```bash
-cargo run --example axum  # or actix-web, poem, rocket, warp
+cargo run --example axum  # or actix-web, poem, rocket, salvo, warp
 ```
 
 Then visit `http://localhost:3000` in your browser.
