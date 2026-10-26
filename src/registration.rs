@@ -14,8 +14,8 @@
 
 //! Passkey registration functionality.
 
-use aws_lc_rs::digest::{self, SHA256};
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 
 use crate::Passki;
 use crate::client_data::{ClientData, ClientDataType};
@@ -372,7 +372,7 @@ impl Passki {
             &self.rp_origins,
             &self.embedding_origins,
         )?;
-        let client_data_hash = digest::digest(&SHA256, &client_data_bytes);
+        let client_data_hash = Sha256::digest(&client_data_bytes);
 
         let attestation_bytes = Self::base64_decode(&credential.response.attestation_object)?;
         let parsed = self.verify_attestation(&attestation_bytes, client_data_hash.as_ref())?;
@@ -511,8 +511,8 @@ impl Passki {
         }
 
         // Bytes 0-31 bind the credential to our domain.
-        let rp_id_hash = digest::digest(&SHA256, self.rp_id.as_bytes());
-        if &auth_data_bytes[..32] != rp_id_hash.as_ref() {
+        let rp_id_hash = Sha256::digest(self.rp_id.as_bytes());
+        if auth_data_bytes[..32] != rp_id_hash[..] {
             return Err(PasskiError::RpIdHashMismatch);
         }
 

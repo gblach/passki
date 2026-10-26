@@ -22,12 +22,8 @@
 //! Whether that certificate leads back to a root the relying party trusts is a separate question,
 //! answered by [`crate::trust`] afterwards.
 
-use aws_lc_rs::digest::{self, SHA256, SHA384};
-use aws_lc_rs::signature::{
-    ECDSA_P256_SHA256_ASN1, ECDSA_P384_SHA384_ASN1, ED25519, RSA_PKCS1_2048_8192_SHA256,
-    RSA_PKCS1_2048_8192_SHA384, RsaPublicKeyComponents, UnparsedPublicKey,
-};
 use ciborium::Value;
+use sha2::{Digest, Sha256, Sha384};
 use x509_cert::Certificate;
 use x509_cert::certificate::Version;
 use x509_cert::der::Decode;
@@ -35,10 +31,10 @@ use x509_cert::der::asn1::OctetString;
 use x509_cert::der::oid::{AssociatedOid, ObjectIdentifier};
 use x509_cert::ext::pkix::{BasicConstraints, ExtendedKeyUsage};
 
-use crate::Passki;
 use crate::registration::ParsedAttestation;
 use crate::trust::validate_trust_path;
 use crate::types::*;
+use crate::{Passki, crypto};
 
 /// id-fido-gen-ce-aaguid: the model identifier, when the certificate states one.
 const OID_FIDO_AAGUID: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.3.6.1.4.1.45724.1.1.4");
@@ -456,26 +452,12 @@ pub(crate) fn verify_with_key(
     signature: &[u8],
 ) -> Result<()> {
     match alg {
-        ALG_ES256 => UnparsedPublicKey::new(&ECDSA_P256_SHA256_ASN1, key)
-            .verify(signed_data, signature)
-            .map_err(|_| PasskiError::SignatureVerificationFailed),
-        ALG_ES384 => UnparsedPublicKey::new(&ECDSA_P384_SHA384_ASN1, key)
-            .verify(signed_data, signature)
-            .map_err(|_| PasskiError::SignatureVerificationFailed),
-        ALG_EDDSA => UnparsedPublicKey::new(&ED25519, key)
-            .verify(signed_data, signature)
-            .map_err(|_| PasskiError::SignatureVerificationFailed),
-        ALG_RS256 => {
+        ALG_ES256 => crypto::verify_es256(key, signed_data, signature),
+        ALG_ES384 => crypto::verify_es384(key, signed_data, signature),
+        ALG_EDDSA => crypto::verify_ed25519(key, signed_data, signature),
+        ALG_RS256 | ALG_RS384 => {
             let (n, e) = parse_rsa_public_key(key)?;
-            RsaPublicKeyComponents { n: &n, e: &e }
-                .verify(&RSA_PKCS1_2048_8192_SHA256, signed_data, signature)
-                .map_err(|_| PasskiError::SignatureVerificationFailed)
-        }
-        ALG_RS384 => {
-            let (n, e) = parse_rsa_public_key(key)?;
-            RsaPublicKeyComponents { n: &n, e: &e }
-                .verify(&RSA_PKCS1_2048_8192_SHA384, signed_data, signature)
-                .map_err(|_| PasskiError::SignatureVerificationFailed)
+            crypto::verify_rsa(alg, &n, &e, signed_data, signature)
         }
         _ => Err(PasskiError::UnsupportedAlgorithm(alg)),
     }
@@ -590,12 +572,11 @@ fn public_keys_match(tpm_key: &PublicKey, cose_key: &PublicKey) -> bool {
 }
 
 fn digest_for_alg(alg: i32, data: &[u8]) -> Result<Vec<u8>> {
-    let algorithm = match alg {
-        ALG_ES256 | ALG_RS256 => &SHA256,
-        ALG_ES384 | ALG_RS384 => &SHA384,
-        _ => return Err(PasskiError::UnsupportedAlgorithm(alg)),
-    };
-    Ok(digest::digest(algorithm, data).as_ref().to_vec())
+    match alg {
+        ALG_ES256 | ALG_RS256 => Ok(Sha256::digest(data).to_vec()),
+        ALG_ES384 | ALG_RS384 => Ok(Sha384::digest(data).to_vec()),
+        _ => Err(PasskiError::UnsupportedAlgorithm(alg)),
+    }
 }
 
 /// Compares big-endian integers, which the encodings involved pad differently.
@@ -766,9 +747,9 @@ fn parse_tpms_attest(cert_info: &[u8]) -> Result<(u32, u16, Vec<u8>, Vec<u8>)> {
 /// Computes a TPM Name, how a TPM refers to a key: the 2-byte hash algorithm id followed
 /// by the digest of the key's `pub_area` under it.
 fn tpm_name(name_alg: u16, pub_area: &[u8]) -> Result<Vec<u8>> {
-    let algorithm = match name_alg {
-        0x000B => &SHA256,
-        0x000C => &SHA384,
+    let digest = match name_alg {
+        0x000B => Sha256::digest(pub_area).to_vec(),
+        0x000C => Sha384::digest(pub_area).to_vec(),
         _ => {
             return Err(PasskiError::InvalidAttestation(
                 "Unsupported TPM name algorithm".to_string(),
@@ -776,7 +757,7 @@ fn tpm_name(name_alg: u16, pub_area: &[u8]) -> Result<Vec<u8>> {
         }
     };
     let mut name = name_alg.to_be_bytes().to_vec();
-    name.extend_from_slice(digest::digest(algorithm, pub_area).as_ref());
+    name.extend_from_slice(&digest);
     Ok(name)
 }
 

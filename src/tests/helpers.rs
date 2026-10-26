@@ -13,12 +13,14 @@
 // limitations under the License.
 
 use crate::Passki;
-use aws_lc_rs::digest::{self, SHA256};
-use aws_lc_rs::rsa::KeySize;
-use aws_lc_rs::signature::{KeyPair, RsaKeyPair};
+use getrandom::SysRng;
+use getrandom::rand_core::UnwrapErr;
+use rsa::RsaPrivateKey;
+use rsa::traits::PublicKeyParts;
+use sha2::{Digest, Sha256};
 
 pub fn rp_id_hash(rp_id: &str) -> Vec<u8> {
-    digest::digest(&SHA256, rp_id.as_bytes()).as_ref().to_vec()
+    Sha256::digest(rp_id.as_bytes()).to_vec()
 }
 
 /// A minimal attestation object with `fmt` `none` and no counter.
@@ -239,57 +241,14 @@ pub fn create_rs384_cose_key(n: &[u8], e: &[u8]) -> Vec<u8> {
 }
 
 /// A fresh RSA key pair, with its modulus and exponent split out.
-pub fn create_test_rsa_keypair() -> (RsaKeyPair, Vec<u8>, Vec<u8>) {
-    let key_pair = RsaKeyPair::generate(KeySize::Rsa2048).unwrap();
-
-    let pub_key = key_pair.public_key();
-    let (n, e) = parse_rsa_public_key(pub_key.as_ref());
-
+pub fn create_test_rsa_keypair() -> (RsaPrivateKey, Vec<u8>, Vec<u8>) {
+    let key_pair = RsaPrivateKey::new(&mut UnwrapErr(SysRng), 2048).unwrap();
+    let n = strip_leading_zeros(&key_pair.n().to_be_bytes());
+    let e = strip_leading_zeros(&key_pair.e().to_be_bytes());
     (key_pair, n, e)
 }
 
-/// Splits a DER `SEQUENCE { n INTEGER, e INTEGER }` into its two integers.
-fn parse_rsa_public_key(pub_key_bytes: &[u8]) -> (Vec<u8>, Vec<u8>) {
-    let mut pos = 0;
-
-    assert_eq!(pub_key_bytes[pos], 0x30);
-    pos += 1;
-    let (_, len_bytes) = read_der_length(&pub_key_bytes[pos..]);
-    pos += len_bytes;
-
-    assert_eq!(pub_key_bytes[pos], 0x02);
-    pos += 1;
-    let (n_len, len_bytes) = read_der_length(&pub_key_bytes[pos..]);
-    pos += len_bytes;
-    let mut n = pub_key_bytes[pos..pos + n_len].to_vec();
-    // DER pads with a zero byte to keep the integer positive.
-    if !n.is_empty() && n[0] == 0x00 {
-        n.remove(0);
-    }
-    pos += n_len;
-
-    assert_eq!(pub_key_bytes[pos], 0x02);
-    pos += 1;
-    let (e_len, len_bytes) = read_der_length(&pub_key_bytes[pos..]);
-    pos += len_bytes;
-    let mut e = pub_key_bytes[pos..pos + e_len].to_vec();
-    if !e.is_empty() && e[0] == 0x00 {
-        e.remove(0);
-    }
-
-    (n, e)
-}
-
-/// Reads a DER length, returning it with the number of bytes it occupied.
-fn read_der_length(data: &[u8]) -> (usize, usize) {
-    if data[0] < 0x80 {
-        (data[0] as usize, 1)
-    } else {
-        let num_bytes = (data[0] & 0x7F) as usize;
-        let mut len = 0usize;
-        for i in 0..num_bytes {
-            len = (len << 8) | (data[1 + i] as usize);
-        }
-        (len, 1 + num_bytes)
-    }
+fn strip_leading_zeros(bytes: &[u8]) -> Vec<u8> {
+    let start = bytes.iter().position(|&b| b != 0).unwrap_or(bytes.len());
+    bytes[start..].to_vec()
 }

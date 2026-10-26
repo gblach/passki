@@ -17,9 +17,11 @@ use super::helpers::{
     create_test_authenticator_data, create_test_client_data_json,
 };
 use crate::*;
-use aws_lc_rs::digest::{self, SHA256};
-use aws_lc_rs::rand::SystemRandom;
-use aws_lc_rs::signature::{Ed25519KeyPair, KeyPair};
+use ed25519_dalek::Signer;
+use ed25519_dalek::SigningKey as Ed25519SigningKey;
+use getrandom::SysRng;
+use getrandom::rand_core::UnwrapErr;
+use sha2::{Digest, Sha256};
 
 fn registration_challenge(support: Option<LargeBlobSupport>) -> serde_json::Value {
     let passki = Passki::new("localhost", &["http://localhost:3000"], "Test");
@@ -239,7 +241,7 @@ fn test_large_blob_absent_from_authentication_challenge_when_not_requested() {
 fn signed_auth_credential(
     credential_id: &[u8],
     challenge: &[u8],
-    key_pair: &Ed25519KeyPair,
+    key_pair: &Ed25519SigningKey,
     large_blob: Option<LargeBlobResult>,
 ) -> AuthenticationCredential {
     let client_extension_results = large_blob.map(|lb| ClientExtensionResults {
@@ -250,10 +252,10 @@ fn signed_auth_credential(
     let auth_data = create_test_authenticator_data(1, 0x01);
     let client_data_json = create_test_auth_client_data_json(challenge, "http://localhost:3000");
 
-    let client_data_hash = digest::digest(&SHA256, &client_data_json);
+    let client_data_hash = Sha256::digest(&client_data_json);
     let mut signed_data = auth_data.clone();
     signed_data.extend_from_slice(client_data_hash.as_ref());
-    let signature = key_pair.sign(&signed_data);
+    let signature = key_pair.sign(&signed_data).to_bytes();
 
     AuthenticationCredential {
         raw_id: Passki::base64_encode(credential_id),
@@ -271,10 +273,8 @@ fn signed_auth_credential(
 fn authenticate_with_large_blob_result(
     large_blob: Option<LargeBlobResult>,
 ) -> Result<AuthenticationResult> {
-    let rng = SystemRandom::new();
-    let pkcs8 = Ed25519KeyPair::generate_pkcs8(&rng).unwrap();
-    let key_pair = Ed25519KeyPair::from_pkcs8(pkcs8.as_ref()).unwrap();
-    let pub_key: &[u8; 32] = key_pair.public_key().as_ref().try_into().unwrap();
+    let key_pair = Ed25519SigningKey::generate(&mut UnwrapErr(SysRng));
+    let pub_key: &[u8; 32] = &key_pair.verifying_key().to_bytes();
     let cred_id = vec![7u8; 16];
 
     let passki = Passki::new("localhost", &["http://localhost:3000"], "Test");

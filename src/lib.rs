@@ -93,6 +93,7 @@
 mod attestation;
 mod authentication;
 mod client_data;
+mod crypto;
 mod registration;
 mod trust;
 mod types;
@@ -100,7 +101,6 @@ mod types;
 #[cfg(test)]
 mod tests;
 
-use aws_lc_rs::rand::{SecureRandom, SystemRandom};
 use x509_cert::Certificate;
 
 pub use authentication::{
@@ -380,10 +380,8 @@ impl Passki {
 
     /// Generates a cryptographically secure random challenge.
     pub(crate) fn generate_challenge() -> Vec<u8> {
-        let rng = SystemRandom::new();
         let mut challenge = vec![0u8; 32];
-        rng.fill(&mut challenge)
-            .expect("Failed to generate random challenge");
+        getrandom::fill(&mut challenge).expect("Failed to generate random challenge");
         challenge
     }
 

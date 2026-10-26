@@ -17,10 +17,10 @@ use super::helpers::{
 };
 use crate::Passki;
 use crate::types::cbor_int;
-use aws_lc_rs::digest::{SHA256, digest};
-use aws_lc_rs::rand::SystemRandom;
-use aws_lc_rs::signature::{ECDSA_P256_SHA256_ASN1_SIGNING, EcdsaKeyPair, KeyPair};
 use ciborium::Value;
+use p256::ecdsa::signature::Signer;
+use p256::elliptic_curve::Generate;
+use sha2::{Digest, Sha256};
 
 fn passki() -> Passki {
     Passki::new("localhost", &["http://localhost:3000"], "Test")
@@ -29,13 +29,10 @@ fn passki() -> Passki {
 /// A `packed` self-attestation object signed by a fresh ES256 key, returned with the client data
 /// hash it was signed over.
 fn build_packed_self_attestation(alg: i32) -> (Vec<u8>, Vec<u8>) {
-    let rng = SystemRandom::new();
-    let pkcs8 = EcdsaKeyPair::generate_pkcs8(&ECDSA_P256_SHA256_ASN1_SIGNING, &rng).unwrap();
-    let key_pair =
-        EcdsaKeyPair::from_pkcs8(&ECDSA_P256_SHA256_ASN1_SIGNING, pkcs8.as_ref()).unwrap();
+    let key_pair = p256::ecdsa::SigningKey::generate();
 
-    // public_key() is the uncompressed point 0x04 || x || y.
-    let point = key_pair.public_key().as_ref();
+    let point = key_pair.verifying_key().to_sec1_point(false);
+    let point = point.as_bytes();
     let x = &point[1..33];
     let y = &point[33..65];
 
@@ -58,15 +55,18 @@ fn build_packed_self_attestation(alg: i32) -> (Vec<u8>, Vec<u8>) {
     auth_data.extend_from_slice(&[1u8; 16]); // credId
     auth_data.extend_from_slice(&cose_key_bytes);
 
-    let client_data_hash = digest(&SHA256, b"test client data").as_ref().to_vec();
+    let client_data_hash = Sha256::digest(b"test client data").to_vec();
 
     let mut signed = auth_data.clone();
     signed.extend_from_slice(&client_data_hash);
-    let signature = key_pair.sign(&rng, &signed).unwrap().as_ref().to_vec();
+    let signature: p256::ecdsa::DerSignature = key_pair.sign(&signed);
 
     let att_stmt = vec![
         (Value::Text("alg".to_string()), Value::Integer(alg.into())),
-        (Value::Text("sig".to_string()), Value::Bytes(signature)),
+        (
+            Value::Text("sig".to_string()),
+            Value::Bytes(signature.as_bytes().to_vec()),
+        ),
     ];
 
     let att_obj = vec![
@@ -110,7 +110,7 @@ fn test_verify_packed_self_attestation_tampered_signature() {
 #[test]
 fn test_verify_packed_self_attestation_wrong_client_data_hash() {
     let (bytes, _) = build_packed_self_attestation(-7);
-    let wrong_hash = digest(&SHA256, b"different client data").as_ref().to_vec();
+    let wrong_hash = Sha256::digest(b"different client data").to_vec();
 
     assert!(passki().verify_attestation(&bytes, &wrong_hash).is_err());
 }

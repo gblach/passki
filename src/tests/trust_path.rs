@@ -14,10 +14,11 @@
 
 use super::helpers::rp_id_hash;
 use crate::{AttestationTrustPolicy, AttestationType, Passki, PasskiError, RegistrationResponse};
-use aws_lc_rs::digest::{SHA256, digest};
-use aws_lc_rs::rand::SystemRandom;
-use aws_lc_rs::signature::{ECDSA_P256_SHA256_ASN1_SIGNING, EcdsaKeyPair, KeyPair};
 use ciborium::Value;
+use p256::ecdsa::SigningKey;
+use p256::ecdsa::signature::Signer;
+use p256::elliptic_curve::Generate;
+use sha2::{Digest, Sha256};
 use std::str::FromStr;
 use std::time::{Duration, SystemTime};
 use x509_cert::Version;
@@ -75,26 +76,27 @@ enum Role {
 
 /// An ES256 key pair together with the certificate that carries its public key.
 struct TestCert {
-    key_pair: EcdsaKeyPair,
+    key_pair: SigningKey,
     name: Name,
     der: Vec<u8>,
 }
 
 /// Generates a fresh ES256 key pair.
-fn generate_key() -> EcdsaKeyPair {
-    let rng = SystemRandom::new();
-    let pkcs8 = EcdsaKeyPair::generate_pkcs8(&ECDSA_P256_SHA256_ASN1_SIGNING, &rng).unwrap();
-    EcdsaKeyPair::from_pkcs8(&ECDSA_P256_SHA256_ASN1_SIGNING, pkcs8.as_ref()).unwrap()
+fn generate_key() -> SigningKey {
+    SigningKey::generate()
 }
 
 /// The `SubjectPublicKeyInfo` for an ES256 key pair.
-fn spki(key_pair: &EcdsaKeyPair) -> SubjectPublicKeyInfoOwned {
+fn spki(key_pair: &SigningKey) -> SubjectPublicKeyInfoOwned {
     SubjectPublicKeyInfoOwned {
         algorithm: AlgorithmIdentifierOwned {
             oid: OID_EC_PUBLIC_KEY,
             parameters: Some(Any::from(OID_PRIME256V1)),
         },
-        subject_public_key: BitString::from_bytes(key_pair.public_key().as_ref()).unwrap(),
+        subject_public_key: BitString::from_bytes(
+            key_pair.verifying_key().to_sec1_point(false).as_bytes(),
+        )
+        .unwrap(),
     }
 }
 
@@ -155,9 +157,9 @@ fn not_yet_valid() -> Validity {
 
 /// Assembles and signs a certificate for `subject_key`, issued by `issuer_key` under `issuer_name`.
 fn issue_certificate(
-    issuer_key: &EcdsaKeyPair,
+    issuer_key: &SigningKey,
     issuer_name: &Name,
-    subject_key: &EcdsaKeyPair,
+    subject_key: &SigningKey,
     subject_name: &Name,
     role: Role,
     validity: Validity,
@@ -178,10 +180,7 @@ fn issue_certificate(
         extensions: Some(vec![basic_constraints(role)]),
     };
 
-    let rng = SystemRandom::new();
-    let signature = issuer_key
-        .sign(&rng, &tbs_certificate.to_der().unwrap())
-        .unwrap();
+    let signature: p256::ecdsa::DerSignature = issuer_key.sign(&tbs_certificate.to_der().unwrap());
 
     Certificate {
         tbs_certificate,
@@ -260,8 +259,7 @@ fn packed_attestation_over(chain: &[&TestCert], client_data_hash: &[u8]) -> Vec<
     // In full attestation the attestation key signs, not the credential key.
     let mut signed = auth_data.clone();
     signed.extend_from_slice(client_data_hash);
-    let rng = SystemRandom::new();
-    let signature = chain[0].key_pair.sign(&rng, &signed).unwrap();
+    let signature: p256::ecdsa::DerSignature = chain[0].key_pair.sign(&signed);
 
     let att_stmt = vec![
         (Value::Text("alg".to_string()), Value::Integer((-7).into())),
@@ -297,7 +295,7 @@ fn packed_attestation_over(chain: &[&TestCert], client_data_hash: &[u8]) -> Vec<
 /// Builds a `packed` full-attestation object over a fixed client data hash, and returns both
 /// so the caller can hand them to `verify_attestation`.
 fn packed_attestation(chain: &[&TestCert]) -> (Vec<u8>, Vec<u8>) {
-    let client_data_hash = digest(&SHA256, b"trust path client data").as_ref().to_vec();
+    let client_data_hash = Sha256::digest(b"trust path client data").to_vec();
     let bytes = packed_attestation_over(chain, &client_data_hash);
 
     (bytes, client_data_hash)
@@ -625,7 +623,7 @@ fn test_registration_stores_the_attestation_type() {
     // The statement has to commit to the hash of the real client data JSON.
     let client_data_json =
         super::helpers::create_test_client_data_json(&state.challenge, "http://localhost:3000");
-    let client_data_hash = digest(&SHA256, &client_data_json).as_ref().to_vec();
+    let client_data_hash = Sha256::digest(&client_data_json).to_vec();
     let attestation_obj = packed_attestation_over(&[&leaf], &client_data_hash);
 
     let credential = RegistrationCredential {

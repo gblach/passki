@@ -26,3 +26,5 @@ jobs:
       - run: cargo check
       - run: cargo test
       - run: cargo clippy -- -D warnings
+      - run: cargo test --no-default-features --features aws-lc-rs
+      - run: cargo clippy --no-default-features --features aws-lc-rs -- -D warnings

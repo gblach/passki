@@ -28,7 +28,9 @@ A simple and secure WebAuthn/Passkey implementation for Rust.
   so stale ones stop being offered
 - 📜 **[Attestation](docs/attestation.md)** - Statement verification for `packed`, `tpm`, `android-key` and `fido-u2f`,
   with opt-in trust path validation against your own roots
-- 🦀 **Pure Rust** - Memory-safe implementation with no unsafe code
+- 🦀 **Two Crypto Backends** - Pure Rust [RustCrypto](https://github.com/RustCrypto) by default,
+  or [aws-lc-rs](https://crates.io/crates/aws-lc-rs) with the `aws-lc-rs` feature (see
+  [Installation](#installation)); passki itself contains no unsafe code
 
 ## Installation
 
@@ -38,6 +40,23 @@ Add this to your `Cargo.toml`:
 [dependencies]
 passki = "0.4"
 ```
+
+Signatures are verified with the pure Rust [RustCrypto](https://github.com/RustCrypto) crates by
+default, which need no C toolchain. To use [aws-lc-rs](https://crates.io/crates/aws-lc-rs)
+instead, which is 3-5x faster at ECDSA and RSA and has a FIPS-validated build, enable its feature:
+
+```toml
+[dependencies]
+passki = { version = "0.4", default-features = false, features = ["aws-lc-rs"] }
+```
+
+| Feature       | Default | Backend                                   |
+| ------------- | ------- | ----------------------------------------- |
+| `rust-crypto` | yes     | `p256`, `p384`, `ed25519-dalek` and `rsa` |
+| `aws-lc-rs`   | no      | aws-lc-rs                                 |
+
+If both are enabled, aws-lc-rs is used. The RustCrypto crates are still compiled in that case,
+so turn off the default features to drop them.
 
 ## Quick Start
 

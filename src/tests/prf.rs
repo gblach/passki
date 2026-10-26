@@ -16,9 +16,11 @@ use super::helpers::{
     create_eddsa_cose_key, create_test_auth_client_data_json, create_test_authenticator_data,
 };
 use crate::*;
-use aws_lc_rs::digest::{self, SHA256};
-use aws_lc_rs::rand::SystemRandom;
-use aws_lc_rs::signature::{Ed25519KeyPair, KeyPair};
+use ed25519_dalek::Signer;
+use ed25519_dalek::SigningKey as Ed25519SigningKey;
+use getrandom::SysRng;
+use getrandom::rand_core::UnwrapErr;
+use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 
 // A properly signed credential, using a real Ed25519 key pair. PRF outputs are only extracted once
@@ -28,7 +30,7 @@ fn signed_auth_credential(
     challenge: &[u8],
     origin: &str,
     counter: u32,
-    key_pair: &Ed25519KeyPair,
+    key_pair: &Ed25519SigningKey,
     prf: Option<PrfExtensionResult>,
 ) -> AuthenticationCredential {
     let client_extension_results = prf.map(|p| ClientExtensionResults {
@@ -39,10 +41,10 @@ fn signed_auth_credential(
     let auth_data = create_test_authenticator_data(counter, 0x01);
     let client_data_json = create_test_auth_client_data_json(challenge, origin);
 
-    let client_data_hash = digest::digest(&SHA256, &client_data_json);
+    let client_data_hash = Sha256::digest(&client_data_json);
     let mut signed_data = auth_data.clone();
     signed_data.extend_from_slice(client_data_hash.as_ref());
-    let signature = key_pair.sign(&signed_data);
+    let signature = key_pair.sign(&signed_data).to_bytes();
 
     AuthenticationCredential {
         raw_id: Passki::base64_encode(credential_id),
@@ -568,10 +570,8 @@ fn test_eval_by_credential_without_allow_credentials_rejected() {
 
 #[test]
 fn test_prf_outputs_none_when_no_extension_results() {
-    let rng = SystemRandom::new();
-    let pkcs8 = Ed25519KeyPair::generate_pkcs8(&rng).unwrap();
-    let key_pair = Ed25519KeyPair::from_pkcs8(pkcs8.as_ref()).unwrap();
-    let pub_key: &[u8; 32] = key_pair.public_key().as_ref().try_into().unwrap();
+    let key_pair = Ed25519SigningKey::generate(&mut UnwrapErr(SysRng));
+    let pub_key: &[u8; 32] = &key_pair.verifying_key().to_bytes();
     let cred_id = vec![1u8; 16];
 
     let passki = Passki::new("localhost", &["http://localhost:3000"], "Test");
@@ -601,10 +601,8 @@ fn test_prf_outputs_none_when_no_extension_results() {
 
 #[test]
 fn test_prf_outputs_none_when_results_absent_in_extension() {
-    let rng = SystemRandom::new();
-    let pkcs8 = Ed25519KeyPair::generate_pkcs8(&rng).unwrap();
-    let key_pair = Ed25519KeyPair::from_pkcs8(pkcs8.as_ref()).unwrap();
-    let pub_key: &[u8; 32] = key_pair.public_key().as_ref().try_into().unwrap();
+    let key_pair = Ed25519SigningKey::generate(&mut UnwrapErr(SysRng));
+    let pub_key: &[u8; 32] = &key_pair.verifying_key().to_bytes();
     let cred_id = vec![2u8; 16];
 
     let passki = Passki::new("localhost", &["http://localhost:3000"], "Test");
@@ -639,10 +637,8 @@ fn test_prf_outputs_none_when_results_absent_in_extension() {
 
 #[test]
 fn test_prf_first_output_decoded() {
-    let rng = SystemRandom::new();
-    let pkcs8 = Ed25519KeyPair::generate_pkcs8(&rng).unwrap();
-    let key_pair = Ed25519KeyPair::from_pkcs8(pkcs8.as_ref()).unwrap();
-    let pub_key: &[u8; 32] = key_pair.public_key().as_ref().try_into().unwrap();
+    let key_pair = Ed25519SigningKey::generate(&mut UnwrapErr(SysRng));
+    let pub_key: &[u8; 32] = &key_pair.verifying_key().to_bytes();
     let cred_id = vec![3u8; 16];
 
     let passki = Passki::new("localhost", &["http://localhost:3000"], "Test");
@@ -680,10 +676,8 @@ fn test_prf_first_output_decoded() {
 
 #[test]
 fn test_prf_both_outputs_decoded() {
-    let rng = SystemRandom::new();
-    let pkcs8 = Ed25519KeyPair::generate_pkcs8(&rng).unwrap();
-    let key_pair = Ed25519KeyPair::from_pkcs8(pkcs8.as_ref()).unwrap();
-    let pub_key: &[u8; 32] = key_pair.public_key().as_ref().try_into().unwrap();
+    let key_pair = Ed25519SigningKey::generate(&mut UnwrapErr(SysRng));
+    let pub_key: &[u8; 32] = &key_pair.verifying_key().to_bytes();
     let cred_id = vec![4u8; 16];
 
     let passki = Passki::new("localhost", &["http://localhost:3000"], "Test");
@@ -722,10 +716,8 @@ fn test_prf_both_outputs_decoded() {
 
 #[test]
 fn test_prf_invalid_base64_first_returns_error() {
-    let rng = SystemRandom::new();
-    let pkcs8 = Ed25519KeyPair::generate_pkcs8(&rng).unwrap();
-    let key_pair = Ed25519KeyPair::from_pkcs8(pkcs8.as_ref()).unwrap();
-    let pub_key: &[u8; 32] = key_pair.public_key().as_ref().try_into().unwrap();
+    let key_pair = Ed25519SigningKey::generate(&mut UnwrapErr(SysRng));
+    let pub_key: &[u8; 32] = &key_pair.verifying_key().to_bytes();
     let cred_id = vec![5u8; 16];
 
     let passki = Passki::new("localhost", &["http://localhost:3000"], "Test");
@@ -765,10 +757,8 @@ fn test_prf_invalid_base64_first_returns_error() {
 
 #[test]
 fn test_prf_invalid_base64_second_returns_error() {
-    let rng = SystemRandom::new();
-    let pkcs8 = Ed25519KeyPair::generate_pkcs8(&rng).unwrap();
-    let key_pair = Ed25519KeyPair::from_pkcs8(pkcs8.as_ref()).unwrap();
-    let pub_key: &[u8; 32] = key_pair.public_key().as_ref().try_into().unwrap();
+    let key_pair = Ed25519SigningKey::generate(&mut UnwrapErr(SysRng));
+    let pub_key: &[u8; 32] = &key_pair.verifying_key().to_bytes();
     let cred_id = vec![6u8; 16];
 
     let passki = Passki::new("localhost", &["http://localhost:3000"], "Test");

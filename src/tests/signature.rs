@@ -18,24 +18,24 @@ use super::helpers::{
 };
 use crate::Passki;
 use crate::types::{ALG_ES256, ALG_ES384, ALG_RS256, ALG_RS384};
-use aws_lc_rs::rand::SystemRandom;
-use aws_lc_rs::signature::{
-    ECDSA_P256_SHA256_ASN1_SIGNING, ECDSA_P384_SHA384_ASN1_SIGNING, EcdsaKeyPair, Ed25519KeyPair,
-    KeyPair, RSA_PKCS1_SHA256, RSA_PKCS1_SHA384,
-};
+use ed25519_dalek::SigningKey as Ed25519SigningKey;
+use getrandom::SysRng;
+use getrandom::rand_core::UnwrapErr;
+use p256::ecdsa::signature::{SignatureEncoding, Signer};
+use p256::elliptic_curve::Generate;
+use rsa::pkcs1v15::SigningKey as RsaSigningKey;
+use sha2::{Sha256, Sha384};
 
 // EdDSA signature tests
 
 #[test]
 fn test_verify_eddsa_valid_signature() {
-    let rng = SystemRandom::new();
-    let pkcs8_bytes = Ed25519KeyPair::generate_pkcs8(&rng).unwrap();
-    let key_pair = Ed25519KeyPair::from_pkcs8(pkcs8_bytes.as_ref()).unwrap();
+    let key_pair = Ed25519SigningKey::generate(&mut UnwrapErr(SysRng));
 
     let message = b"test message for EdDSA";
-    let signature = key_pair.sign(message);
+    let signature = key_pair.sign(message).to_bytes();
 
-    let pub_key: &[u8; 32] = key_pair.public_key().as_ref().try_into().unwrap();
+    let pub_key: &[u8; 32] = &key_pair.verifying_key().to_bytes();
     let cose_key_bytes = create_eddsa_cose_key(pub_key);
 
     let result = Passki::verify_eddsa(&cose_key_bytes, message, signature.as_ref());
@@ -48,14 +48,12 @@ fn test_verify_eddsa_valid_signature() {
 
 #[test]
 fn test_verify_eddsa_invalid_signature() {
-    let rng = SystemRandom::new();
-    let pkcs8_bytes = Ed25519KeyPair::generate_pkcs8(&rng).unwrap();
-    let key_pair = Ed25519KeyPair::from_pkcs8(pkcs8_bytes.as_ref()).unwrap();
+    let key_pair = Ed25519SigningKey::generate(&mut UnwrapErr(SysRng));
 
     let message = b"test message";
-    let signature = key_pair.sign(message);
+    let signature = key_pair.sign(message).to_bytes();
 
-    let pub_key: &[u8; 32] = key_pair.public_key().as_ref().try_into().unwrap();
+    let pub_key: &[u8; 32] = &key_pair.verifying_key().to_bytes();
     let cose_key_bytes = create_eddsa_cose_key(pub_key);
 
     let wrong_message = b"different message";
@@ -75,17 +73,15 @@ fn test_verify_eddsa_invalid_signature() {
 
 #[test]
 fn test_verify_eddsa_corrupted_signature() {
-    let rng = SystemRandom::new();
-    let pkcs8_bytes = Ed25519KeyPair::generate_pkcs8(&rng).unwrap();
-    let key_pair = Ed25519KeyPair::from_pkcs8(pkcs8_bytes.as_ref()).unwrap();
+    let key_pair = Ed25519SigningKey::generate(&mut UnwrapErr(SysRng));
 
     let message = b"test message";
-    let sig = key_pair.sign(message);
+    let sig = key_pair.sign(message).to_bytes();
     let mut signature = sig.as_ref().to_vec();
 
     signature[0] ^= 0xFF;
 
-    let pub_key: &[u8; 32] = key_pair.public_key().as_ref().try_into().unwrap();
+    let pub_key: &[u8; 32] = &key_pair.verifying_key().to_bytes();
     let cose_key_bytes = create_eddsa_cose_key(pub_key);
 
     let result = Passki::verify_eddsa(&cose_key_bytes, message, &signature);
@@ -206,16 +202,14 @@ fn test_verify_eddsa_cose_key_not_map() {
 
 #[test]
 fn test_verify_es256_valid_signature() {
-    let rng = SystemRandom::new();
-    let pkcs8_bytes = EcdsaKeyPair::generate_pkcs8(&ECDSA_P256_SHA256_ASN1_SIGNING, &rng).unwrap();
-    let key_pair =
-        EcdsaKeyPair::from_pkcs8(&ECDSA_P256_SHA256_ASN1_SIGNING, pkcs8_bytes.as_ref()).unwrap();
+    let key_pair = p256::ecdsa::SigningKey::generate();
 
     let message = b"test message for ES256";
-    let signature = key_pair.sign(&rng, message).unwrap();
+    let signature: p256::ecdsa::DerSignature = key_pair.sign(message);
 
     // The public key is an uncompressed point: 0x04 || x || y.
-    let public_key_bytes = key_pair.public_key().as_ref();
+    let point = key_pair.verifying_key().to_sec1_point(false);
+    let public_key_bytes = point.as_bytes();
     let x = &public_key_bytes[1..33];
     let y = &public_key_bytes[33..65];
 
@@ -231,15 +225,13 @@ fn test_verify_es256_valid_signature() {
 
 #[test]
 fn test_verify_es256_invalid_signature() {
-    let rng = SystemRandom::new();
-    let pkcs8_bytes = EcdsaKeyPair::generate_pkcs8(&ECDSA_P256_SHA256_ASN1_SIGNING, &rng).unwrap();
-    let key_pair =
-        EcdsaKeyPair::from_pkcs8(&ECDSA_P256_SHA256_ASN1_SIGNING, pkcs8_bytes.as_ref()).unwrap();
+    let key_pair = p256::ecdsa::SigningKey::generate();
 
     let message = b"test message";
-    let signature = key_pair.sign(&rng, message).unwrap();
+    let signature: p256::ecdsa::DerSignature = key_pair.sign(message);
 
-    let public_key_bytes = key_pair.public_key().as_ref();
+    let point = key_pair.verifying_key().to_sec1_point(false);
+    let public_key_bytes = point.as_bytes();
     let x = &public_key_bytes[1..33];
     let y = &public_key_bytes[33..65];
 
@@ -267,15 +259,13 @@ fn test_verify_es256_invalid_signature() {
 
 #[test]
 fn test_verify_es256_corrupted_signature() {
-    let rng = SystemRandom::new();
-    let pkcs8_bytes = EcdsaKeyPair::generate_pkcs8(&ECDSA_P256_SHA256_ASN1_SIGNING, &rng).unwrap();
-    let key_pair =
-        EcdsaKeyPair::from_pkcs8(&ECDSA_P256_SHA256_ASN1_SIGNING, pkcs8_bytes.as_ref()).unwrap();
+    let key_pair = p256::ecdsa::SigningKey::generate();
 
     let message = b"test message";
-    let signature = key_pair.sign(&rng, message).unwrap();
+    let signature: p256::ecdsa::DerSignature = key_pair.sign(message);
 
-    let public_key_bytes = key_pair.public_key().as_ref();
+    let point = key_pair.verifying_key().to_sec1_point(false);
+    let public_key_bytes = point.as_bytes();
     let x = &public_key_bytes[1..33];
     let y = &public_key_bytes[33..65];
 
@@ -369,16 +359,14 @@ fn test_verify_es256_invalid_public_key() {
 
 #[test]
 fn test_verify_es384_valid_signature() {
-    let rng = SystemRandom::new();
-    let pkcs8_bytes = EcdsaKeyPair::generate_pkcs8(&ECDSA_P384_SHA384_ASN1_SIGNING, &rng).unwrap();
-    let key_pair =
-        EcdsaKeyPair::from_pkcs8(&ECDSA_P384_SHA384_ASN1_SIGNING, pkcs8_bytes.as_ref()).unwrap();
+    let key_pair = p384::ecdsa::SigningKey::generate();
 
     let message = b"test message for ES384";
-    let signature = key_pair.sign(&rng, message).unwrap();
+    let signature: p384::ecdsa::DerSignature = key_pair.sign(message);
 
     // The public key is an uncompressed point: 0x04 || x || y.
-    let public_key_bytes = key_pair.public_key().as_ref();
+    let point = key_pair.verifying_key().to_sec1_point(false);
+    let public_key_bytes = point.as_bytes();
     let x = &public_key_bytes[1..49];
     let y = &public_key_bytes[49..97];
 
@@ -394,15 +382,13 @@ fn test_verify_es384_valid_signature() {
 
 #[test]
 fn test_verify_es384_invalid_signature() {
-    let rng = SystemRandom::new();
-    let pkcs8_bytes = EcdsaKeyPair::generate_pkcs8(&ECDSA_P384_SHA384_ASN1_SIGNING, &rng).unwrap();
-    let key_pair =
-        EcdsaKeyPair::from_pkcs8(&ECDSA_P384_SHA384_ASN1_SIGNING, pkcs8_bytes.as_ref()).unwrap();
+    let key_pair = p384::ecdsa::SigningKey::generate();
 
     let message = b"test message";
-    let signature = key_pair.sign(&rng, message).unwrap();
+    let signature: p384::ecdsa::DerSignature = key_pair.sign(message);
 
-    let public_key_bytes = key_pair.public_key().as_ref();
+    let point = key_pair.verifying_key().to_sec1_point(false);
+    let public_key_bytes = point.as_bytes();
     let x = &public_key_bytes[1..49];
     let y = &public_key_bytes[49..97];
 
@@ -430,15 +416,13 @@ fn test_verify_es384_invalid_signature() {
 
 #[test]
 fn test_verify_es384_dispatch() {
-    let rng = SystemRandom::new();
-    let pkcs8_bytes = EcdsaKeyPair::generate_pkcs8(&ECDSA_P384_SHA384_ASN1_SIGNING, &rng).unwrap();
-    let key_pair =
-        EcdsaKeyPair::from_pkcs8(&ECDSA_P384_SHA384_ASN1_SIGNING, pkcs8_bytes.as_ref()).unwrap();
+    let key_pair = p384::ecdsa::SigningKey::generate();
 
     let message = b"test message";
-    let signature = key_pair.sign(&rng, message).unwrap();
+    let signature: p384::ecdsa::DerSignature = key_pair.sign(message);
 
-    let public_key_bytes = key_pair.public_key().as_ref();
+    let point = key_pair.verifying_key().to_sec1_point(false);
+    let public_key_bytes = point.as_bytes();
     let x = &public_key_bytes[1..49];
     let y = &public_key_bytes[49..97];
 
@@ -456,15 +440,13 @@ fn test_verify_es384_dispatch() {
 
 #[test]
 fn test_verify_rs256_valid_signature() {
-    let rng = SystemRandom::new();
     let (key_pair, n, e) = create_test_rsa_keypair();
 
     let message = b"test message for RS256";
 
-    let mut signature = vec![0u8; key_pair.public_modulus_len()];
-    key_pair
-        .sign(&RSA_PKCS1_SHA256, &rng, message, &mut signature)
-        .unwrap();
+    let signature = RsaSigningKey::<Sha256>::new(key_pair)
+        .sign(message)
+        .to_vec();
 
     let cose_key_bytes = create_rs256_cose_key(&n, &e);
 
@@ -479,15 +461,13 @@ fn test_verify_rs256_valid_signature() {
 
 #[test]
 fn test_verify_rs256_invalid_signature() {
-    let rng = SystemRandom::new();
     let (key_pair, n, e) = create_test_rsa_keypair();
 
     let message = b"test message";
 
-    let mut signature = vec![0u8; key_pair.public_modulus_len()];
-    key_pair
-        .sign(&RSA_PKCS1_SHA256, &rng, message, &mut signature)
-        .unwrap();
+    let signature = RsaSigningKey::<Sha256>::new(key_pair)
+        .sign(message)
+        .to_vec();
 
     let cose_key_bytes = create_rs256_cose_key(&n, &e);
 
@@ -508,15 +488,13 @@ fn test_verify_rs256_invalid_signature() {
 
 #[test]
 fn test_verify_rs256_corrupted_signature() {
-    let rng = SystemRandom::new();
     let (key_pair, n, e) = create_test_rsa_keypair();
 
     let message = b"test message";
 
-    let mut signature = vec![0u8; key_pair.public_modulus_len()];
-    key_pair
-        .sign(&RSA_PKCS1_SHA256, &rng, message, &mut signature)
-        .unwrap();
+    let mut signature = RsaSigningKey::<Sha256>::new(key_pair)
+        .sign(message)
+        .to_vec();
 
     signature[0] ^= 0xFF;
 
@@ -610,15 +588,13 @@ fn test_verify_rs256_invalid_public_key() {
 
 #[test]
 fn test_verify_rs384_valid_signature() {
-    let rng = SystemRandom::new();
     let (key_pair, n, e) = create_test_rsa_keypair();
 
     let message = b"test message for RS384";
 
-    let mut signature = vec![0u8; key_pair.public_modulus_len()];
-    key_pair
-        .sign(&RSA_PKCS1_SHA384, &rng, message, &mut signature)
-        .unwrap();
+    let signature = RsaSigningKey::<Sha384>::new(key_pair)
+        .sign(message)
+        .to_vec();
 
     let cose_key_bytes = create_rs384_cose_key(&n, &e);
 
@@ -633,15 +609,13 @@ fn test_verify_rs384_valid_signature() {
 
 #[test]
 fn test_verify_rs384_invalid_signature() {
-    let rng = SystemRandom::new();
     let (key_pair, n, e) = create_test_rsa_keypair();
 
     let message = b"test message";
 
-    let mut signature = vec![0u8; key_pair.public_modulus_len()];
-    key_pair
-        .sign(&RSA_PKCS1_SHA384, &rng, message, &mut signature)
-        .unwrap();
+    let signature = RsaSigningKey::<Sha384>::new(key_pair)
+        .sign(message)
+        .to_vec();
 
     let cose_key_bytes = create_rs384_cose_key(&n, &e);
 
@@ -662,15 +636,13 @@ fn test_verify_rs384_invalid_signature() {
 
 #[test]
 fn test_verify_rs384_dispatch() {
-    let rng = SystemRandom::new();
     let (key_pair, n, e) = create_test_rsa_keypair();
 
     let message = b"test message";
 
-    let mut signature = vec![0u8; key_pair.public_modulus_len()];
-    key_pair
-        .sign(&RSA_PKCS1_SHA384, &rng, message, &mut signature)
-        .unwrap();
+    let signature = RsaSigningKey::<Sha384>::new(key_pair)
+        .sign(message)
+        .to_vec();
 
     let cose_key_bytes = create_rs384_cose_key(&n, &e);
 
@@ -804,14 +776,12 @@ fn test_verify_rs256_wrong_kty() {
 
 #[test]
 fn test_verify_signature_eddsa_dispatch() {
-    let rng = SystemRandom::new();
-    let pkcs8_bytes = Ed25519KeyPair::generate_pkcs8(&rng).unwrap();
-    let key_pair = Ed25519KeyPair::from_pkcs8(pkcs8_bytes.as_ref()).unwrap();
+    let key_pair = Ed25519SigningKey::generate(&mut UnwrapErr(SysRng));
 
     let message = b"test message";
-    let signature = key_pair.sign(message);
+    let signature = key_pair.sign(message).to_bytes();
 
-    let pub_key: &[u8; 32] = key_pair.public_key().as_ref().try_into().unwrap();
+    let pub_key: &[u8; 32] = &key_pair.verifying_key().to_bytes();
     let cose_key_bytes = create_eddsa_cose_key(pub_key);
 
     let result = Passki::verify_signature(
@@ -829,15 +799,13 @@ fn test_verify_signature_eddsa_dispatch() {
 
 #[test]
 fn test_verify_signature_es256_dispatch() {
-    let rng = SystemRandom::new();
-    let pkcs8_bytes = EcdsaKeyPair::generate_pkcs8(&ECDSA_P256_SHA256_ASN1_SIGNING, &rng).unwrap();
-    let key_pair =
-        EcdsaKeyPair::from_pkcs8(&ECDSA_P256_SHA256_ASN1_SIGNING, pkcs8_bytes.as_ref()).unwrap();
+    let key_pair = p256::ecdsa::SigningKey::generate();
 
     let message = b"test message";
-    let signature = key_pair.sign(&rng, message).unwrap();
+    let signature: p256::ecdsa::DerSignature = key_pair.sign(message);
 
-    let public_key_bytes = key_pair.public_key().as_ref();
+    let point = key_pair.verifying_key().to_sec1_point(false);
+    let public_key_bytes = point.as_bytes();
     let x = &public_key_bytes[1..33];
     let y = &public_key_bytes[33..65];
 
@@ -858,15 +826,13 @@ fn test_verify_signature_es256_dispatch() {
 
 #[test]
 fn test_verify_signature_rs256_dispatch() {
-    let rng = SystemRandom::new();
     let (key_pair, n, e) = create_test_rsa_keypair();
 
     let message = b"test message";
 
-    let mut signature = vec![0u8; key_pair.public_modulus_len()];
-    key_pair
-        .sign(&RSA_PKCS1_SHA256, &rng, message, &mut signature)
-        .unwrap();
+    let signature = RsaSigningKey::<Sha256>::new(key_pair)
+        .sign(message)
+        .to_vec();
 
     let cose_key_bytes = create_rs256_cose_key(&n, &e);
 

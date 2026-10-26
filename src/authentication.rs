@@ -16,17 +16,13 @@
 
 use std::collections::BTreeMap;
 
-use aws_lc_rs::digest::{self, SHA256};
-use aws_lc_rs::signature::{
-    ECDSA_P256_SHA256_ASN1, ECDSA_P384_SHA384_ASN1, ED25519, EcdsaVerificationAlgorithm,
-    RSA_PKCS1_2048_8192_SHA256, RSA_PKCS1_2048_8192_SHA384, RsaParameters, RsaPublicKeyComponents,
-    UnparsedPublicKey,
-};
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 
-use crate::Passki;
+use crate::attestation::verify_with_key;
 use crate::client_data::{ClientData, ClientDataType};
 use crate::types::*;
+use crate::{Passki, crypto};
 
 /// Challenge sent to the client to begin passkey authentication.
 ///
@@ -340,7 +336,7 @@ impl Passki {
         }
 
         let signature = Self::base64_decode(&credential.response.signature)?;
-        let client_data_hash = digest::digest(&SHA256, &client_data_bytes);
+        let client_data_hash = Sha256::digest(&client_data_bytes);
 
         // The authenticator signed authData || SHA-256(clientDataJSON).
         let mut signed_data = authenticator_data.clone();
@@ -407,32 +403,15 @@ impl Passki {
     ) -> Result<()> {
         match algorithm {
             ALG_EDDSA => Self::verify_eddsa(cose_key_bytes, signed_data, signature),
-            ALG_ES256 => Self::verify_ecdsa(
-                &ECDSA_P256_SHA256_ASN1,
-                CRV_P256,
-                cose_key_bytes,
-                signed_data,
-                signature,
-            ),
-            ALG_ES384 => Self::verify_ecdsa(
-                &ECDSA_P384_SHA384_ASN1,
-                CRV_P384,
-                cose_key_bytes,
-                signed_data,
-                signature,
-            ),
-            ALG_RS256 => Self::verify_rsa(
-                &RSA_PKCS1_2048_8192_SHA256,
-                cose_key_bytes,
-                signed_data,
-                signature,
-            ),
-            ALG_RS384 => Self::verify_rsa(
-                &RSA_PKCS1_2048_8192_SHA384,
-                cose_key_bytes,
-                signed_data,
-                signature,
-            ),
+            ALG_ES256 => {
+                Self::verify_ecdsa(ALG_ES256, CRV_P256, cose_key_bytes, signed_data, signature)
+            }
+            ALG_ES384 => {
+                Self::verify_ecdsa(ALG_ES384, CRV_P384, cose_key_bytes, signed_data, signature)
+            }
+            ALG_RS256 | ALG_RS384 => {
+                Self::verify_rsa(algorithm, cose_key_bytes, signed_data, signature)
+            }
             _ => Err(PasskiError::UnsupportedAlgorithm(algorithm)),
         }
     }
@@ -509,17 +488,12 @@ impl Passki {
             ));
         }
 
-        let public_key = UnparsedPublicKey::new(&ED25519, x);
-        public_key
-            .verify(signed_data, signature)
-            .map_err(|_| PasskiError::SignatureVerificationFailed)?;
-
-        Ok(())
+        verify_with_key(ALG_EDDSA, x, signed_data, signature)
     }
 
     /// Verifies an ECDSA signature (ES256 or ES384).
     pub(crate) fn verify_ecdsa(
-        algorithm: &'static EcdsaVerificationAlgorithm,
+        algorithm: i32,
         crv: i64,
         cose_key_bytes: &[u8],
         signed_data: &[u8],
@@ -537,17 +511,12 @@ impl Passki {
         public_key_bytes.extend_from_slice(y);
 
         // signed_data goes in unhashed; the algorithm hashes it itself.
-        let public_key = UnparsedPublicKey::new(algorithm, &public_key_bytes);
-        public_key
-            .verify(signed_data, signature)
-            .map_err(|_| PasskiError::SignatureVerificationFailed)?;
-
-        Ok(())
+        verify_with_key(algorithm, &public_key_bytes, signed_data, signature)
     }
 
     /// Verifies an RSA PKCS#1 v1.5 signature (RS256 or RS384).
     pub(crate) fn verify_rsa(
-        algorithm: &'static RsaParameters,
+        algorithm: i32,
         cose_key_bytes: &[u8],
         signed_data: &[u8],
         signature: &[u8],
@@ -558,11 +527,6 @@ impl Passki {
         let e = Self::cose_field(&cose_map, -2, "e (exponent)")?;
 
         // signed_data goes in unhashed; the algorithm hashes it itself.
-        let public_key = RsaPublicKeyComponents { n, e };
-        public_key
-            .verify(algorithm, signed_data, signature)
-            .map_err(|_| PasskiError::SignatureVerificationFailed)?;
-
-        Ok(())
+        crypto::verify_rsa(algorithm, n, e, signed_data, signature)
     }
 }

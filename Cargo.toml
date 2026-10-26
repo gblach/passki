@@ -10,12 +10,23 @@ license = "Apache-2.0"
 keywords = ["webauthn", "passkey", "authentication", "fido2", "cryptography"]
 categories = ["authentication", "cryptography", "web-programming"]
 
+[features]
+default = ["rust-crypto"]
+aws-lc-rs = ["dep:aws-lc-rs"]
+rust-crypto = ["dep:ed25519-dalek", "dep:p256", "dep:p384", "dep:rsa"]
+
 [dependencies]
-aws-lc-rs = "1"
+aws-lc-rs = { version = "1", optional = true }
 base64ct = { version = "1", features = ["alloc"] }
 ciborium = "0.2"
+ed25519-dalek = { version = "3", optional = true }
+getrandom = "0.4"
+p256 = { version = "0.14", optional = true }
+p384 = { version = "0.14", optional = true }
+rsa = { version = "0.10.0-rc.19", default-features = false, features = ["sha2", "std"], optional = true }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+sha2 = "0.11"
 thiserror = "2"
 x509-cert = { version = "0.3", default-features = false, features = ["std"] }
 
@@ -23,9 +34,14 @@ x509-cert = { version = "0.3", default-features = false, features = ["std"] }
 actix-web = "4"
 axum = { version = "0.8", features = ["json"] }
 der = { version = "0.8", features = ["alloc", "derive"] }
+ed25519-dalek = { version = "3", features = ["rand_core"] }
 env_logger = "0.11"
+getrandom = { version = "0.4", features = ["sys_rng"] }
+p256 = "0.14"
+p384 = "0.14"
 poem = "3"
 rocket = { version = "0.5", features = ["json"] }
+rsa = { version = "0.10.0-rc.19", default-features = false, features = ["sha2", "std"] }
 salvo = { version = "1", features = ["affix-state", "cors", "logging"] }
 time = "0.3"
 tokio = { version = "1", features = ["full"] }

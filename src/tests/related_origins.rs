@@ -12,9 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use aws_lc_rs::digest::{self, SHA256};
-use aws_lc_rs::rand::SystemRandom;
-use aws_lc_rs::signature::{Ed25519KeyPair, KeyPair};
+use ed25519_dalek::Signer;
+use ed25519_dalek::SigningKey as Ed25519SigningKey;
+use getrandom::SysRng;
+use getrandom::rand_core::UnwrapErr;
+use sha2::{Digest, Sha256};
 
 use super::helpers::{
     create_eddsa_cose_key, create_test_attestation_object_for_rp,
@@ -133,10 +135,8 @@ fn test_registration_rejects_an_unlisted_origin() {
 
 #[test]
 fn test_authentication_accepts_an_origin_other_than_the_one_registered_on() {
-    let rng = SystemRandom::new();
-    let pkcs8 = Ed25519KeyPair::generate_pkcs8(&rng).unwrap();
-    let key_pair = Ed25519KeyPair::from_pkcs8(pkcs8.as_ref()).unwrap();
-    let pub_key: &[u8; 32] = key_pair.public_key().as_ref().try_into().unwrap();
+    let key_pair = Ed25519SigningKey::generate(&mut UnwrapErr(SysRng));
+    let pub_key: &[u8; 32] = &key_pair.verifying_key().to_bytes();
 
     // Registered from the first origin, as far as the relying party is concerned.
     let passki = passki();
@@ -165,10 +165,10 @@ fn test_authentication_accepts_an_origin_other_than_the_one_registered_on() {
     // The same credential asserting from the second origin, under the one shared rp_id.
     let auth_data = create_test_authenticator_data_for_rp(RP_ID, 1, 0x01);
     let client_data_json = create_test_auth_client_data_json(&state.challenge, ORIGINS[1]);
-    let client_data_hash = digest::digest(&SHA256, &client_data_json);
+    let client_data_hash = Sha256::digest(&client_data_json);
     let mut signed_data = auth_data.clone();
     signed_data.extend_from_slice(client_data_hash.as_ref());
-    let signature = key_pair.sign(&signed_data);
+    let signature = key_pair.sign(&signed_data).to_bytes();
 
     let credential = AuthenticationCredential {
         raw_id: Passki::base64_encode(&[7u8; 16]),
