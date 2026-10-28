@@ -13,6 +13,7 @@ categories = ["authentication", "cryptography", "web-programming"]
 [features]
 default = ["rust-crypto"]
 aws-lc-rs = ["dep:aws-lc-rs"]
+graviola = ["dep:graviola"]
 rust-crypto = ["dep:ed25519-dalek", "dep:p256", "dep:p384", "dep:rsa"]
 
 [dependencies]
@@ -21,6 +22,7 @@ base64ct = { version = "1", features = ["alloc"] }
 ciborium = "0.2"
 ed25519-dalek = { version = "3", optional = true }
 getrandom = "0.4"
+graviola = { version = "0.4", optional = true }
 p256 = { version = "0.14", optional = true }
 p384 = { version = "0.14", optional = true }
 rsa = { version = "0.10.0-rc.19", default-features = false, features = ["sha2", "std"], optional = true }

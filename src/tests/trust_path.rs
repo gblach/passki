@@ -86,15 +86,19 @@ fn generate_key() -> SigningKey {
     SigningKey::generate()
 }
 
-/// The `SubjectPublicKeyInfo` for an ES256 key pair.
-fn spki(key_pair: &SigningKey) -> SubjectPublicKeyInfoOwned {
+/// The `SubjectPublicKeyInfo` for an ES256 key pair, with the point in SEC1 compressed or
+/// uncompressed form.
+fn spki(key_pair: &SigningKey, compressed: bool) -> SubjectPublicKeyInfoOwned {
     SubjectPublicKeyInfoOwned {
         algorithm: AlgorithmIdentifierOwned {
             oid: OID_EC_PUBLIC_KEY,
             parameters: Some(Any::from(OID_PRIME256V1)),
         },
         subject_public_key: BitString::from_bytes(
-            key_pair.verifying_key().to_sec1_point(false).as_bytes(),
+            key_pair
+                .verifying_key()
+                .to_sec1_point(compressed)
+                .as_bytes(),
         )
         .unwrap(),
     }
@@ -163,6 +167,7 @@ fn issue_certificate(
     subject_name: &Name,
     role: Role,
     validity: Validity,
+    compressed: bool,
 ) -> Vec<u8> {
     let signature_algorithm = AlgorithmIdentifierOwned {
         oid: OID_ECDSA_SHA256,
@@ -176,7 +181,7 @@ fn issue_certificate(
         issuer: issuer_name.clone(),
         validity,
         subject: subject_name.clone(),
-        subject_public_key_info: spki(subject_key),
+        subject_public_key_info: spki(subject_key, compressed),
         extensions: Some(vec![basic_constraints(role)]),
     };
 
@@ -201,7 +206,7 @@ impl TestCert {
     fn root_with(common_name: &str, role: Role, validity: Validity) -> Self {
         let key_pair = generate_key();
         let name = Name::from_str(&format!("CN={}", common_name)).unwrap();
-        let der = issue_certificate(&key_pair, &name, &key_pair, &name, role, validity);
+        let der = issue_certificate(&key_pair, &name, &key_pair, &name, role, validity, false);
 
         Self {
             key_pair,
@@ -212,9 +217,28 @@ impl TestCert {
 
     /// Issues a certificate below this one.
     fn issue(&self, common_name: &str, role: Role, validity: Validity) -> Self {
+        self.issue_with(common_name, role, validity, false)
+    }
+
+    /// Issues a certificate below this one, choosing the SEC1 form of its public key.
+    fn issue_with(
+        &self,
+        common_name: &str,
+        role: Role,
+        validity: Validity,
+        compressed: bool,
+    ) -> Self {
         let key_pair = generate_key();
         let name = Name::from_str(&format!("CN={}", common_name)).unwrap();
-        let der = issue_certificate(&self.key_pair, &self.name, &key_pair, &name, role, validity);
+        let der = issue_certificate(
+            &self.key_pair,
+            &self.name,
+            &key_pair,
+            &name,
+            role,
+            validity,
+            compressed,
+        );
 
         Self {
             key_pair,
@@ -324,6 +348,28 @@ fn test_default_policy_leaves_a_chain_unverified() {
         .unwrap();
 
     assert_eq!(parsed.attestation_type, AttestationType::Unverified);
+}
+
+#[test]
+fn test_compressed_attestation_key_depends_on_the_backend() {
+    let root = TestCert::root("Passki Test Root");
+    let leaf = root.issue_with("Passki Attestation", Role::Leaf, current(), true);
+    let (bytes, client_data_hash) = packed_attestation(&[&leaf]);
+
+    let result = passki().verify_attestation(&bytes, &client_data_hash);
+
+    // graviola only parses uncompressed points, the other backends accept both forms.
+    if cfg!(all(feature = "graviola", not(feature = "aws-lc-rs"))) {
+        assert!(matches!(
+            result,
+            Err(PasskiError::SignatureVerificationFailed)
+        ));
+    } else {
+        assert_eq!(
+            result.unwrap().attestation_type,
+            AttestationType::Unverified
+        );
+    }
 }
 
 #[test]

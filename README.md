@@ -28,8 +28,9 @@ A simple and secure WebAuthn/Passkey implementation for Rust.
   so stale ones stop being offered
 - 📜 **[Attestation](docs/attestation.md)** - Statement verification for `packed`, `tpm`, `android-key` and `fido-u2f`,
   with opt-in trust path validation against your own roots
-- 🦀 **Two Crypto Backends** - Pure Rust [RustCrypto](https://github.com/RustCrypto) by default,
-  or [aws-lc-rs](https://crates.io/crates/aws-lc-rs) with the `aws-lc-rs` feature (see
+- 🦀 **Three Crypto Backends** - Pure Rust [RustCrypto](https://github.com/RustCrypto) by default,
+  [aws-lc-rs](https://crates.io/crates/aws-lc-rs) with the `aws-lc-rs` feature or
+  [graviola](https://crates.io/crates/graviola) with the `graviola` feature (see
   [Installation](#installation)); passki itself contains no unsafe code
 
 ## Installation
@@ -50,13 +51,22 @@ instead, which is 3-5x faster at ECDSA and RSA and has a FIPS-validated build, e
 passki = { version = "0.4", default-features = false, features = ["aws-lc-rs"] }
 ```
 
+[graviola](https://crates.io/crates/graviola) is nearly as fast as aws-lc-rs and, like RustCrypto,
+needs no C toolchain, but builds only for x86_64 and aarch64:
+
+```toml
+[dependencies]
+passki = { version = "0.4", default-features = false, features = ["graviola"] }
+```
+
 | Feature       | Default | Backend                                   |
 | ------------- | ------- | ----------------------------------------- |
 | `rust-crypto` | yes     | `p256`, `p384`, `ed25519-dalek` and `rsa` |
 | `aws-lc-rs`   | no      | aws-lc-rs                                 |
+| `graviola`    | no      | graviola                                  |
 
-If both are enabled, aws-lc-rs is used. The RustCrypto crates are still compiled in that case,
-so turn off the default features to drop them.
+If several are enabled, aws-lc-rs wins over graviola, and both win over RustCrypto. The other
+backends are still compiled in that case, so turn off the default features to drop them.
 
 ## Quick Start
 

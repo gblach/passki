@@ -20,9 +20,11 @@
 //! cargo bench --bench backends -- --save-baseline rust-crypto
 //! cargo bench --bench backends --no-default-features --features aws-lc-rs -- \
 //!     --baseline rust-crypto
+//! cargo bench --bench backends --no-default-features --features graviola -- \
+//!     --baseline rust-crypto
 //! ```
 //!
-//! The second run reports each benchmark's change against the first.
+//! The later runs report each benchmark's change against the first.
 
 use ciborium::Value;
 use criterion::{Criterion, criterion_group, criterion_main};
