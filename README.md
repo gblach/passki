@@ -39,7 +39,7 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-passki = "0.4"
+passki = "0.5"
 ```
 
 Signatures are verified with the pure Rust [RustCrypto](https://github.com/RustCrypto) crates by
@@ -48,7 +48,7 @@ instead, which is 3-5x faster at ECDSA and RSA and has a FIPS-validated build, e
 
 ```toml
 [dependencies]
-passki = { version = "0.4", default-features = false, features = ["aws-lc-rs"] }
+passki = { version = "0.5", default-features = false, features = ["aws-lc-rs"] }
 ```
 
 [graviola](https://crates.io/crates/graviola) is nearly as fast as aws-lc-rs and, like RustCrypto,
@@ -56,7 +56,7 @@ needs no C toolchain, but builds only for x86_64 and aarch64:
 
 ```toml
 [dependencies]
-passki = { version = "0.4", default-features = false, features = ["graviola"] }
+passki = { version = "0.5", default-features = false, features = ["graviola"] }
 ```
 
 | Feature       | Default | Backend                                   |
