@@ -315,6 +315,23 @@ impl Passki {
         let authenticator_data = Self::base64_decode(&credential.response.authenticator_data)?;
         let (flags, counter) = self.parse_auth_data_header(&authenticator_data)?;
 
+        let signature = Self::base64_decode(&credential.response.signature)?;
+        let client_data_hash = Sha256::digest(&client_data_bytes);
+
+        // The authenticator signed authData || SHA-256(clientDataJSON).
+        let mut signed_data = authenticator_data.clone();
+        signed_data.extend_from_slice(client_data_hash.as_ref());
+
+        Self::verify_signature(
+            &stored_passkey.public_key,
+            stored_passkey.algorithm,
+            &signed_data,
+            &signature,
+        )?;
+
+        // The flags and the counter are only worth acting on once the signature proves
+        // the authenticator wrote them. Checked earlier, anyone who knows a credential ID could
+        // forge a low counter and make a valid passkey look cloned.
         if (flags & FLAG_UP) == 0 {
             return Err(PasskiError::UserNotPresent);
         }
@@ -334,20 +351,6 @@ impl Passki {
         if (counter != 0 || stored_passkey.counter != 0) && counter <= stored_passkey.counter {
             return Err(PasskiError::CounterRegression);
         }
-
-        let signature = Self::base64_decode(&credential.response.signature)?;
-        let client_data_hash = Sha256::digest(&client_data_bytes);
-
-        // The authenticator signed authData || SHA-256(clientDataJSON).
-        let mut signed_data = authenticator_data.clone();
-        signed_data.extend_from_slice(client_data_hash.as_ref());
-
-        Self::verify_signature(
-            &stored_passkey.public_key,
-            stored_passkey.algorithm,
-            &signed_data,
-            &signature,
-        )?;
 
         let prf_results = credential
             .client_extension_results

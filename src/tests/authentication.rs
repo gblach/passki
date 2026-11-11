@@ -12,8 +12,73 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use super::helpers::{create_test_auth_client_data_json, create_test_authenticator_data};
+use super::helpers::{
+    create_eddsa_cose_key, create_test_auth_client_data_json, create_test_authenticator_data,
+};
 use crate::*;
+use ed25519_dalek::Signer;
+use ed25519_dalek::SigningKey as Ed25519SigningKey;
+use getrandom::SysRng;
+use getrandom::rand_core::UnwrapErr;
+use sha2::{Digest, Sha256};
+
+/// Runs a whole authentication for a passkey whose stored counter is `stored_counter`,
+/// with authenticator data carrying `counter` and `flags`. `forge` replaces the signature with
+/// one the credential key did not make, as a caller who only knows the credential ID would send.
+fn authenticate(
+    user_verification: UserVerificationRequirement,
+    stored_counter: u32,
+    counter: u32,
+    flags: u8,
+    forge: bool,
+) -> Result<AuthenticationResult> {
+    let key_pair = Ed25519SigningKey::generate(&mut UnwrapErr(SysRng));
+    let passki = Passki::new("localhost", &["http://localhost:3000"], "Test App");
+
+    let stored_passkey = StoredPasskey {
+        credential_id: vec![1u8; 16],
+        public_key: create_eddsa_cose_key(&key_pair.verifying_key().to_bytes()),
+        counter: stored_counter,
+        algorithm: -8,
+        ..Default::default()
+    };
+
+    let (_challenge, state) = passki
+        .start_passkey_authentication(
+            std::slice::from_ref(&stored_passkey),
+            AuthenticationOptions {
+                user_verification,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+    let authenticator_data = create_test_authenticator_data(counter, flags);
+    let client_data_json =
+        create_test_auth_client_data_json(&state.challenge, "http://localhost:3000");
+
+    let mut signed_data = authenticator_data.clone();
+    signed_data.extend_from_slice(Sha256::digest(&client_data_json).as_ref());
+    let signature = if forge {
+        [9u8; 64]
+    } else {
+        key_pair.sign(&signed_data).to_bytes()
+    };
+
+    let credential = AuthenticationCredential {
+        raw_id: Passki::base64_encode(&stored_passkey.credential_id),
+        response: AuthenticationResponse {
+            client_data_json: Passki::base64_encode(&client_data_json),
+            authenticator_data: Passki::base64_encode(&authenticator_data),
+            signature: Passki::base64_encode(&signature),
+            user_handle: None,
+        },
+        client_extension_results: None,
+        authenticator_attachment: None,
+    };
+
+    passki.finish_passkey_authentication(&credential, &state, &stored_passkey)
+}
 
 #[test]
 fn test_start_passkey_authentication_returns_challenge() {
@@ -410,48 +475,22 @@ fn test_finish_passkey_authentication_wrong_origin() {
 
 #[test]
 fn test_finish_passkey_authentication_invalid_counter() {
-    let passki = Passki::new("localhost", &["http://localhost:3000"], "Test App");
+    // Counter 5 <= stored counter 10
+    let err = authenticate(UserVerificationRequirement::Preferred, 10, 5, 0x01, false).unwrap_err();
+    assert!(matches!(err, PasskiError::CounterRegression));
+}
 
-    let stored_passkey = StoredPasskey {
-        credential_id: vec![1u8; 16],
-        public_key: vec![2u8; 64],
-        counter: 10,
-        algorithm: -7,
-        aaguid: [0u8; 16],
-        attestation_type: AttestationType::None,
-        transports: Vec::new(),
-        rk: None,
-        large_blob_supported: None,
-        cred_protect: None,
-        min_pin_length: None,
-        be: false,
-        bs: false,
-    };
+#[test]
+fn test_finish_passkey_authentication_forged_counter_fails_on_signature() {
+    let err = authenticate(UserVerificationRequirement::Preferred, 10, 5, 0x01, true).unwrap_err();
+    assert!(matches!(err, PasskiError::SignatureVerificationFailed));
+}
 
-    let passkeys = vec![stored_passkey.clone()];
-    let (_challenge, state) = passki
-        .start_passkey_authentication(&passkeys, AuthenticationOptions::default())
-        .unwrap();
-
-    let authenticator_data = create_test_authenticator_data(5, 0x01); // Counter 5 <= stored counter 10
-    let client_data_json =
-        create_test_auth_client_data_json(&state.challenge, "http://localhost:3000");
-
-    let credential = AuthenticationCredential {
-        raw_id: Passki::base64_encode(&[1u8; 16]),
-        response: AuthenticationResponse {
-            client_data_json: Passki::base64_encode(&client_data_json),
-            authenticator_data: Passki::base64_encode(&authenticator_data),
-            signature: Passki::base64_encode(&[9u8; 64]),
-            user_handle: None,
-        },
-        client_extension_results: None,
-        authenticator_attachment: None,
-    };
-
-    let result = passki.finish_passkey_authentication(&credential, &state, &stored_passkey);
-    assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("Invalid counter"));
+#[test]
+fn test_finish_passkey_authentication_forged_flags_fail_on_signature() {
+    // flags: UP=0 (0x00), with user verification required
+    let err = authenticate(UserVerificationRequirement::Required, 5, 6, 0x00, true).unwrap_err();
+    assert!(matches!(err, PasskiError::SignatureVerificationFailed));
 }
 
 #[test]
@@ -565,54 +604,9 @@ fn test_finish_passkey_authentication_uv_required_flag_set() {
 
 #[test]
 fn test_finish_passkey_authentication_uv_required_flag_not_set() {
-    let passki = Passki::new("localhost", &["http://localhost:3000"], "Test App");
-
-    let stored_passkey = StoredPasskey {
-        credential_id: vec![1u8; 16],
-        public_key: vec![2u8; 64],
-        counter: 5,
-        algorithm: -7,
-        aaguid: [0u8; 16],
-        attestation_type: AttestationType::None,
-        transports: Vec::new(),
-        rk: None,
-        large_blob_supported: None,
-        cred_protect: None,
-        min_pin_length: None,
-        be: false,
-        bs: false,
-    };
-
-    let passkeys = vec![stored_passkey.clone()];
-    let (_challenge, state) = passki
-        .start_passkey_authentication(
-            &passkeys,
-            AuthenticationOptions {
-                user_verification: UserVerificationRequirement::Required,
-                ..Default::default()
-            },
-        )
-        .unwrap();
-
     // flags: UP=1, UV=0 (0x01)
-    let authenticator_data = create_test_authenticator_data(6, 0x01);
-    let client_data_json =
-        create_test_auth_client_data_json(&state.challenge, "http://localhost:3000");
-    let credential = AuthenticationCredential {
-        raw_id: Passki::base64_encode(&[1u8; 16]),
-        response: AuthenticationResponse {
-            client_data_json: Passki::base64_encode(&client_data_json),
-            authenticator_data: Passki::base64_encode(&authenticator_data),
-            signature: Passki::base64_encode(&[9u8; 64]),
-            user_handle: None,
-        },
-        client_extension_results: None,
-        authenticator_attachment: None,
-    };
-
-    let result = passki.finish_passkey_authentication(&credential, &state, &stored_passkey);
-    assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("UV flag not set"));
+    let err = authenticate(UserVerificationRequirement::Required, 5, 6, 0x01, false).unwrap_err();
+    assert!(matches!(err, PasskiError::UserVerificationRequired));
 }
 
 #[test]
@@ -669,49 +663,9 @@ fn test_finish_passkey_authentication_uv_preferred_flag_not_set() {
 
 #[test]
 fn test_finish_passkey_authentication_up_flag_not_set() {
-    let passki = Passki::new("localhost", &["http://localhost:3000"], "Test App");
-
-    let stored_passkey = StoredPasskey {
-        credential_id: vec![1u8; 16],
-        public_key: vec![2u8; 64],
-        counter: 5,
-        algorithm: -7,
-        aaguid: [0u8; 16],
-        attestation_type: AttestationType::None,
-        transports: Vec::new(),
-        rk: None,
-        large_blob_supported: None,
-        cred_protect: None,
-        min_pin_length: None,
-        be: false,
-        bs: false,
-    };
-
-    let passkeys = vec![stored_passkey.clone()];
-    let (_challenge, state) = passki
-        .start_passkey_authentication(&passkeys, AuthenticationOptions::default())
-        .unwrap();
-
     // flags: UP=0 (0x00)
-    let authenticator_data = create_test_authenticator_data(6, 0x00);
-    let client_data_json =
-        create_test_auth_client_data_json(&state.challenge, "http://localhost:3000");
-
-    let credential = AuthenticationCredential {
-        raw_id: Passki::base64_encode(&[1u8; 16]),
-        response: AuthenticationResponse {
-            client_data_json: Passki::base64_encode(&client_data_json),
-            authenticator_data: Passki::base64_encode(&authenticator_data),
-            signature: Passki::base64_encode(&[9u8; 64]),
-            user_handle: None,
-        },
-        client_extension_results: None,
-        authenticator_attachment: None,
-    };
-
-    let result = passki.finish_passkey_authentication(&credential, &state, &stored_passkey);
-    assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("UP flag not set"));
+    let err = authenticate(UserVerificationRequirement::Preferred, 5, 6, 0x00, false).unwrap_err();
+    assert!(matches!(err, PasskiError::UserNotPresent));
 }
 
 #[test]
