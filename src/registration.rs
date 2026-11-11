@@ -359,6 +359,7 @@ impl Passki {
     /// * The challenge doesn't match
     /// * The origin doesn't match
     /// * The attestation object is malformed
+    /// * The credential key uses an unsupported algorithm or is malformed
     pub fn finish_passkey_registration(
         &self,
         credential: &RegistrationCredential,
@@ -376,6 +377,7 @@ impl Passki {
 
         let attestation_bytes = Self::base64_decode(&credential.response.attestation_object)?;
         let parsed = self.verify_attestation(&attestation_bytes, client_data_hash.as_ref())?;
+        Self::validate_cose_key(&parsed.public_key, parsed.algorithm)?;
 
         if (parsed.flags & FLAG_UP) == 0 {
             return Err(PasskiError::UserNotPresent);

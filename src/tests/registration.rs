@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use super::helpers::{
+    create_eddsa_cose_key, create_es256_cose_key, create_es384_cose_key, create_rs256_cose_key,
     create_test_attestation_object, create_test_attestation_object_with_counter,
     create_test_client_data_json,
 };
@@ -699,4 +700,94 @@ fn test_finish_passkey_registration_credential_id_mismatch() {
             .to_string()
             .contains("Credential ID mismatch")
     );
+}
+
+#[test]
+fn test_finish_passkey_registration_rejects_unsupported_algorithm() {
+    let passki = Passki::new("localhost", &["http://localhost:3000"], "Test App");
+
+    let (_challenge, state) = passki
+        .start_passkey_registration(
+            b"user123_16bytes_",
+            "testuser",
+            "Test User",
+            RegistrationOptions::default(),
+        )
+        .unwrap();
+
+    // -36 is ES512, which is not among the offered pubKeyCredParams.
+    let attestation_obj = create_test_attestation_object(-36, 0x45);
+    let client_data_json = create_test_client_data_json(&state.challenge, "http://localhost:3000");
+
+    let credential = RegistrationCredential {
+        raw_id: Passki::base64_encode(&[1u8; 16]),
+        response: RegistrationResponse {
+            client_data_json: Passki::base64_encode(&client_data_json),
+            attestation_object: Passki::base64_encode(&attestation_obj),
+            transports: Vec::new(),
+        },
+        client_extension_results: None,
+        authenticator_attachment: None,
+    };
+
+    let err = passki
+        .finish_passkey_registration(&credential, &state)
+        .unwrap_err();
+    assert!(matches!(err, PasskiError::UnsupportedAlgorithm(-36)));
+}
+
+#[test]
+fn test_validate_cose_key_accepts_well_formed_keys() {
+    assert!(Passki::validate_cose_key(&create_eddsa_cose_key(&[4u8; 32]), -8).is_ok());
+    assert!(Passki::validate_cose_key(&create_es256_cose_key(&[2u8; 32], &[3u8; 32]), -7).is_ok());
+    assert!(Passki::validate_cose_key(&create_es384_cose_key(&[2u8; 48], &[3u8; 48]), -35).is_ok());
+    assert!(
+        Passki::validate_cose_key(&create_rs256_cose_key(&[0xffu8; 256], &[1, 0, 1]), -257).is_ok()
+    );
+}
+
+#[test]
+fn test_validate_cose_key_rejects_key_of_another_algorithm() {
+    // An EC key declared as EdDSA, and an EdDSA key declared as ES256.
+    let ec_key = create_es256_cose_key(&[2u8; 32], &[3u8; 32]);
+    let err = Passki::validate_cose_key(&ec_key, -8).unwrap_err();
+    assert!(matches!(err, PasskiError::InvalidCoseKey(_)));
+
+    let eddsa_key = create_eddsa_cose_key(&[4u8; 32]);
+    let err = Passki::validate_cose_key(&eddsa_key, -7).unwrap_err();
+    assert!(matches!(err, PasskiError::InvalidCoseKey(_)));
+
+    // A P-256 key declared as ES384 has the wrong curve.
+    let err = Passki::validate_cose_key(&ec_key, -35).unwrap_err();
+    assert!(matches!(err, PasskiError::InvalidCoseKey(_)));
+}
+
+#[test]
+fn test_validate_cose_key_rejects_wrong_coordinate_length() {
+    let short = create_es256_cose_key(&[2u8; 31], &[3u8; 32]);
+    let err = Passki::validate_cose_key(&short, -7).unwrap_err();
+    assert!(matches!(err, PasskiError::InvalidCoseKey(_)));
+
+    let short = create_es384_cose_key(&[2u8; 48], &[3u8; 32]);
+    let err = Passki::validate_cose_key(&short, -35).unwrap_err();
+    assert!(matches!(err, PasskiError::InvalidCoseKey(_)));
+}
+
+#[test]
+fn test_validate_cose_key_rejects_rsa_modulus_out_of_range() {
+    // 2047 bits: 256 bytes with the top bit clear. Leading zero bytes do not count either.
+    let mut n = vec![0xffu8; 256];
+    n[0] = 0x7f;
+    let err = Passki::validate_cose_key(&create_rs256_cose_key(&n, &[1, 0, 1]), -257).unwrap_err();
+    assert!(matches!(err, PasskiError::InvalidCoseKey(_)));
+
+    let mut padded = vec![0u8; 200];
+    padded.extend_from_slice(&[0xffu8; 128]);
+    let err =
+        Passki::validate_cose_key(&create_rs256_cose_key(&padded, &[1, 0, 1]), -257).unwrap_err();
+    assert!(matches!(err, PasskiError::InvalidCoseKey(_)));
+
+    let err = Passki::validate_cose_key(&create_rs256_cose_key(&[0xffu8; 1025], &[1, 0, 1]), -257)
+        .unwrap_err();
+    assert!(matches!(err, PasskiError::InvalidCoseKey(_)));
 }

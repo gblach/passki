@@ -474,6 +474,68 @@ impl Passki {
         Ok(())
     }
 
+    fn check_ec_key(
+        cose_map: &[(ciborium::Value, ciborium::Value)],
+        crv: i64,
+        coordinate_len: usize,
+    ) -> Result<()> {
+        Self::cose_expect(cose_map, 1, "kty", KTY_EC2)?;
+        Self::cose_expect(cose_map, -1, "crv", crv)?;
+        let x = Self::cose_field(cose_map, -2, "x coordinate")?;
+        let y = Self::cose_field(cose_map, -3, "y coordinate")?;
+
+        if x.len() != coordinate_len || y.len() != coordinate_len {
+            return Err(PasskiError::InvalidCoseKey(
+                "Invalid EC coordinate length".to_string(),
+            ));
+        }
+
+        Ok(())
+    }
+
+    /// Checks at registration that a credential key is one a later authentication can verify:
+    /// a supported algorithm, the key type and curve that algorithm calls for, and fields
+    /// of the right size.
+    ///
+    /// Without this a key passki cannot use would be stored, and the user would only find out
+    /// at their first sign-in. It does not prove an EC point lies on its curve; the crypto backends
+    /// check that when they verify a signature.
+    pub(crate) fn validate_cose_key(cose_key_bytes: &[u8], algorithm: i32) -> Result<()> {
+        let cose_map = Self::cose_parse(cose_key_bytes)?;
+
+        match algorithm {
+            ALG_EDDSA => {
+                Self::cose_expect(&cose_map, 1, "kty", KTY_OKP)?;
+                Self::cose_expect(&cose_map, -1, "crv", CRV_ED25519)?;
+                if Self::cose_field(&cose_map, -2, "x coordinate")?.len() != 32 {
+                    return Err(PasskiError::InvalidCoseKey(
+                        "Invalid Ed25519 public key length".to_string(),
+                    ));
+                }
+                Ok(())
+            }
+            ALG_ES256 => Self::check_ec_key(&cose_map, CRV_P256, 32),
+            ALG_ES384 => Self::check_ec_key(&cose_map, CRV_P384, 48),
+            ALG_RS256 | ALG_RS384 => {
+                Self::cose_expect(&cose_map, 1, "kty", KTY_RSA)?;
+                let n = Self::cose_field(&cose_map, -1, "n (modulus)")?;
+                Self::cose_field(&cose_map, -2, "e (exponent)")?;
+
+                // The same bounds the crypto backends enforce when verifying.
+                let first = n.iter().position(|&byte| byte != 0).unwrap_or(n.len());
+                let n = &n[first..];
+                let bits = n.len() * 8 - n.first().map_or(0, |byte| byte.leading_zeros() as usize);
+                if !(2048..=8192).contains(&bits) {
+                    return Err(PasskiError::InvalidCoseKey(
+                        "RSA modulus must be 2048 to 8192 bits".to_string(),
+                    ));
+                }
+                Ok(())
+            }
+            _ => Err(PasskiError::UnsupportedAlgorithm(algorithm)),
+        }
+    }
+
     /// Verifies an EdDSA (Ed25519) signature.
     pub(crate) fn verify_eddsa(
         cose_key_bytes: &[u8],

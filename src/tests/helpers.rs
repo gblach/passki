@@ -85,8 +85,9 @@ pub fn create_test_attestation_object_for_rp(
     auth_data.extend_from_slice(&[1u8; 16]); // credId
 
     // The public key, in whatever shape the algorithm calls for.
+    let kty = if algorithm == -8 { 1 } else { 2 }; // OKP for EdDSA, EC2 otherwise
     let mut cose_key = vec![
-        (Value::Integer(1.into()), Value::Integer(2.into())), // kty: EC2
+        (Value::Integer(1.into()), Value::Integer(kty.into())), // kty
         (Value::Integer(3.into()), Value::Integer(algorithm.into())), // alg
     ];
 
