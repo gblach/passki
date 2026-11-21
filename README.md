@@ -125,7 +125,7 @@ stored_passkey.counter = result.counter;
 
 ## Requirements
 
-- Rust 1.85 or later (Edition 2024)
+- Rust 1.88 or later (Edition 2024)
 
 ## Examples
 
