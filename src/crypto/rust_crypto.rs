@@ -62,8 +62,8 @@ fn verify_rsa_with<D: Digest + AssociatedOid>(
 ) -> Result<()> {
     let n = BoxedUint::from_be_slice_vartime(n);
     let e = BoxedUint::from_be_slice_vartime(e);
-    let key = rsa::RsaPublicKey::new(n, e).map_err(|_| PasskiError::SignatureVerificationFailed)?;
-    // The upper bound of 8192 bits is enforced by RsaPublicKey::new, the lower one is not.
+    let key = rsa::PublicKey::new(n, e).map_err(|_| PasskiError::SignatureVerificationFailed)?;
+    // PublicKey::new enforces the upper bound of 8192 bits, but its lower bound is only 1024.
     if key.n().bit_width() < 2048 {
         return Err(PasskiError::SignatureVerificationFailed);
     }

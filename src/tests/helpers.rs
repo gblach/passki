@@ -15,7 +15,7 @@
 use crate::Passki;
 use getrandom::SysRng;
 use getrandom::rand_core::UnwrapErr;
-use rsa::RsaPrivateKey;
+use rsa::PrivateKey;
 use rsa::traits::PublicKeyParts;
 use sha2::{Digest, Sha256};
 
@@ -242,8 +242,8 @@ pub fn create_rs384_cose_key(n: &[u8], e: &[u8]) -> Vec<u8> {
 }
 
 /// A fresh RSA key pair, with its modulus and exponent split out.
-pub fn create_test_rsa_keypair() -> (RsaPrivateKey, Vec<u8>, Vec<u8>) {
-    let key_pair = RsaPrivateKey::new(&mut UnwrapErr(SysRng), 2048).unwrap();
+pub fn create_test_rsa_keypair() -> (PrivateKey, Vec<u8>, Vec<u8>) {
+    let key_pair = PrivateKey::new(&mut UnwrapErr(SysRng), 2048).unwrap();
     let n = strip_leading_zeros(&key_pair.n().to_be_bytes());
     let e = strip_leading_zeros(&key_pair.e().to_be_bytes());
     (key_pair, n, e)

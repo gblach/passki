@@ -113,7 +113,7 @@ fn generate_key(alg: i32) -> (Vec<u8>, SignFn) {
             (cose, Box::new(sign))
         }
         -257 | -258 => {
-            let key = rsa::RsaPrivateKey::new(&mut UnwrapErr(SysRng), 2048).unwrap();
+            let key = rsa::PrivateKey::new(&mut UnwrapErr(SysRng), 2048).unwrap();
             let n = strip_leading_zeros(&key.n().to_be_bytes());
             let e = strip_leading_zeros(&key.e().to_be_bytes());
             let cose = cose_key(vec![
