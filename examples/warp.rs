@@ -65,6 +65,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::convert::Infallible;
 use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
 use uuid::Uuid;
 use warp::{
     Filter, Reply,
@@ -93,19 +94,52 @@ async fn handle_rejection(err: warp::Rejection) -> Result<impl Reply, Infallible
 
 // Storage
 
+/// Beyond this many ceremonies in progress, new ones are refused, so a flood of start calls cannot
+/// grow memory without bound.
+const MAX_PENDING: usize = 1000;
+
+/// Ceremonies waiting for their finish call, keyed by challenge. Each one expires with its
+/// timeout, so one the user abandoned does not stay forever.
+struct Pending<T>(HashMap<String, (Instant, T)>);
+
+impl<T> Default for Pending<T> {
+    fn default() -> Self {
+        Pending(HashMap::new())
+    }
+}
+
+impl<T> Pending<T> {
+    fn insert(&mut self, challenge: String, timeout_ms: u64, state: T) -> Result<(), String> {
+        let now = Instant::now();
+        self.0.retain(|_, (expires, _)| *expires > now);
+        if self.0.len() >= MAX_PENDING {
+            return Err("Too many ceremonies in progress, try again later".into());
+        }
+        let expires = now + Duration::from_millis(timeout_ms);
+        self.0.insert(challenge, (expires, state));
+        Ok(())
+    }
+
+    fn remove(&mut self, challenge: &str) -> Option<T> {
+        let (expires, state) = self.0.remove(challenge)?;
+        (expires > Instant::now()).then_some(state)
+    }
+}
+
 /// In-memory storage for users and ceremonies in progress.
 ///
-/// A real server would use a database for the users and an expiring cache for the pending states.
+/// A real server would use a database for the users and a shared expiring cache, such as Redis,
+/// for the pending states.
 #[derive(Clone, Default)]
 struct Store {
     /// Keyed by username.
     users: Arc<Mutex<HashMap<String, User>>>,
 
     /// Registrations waiting for their finish call, keyed by challenge.
-    pending_registrations: Arc<Mutex<HashMap<String, RegistrationState>>>,
+    pending_registrations: Arc<Mutex<Pending<RegistrationState>>>,
 
     /// Authentications waiting for their finish call, keyed by challenge.
-    pending_authentications: Arc<Mutex<HashMap<String, AuthenticationState>>>,
+    pending_authentications: Arc<Mutex<Pending<AuthenticationState>>>,
 
     /// Signed-in usernames, keyed by the token in the session cookie.
     sessions: Arc<Mutex<HashMap<String, String>>>,
@@ -313,7 +347,8 @@ async fn register_start(
         .pending_registrations
         .lock()
         .unwrap()
-        .insert(challenge.challenge.clone(), reg_state);
+        .insert(challenge.challenge.clone(), challenge.timeout, reg_state)
+        .map_err(|e| warp::reject::custom(AppError(e)))?;
 
     Ok(reply::json(&challenge))
 }
@@ -461,7 +496,8 @@ async fn auth_start(state: AppState, req: AuthStartRequest) -> Result<impl Reply
         .pending_authentications
         .lock()
         .unwrap()
-        .insert(challenge.challenge.clone(), auth_state);
+        .insert(challenge.challenge.clone(), challenge.timeout, auth_state)
+        .map_err(|e| warp::reject::custom(AppError(e)))?;
 
     Ok(reply::json(&challenge))
 }
