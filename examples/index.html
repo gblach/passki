@@ -82,6 +82,24 @@
                 color: var(--slate);
             }
 
+            .session {
+                margin-left: auto;
+                font-family: var(--mono);
+                font-size: 12px;
+                color: var(--slate);
+            }
+
+            .session button {
+                font: inherit;
+                color: var(--copper);
+                background: none;
+                border: 0;
+                padding: 0;
+                margin-left: 8px;
+                cursor: pointer;
+                text-decoration: underline;
+            }
+
             /* Bench */
 
             .bench {
@@ -428,6 +446,10 @@
             <header class="rail">
                 <span class="mark">passki</span>
                 <span class="eyebrow">WebAuthn ceremony demo</span>
+                <span class="session" id="session" hidden>
+                    signed in as <b id="session-user"></b>
+                    <button type="button" id="logout-btn">sign out</button>
+                </span>
             </header>
 
             <main class="bench">
@@ -548,7 +570,9 @@
                 that string through the PRF extension.<br />
                 <b>Request attestation</b> reports the authenticator model. This
                 demo installs no trust anchors, so the AAGUID it returns stays
-                self-asserted.
+                self-asserted.<br />
+                <b>Adding a passkey</b> to an existing username needs you to be
+                signed in as that user.
             </p>
         </div>
 
@@ -671,7 +695,9 @@
                     });
 
                     if (!startRes.ok)
-                        throw new Error("Registration start failed");
+                        throw new Error(
+                            (await startRes.text()) || "Registration start failed",
+                        );
 
                     const options = await startRes.json();
 
@@ -689,10 +715,13 @@
                     });
 
                     if (!finishRes.ok)
-                        throw new Error("Registration finish failed");
+                        throw new Error(
+                            (await finishRes.text()) || "Registration finish failed",
+                        );
 
                     const result = await finishRes.json();
                     await processSignals(result.signals);
+                    await refreshSession();
 
                     renderReadout("Registration", username, {
                         rk: result.resident_key,
@@ -740,6 +769,7 @@
                     if (!result.success) throw new Error(result.message);
 
                     showAssertion(result, context);
+                    await refreshSession();
                     $("login-username").value = "";
                     $("prf-context").value = "";
                 } catch (err) {
@@ -833,6 +863,7 @@
                     if (!result.success) throw new Error(result.message);
 
                     showAssertion(result, "");
+                    await refreshSession();
                     $("login-username").value = "";
                     $("prf-context").value = "";
 
@@ -844,6 +875,22 @@
                 }
             }
 
+            // The session cookie is HttpOnly, so the page asks the server
+            // who is signed in.
+            async function refreshSession() {
+                const res = await fetch("/session");
+                const signedIn = res.ok ? (await res.json()).username : null;
+                $("session-user").textContent = signedIn ?? "";
+                $("session").hidden = !signedIn;
+            }
+
+            async function logout() {
+                await fetch("/logout", { method: "POST" });
+                await refreshSession();
+                setStatus("Signed out.", "ok");
+            }
+
+            $("logout-btn").addEventListener("click", logout);
             $("register-form").addEventListener("submit", (e) => {
                 e.preventDefault();
                 register();
@@ -853,6 +900,7 @@
                 login();
             });
 
+            refreshSession();
             initConditionalUI();
         </script>
     </body>

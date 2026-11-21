@@ -37,6 +37,12 @@
 //! it, returned hex-encoded in `prf_output`. The same passkey and salt always yield the same bytes,
 //! which makes them usable as an encryption key.
 //!
+//! ## Sessions
+//! A successful sign-in, or a registration that creates a new account, sets a session cookie.
+//! `GET /session` is a protected route that answers only with that cookie, and `POST /logout`
+//! ends the session. Adding a passkey to an existing account needs a session for that account,
+//! otherwise anyone could add their own passkey to someone else's account.
+//!
 //! ## Signal API
 //! Responses carry a `signals` object for the page to hand to the browser's
 //! `PublicKeyCredential.signal*` methods. Registration and sign-in send the account's passkey list
@@ -48,7 +54,7 @@
 //! ```
 //! Then open http://localhost:3000 in your browser.
 
-use actix_web::{App, HttpResponse, HttpServer, web};
+use actix_web::{App, HttpRequest, HttpResponse, HttpServer, http::header::SET_COOKIE, web};
 use passki::{
     AllAcceptedCredentialsSignal, AttestationConveyancePreference, AuthenticationChallenge,
     AuthenticationCredential, AuthenticationExtensions, AuthenticationOptions, AuthenticationState,
@@ -107,6 +113,9 @@ struct Store {
 
     /// Authentications waiting for their finish call, keyed by challenge.
     pending_authentications: Arc<Mutex<HashMap<String, AuthenticationState>>>,
+
+    /// Signed-in usernames, keyed by the token in the session cookie.
+    sessions: Arc<Mutex<HashMap<String, String>>>,
 }
 
 /// A registered user and their passkeys.
@@ -204,6 +213,41 @@ struct AppState {
     store: Store,
 }
 
+// Sessions
+
+const SESSION_COOKIE: &str = "session";
+
+fn session_user(store: &Store, request: &HttpRequest) -> Option<String> {
+    let cookie = request.cookie(SESSION_COOKIE)?;
+    store.sessions.lock().unwrap().get(cookie.value()).cloned()
+}
+
+/// Signs the user in and returns the `Set-Cookie` value that carries the new session.
+fn start_session(store: &Store, username: &str) -> String {
+    let token = Uuid::new_v4().simple().to_string();
+    store
+        .sessions
+        .lock()
+        .unwrap()
+        .insert(token.clone(), username.to_owned());
+    // HttpOnly hides the token from page scripts and SameSite=Strict stops other sites from
+    // sending it. A real site must also add Secure; it is left out here because the demo runs on
+    // plain http://localhost.
+    format!("{SESSION_COOKIE}={token}; HttpOnly; SameSite=Strict; Path=/")
+}
+
+/// Anyone may create a new account, but only its signed-in owner may add a passkey to one.
+fn check_may_register(
+    users: &HashMap<String, User>,
+    signed_in: Option<&str>,
+    username: &str,
+) -> Result<(), AppError> {
+    if users.contains_key(username) && signed_in != Some(username) {
+        return Err(AppError(format!("Sign in as {username} to add a passkey")));
+    }
+    Ok(())
+}
+
 // Handlers
 
 async fn index() -> HttpResponse {
@@ -218,16 +262,17 @@ async fn index() -> HttpResponse {
 /// needs to create a credential.
 async fn register_start(
     state: web::Data<AppState>,
+    request: HttpRequest,
     req: web::Json<RegisterStartRequest>,
 ) -> AppResult<RegistrationChallenge> {
+    let signed_in = session_user(&state.store, &request);
+
     // Passkeys the user already has, which the authenticator must refuse to register a second time.
-    let existing = state
-        .store
-        .users
-        .lock()
-        .unwrap()
-        .get(&req.username)
-        .map(|u| (u.id, u.passkeys.clone()));
+    let existing = {
+        let users = state.store.users.lock().unwrap();
+        check_may_register(&users, signed_in.as_deref(), &req.username)?;
+        users.get(&req.username).map(|u| (u.id, u.passkeys.clone()))
+    };
 
     // Random and opaque rather than the username, so it cannot be used to track the user across
     // sites. A returning user keeps their first ID, because sign-in finds the user by it.
@@ -273,11 +318,13 @@ async fn register_start(
 /// POST /register/finish - Complete passkey registration
 ///
 /// Verifies the new credential, stores it, and reports whether the passkey supports
-/// the PRF extension.
+/// the PRF extension. A new account is signed in straight away.
 async fn register_finish(
     state: web::Data<AppState>,
+    request: HttpRequest,
     credential: web::Json<RegistrationCredential>,
-) -> AppResult<ApiResponse> {
+) -> Result<HttpResponse, AppError> {
+    let signed_in = session_user(&state.store, &request);
     let credential = credential.into_inner();
 
     // The challenge says which pending ceremony this belongs to.
@@ -312,6 +359,11 @@ async fn register_finish(
     let user_id = Uuid::from_slice(&user_id_bytes)?;
 
     let mut users = state.store.users.lock().unwrap();
+    // Checked again, because someone else may have created the account since the start call.
+    check_may_register(&users, signed_in.as_deref(), &reg_state.user.name)?;
+    let cookie = (!users.contains_key(&reg_state.user.name))
+        .then(|| start_session(&state.store, &reg_state.user.name));
+
     let user = users
         .entry(reg_state.user.name.clone())
         .and_modify(|user| {
@@ -341,7 +393,11 @@ async fn register_finish(
         ..Default::default()
     };
 
-    Ok(web::Json(ApiResponse {
+    let mut response = HttpResponse::Ok();
+    if let Some(cookie) = cookie {
+        response.insert_header((SET_COOKIE, cookie));
+    }
+    Ok(response.json(ApiResponse {
         success: true,
         message: "Registration successful".into(),
         username: None,
@@ -407,12 +463,12 @@ async fn auth_start(
 
 /// POST /auth/finish - Complete passkey authentication
 ///
-/// Verifies the signature and, when a PRF salt was sent, returns the derived key hex-encoded
-/// in `prf_output`.
+/// Verifies the signature, signs the user in and, when a PRF salt was sent, returns the derived
+/// key hex-encoded in `prf_output`.
 async fn auth_finish(
     state: web::Data<AppState>,
     credential: web::Json<AuthenticationCredential>,
-) -> AppResult<ApiResponse> {
+) -> Result<HttpResponse, AppError> {
     let credential = credential.into_inner();
 
     // The challenge says which pending ceremony this belongs to.
@@ -455,7 +511,7 @@ async fn auth_finish(
     // The browser offered a passkey this server does not hold. The signal tells it to hide that
     // passkey rather than offer it again; it names no user, so a signed-out caller may see it.
     let Some((username, passkey)) = found else {
-        return Ok(web::Json(ApiResponse {
+        return Ok(HttpResponse::Ok().json(ApiResponse {
             success: false,
             message: "Unknown credential".into(),
             signals: Some(Signals {
@@ -494,18 +550,49 @@ async fn auth_finish(
         .prf_first
         .map(|bytes| bytes.iter().map(|b| format!("{b:02x}")).collect());
 
-    Ok(web::Json(ApiResponse {
-        success: true,
-        message: format!("Welcome back, {}!", username),
-        username: Some(username),
-        prf_supported: None,
-        resident_key: None,
-        backup_eligible: None,
-        backed_up: None,
-        aaguid: None,
-        prf_output,
-        signals: Some(signals),
-    }))
+    let cookie = start_session(&state.store, &username);
+
+    Ok(HttpResponse::Ok()
+        .insert_header((SET_COOKIE, cookie))
+        .json(ApiResponse {
+            success: true,
+            message: format!("Welcome back, {}!", username),
+            username: Some(username),
+            prf_supported: None,
+            resident_key: None,
+            backup_eligible: None,
+            backed_up: None,
+            aaguid: None,
+            prf_output,
+            signals: Some(signals),
+        }))
+}
+
+/// GET /session - The protected route: answers only to a signed-in user
+async fn session(state: web::Data<AppState>, request: HttpRequest) -> HttpResponse {
+    match session_user(&state.store, &request) {
+        Some(username) => HttpResponse::Ok().json(ApiResponse {
+            success: true,
+            message: format!("Signed in as {username}"),
+            username: Some(username),
+            ..Default::default()
+        }),
+        None => HttpResponse::Unauthorized().body("Not signed in"),
+    }
+}
+
+/// POST /logout - End the session
+async fn logout(state: web::Data<AppState>, request: HttpRequest) -> HttpResponse {
+    if let Some(cookie) = request.cookie(SESSION_COOKIE) {
+        state.store.sessions.lock().unwrap().remove(cookie.value());
+    }
+    HttpResponse::Ok()
+        .insert_header((SET_COOKIE, format!("{SESSION_COOKIE}=; Max-Age=0; Path=/")))
+        .json(ApiResponse {
+            success: true,
+            message: "Signed out".into(),
+            ..Default::default()
+        })
 }
 
 // Main
@@ -531,6 +618,8 @@ async fn main() -> std::io::Result<()> {
             .route("/register/finish", web::post().to(register_finish))
             .route("/auth/start", web::post().to(auth_start))
             .route("/auth/finish", web::post().to(auth_finish))
+            .route("/session", web::get().to(session))
+            .route("/logout", web::post().to(logout))
     })
     .bind("0.0.0.0:3000")?
     .run()

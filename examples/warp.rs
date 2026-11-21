@@ -37,6 +37,12 @@
 //! it, returned hex-encoded in `prf_output`. The same passkey and salt always yield the same bytes,
 //! which makes them usable as an encryption key.
 //!
+//! ## Sessions
+//! A successful sign-in, or a registration that creates a new account, sets a session cookie.
+//! `GET /session` is a protected route that answers only with that cookie, and `POST /logout`
+//! ends the session. Adding a passkey to an existing account needs a session for that account,
+//! otherwise anyone could add their own passkey to someone else's account.
+//!
 //! ## Signal API
 //! Responses carry a `signals` object for the page to hand to the browser's
 //! `PublicKeyCredential.signal*` methods. Registration and sign-in send the account's passkey list
@@ -60,7 +66,12 @@ use std::collections::HashMap;
 use std::convert::Infallible;
 use std::sync::{Arc, Mutex};
 use uuid::Uuid;
-use warp::{Filter, Reply, http::StatusCode, reject::Reject, reply};
+use warp::{
+    Filter, Reply,
+    http::{StatusCode, header::SET_COOKIE},
+    reject::Reject,
+    reply,
+};
 
 // Error handling
 
@@ -95,6 +106,9 @@ struct Store {
 
     /// Authentications waiting for their finish call, keyed by challenge.
     pending_authentications: Arc<Mutex<HashMap<String, AuthenticationState>>>,
+
+    /// Signed-in usernames, keyed by the token in the session cookie.
+    sessions: Arc<Mutex<HashMap<String, String>>>,
 }
 
 /// A registered user and their passkeys.
@@ -200,6 +214,42 @@ fn with_state(state: AppState) -> impl Filter<Extract = (AppState,), Error = Inf
     warp::any().map(move || state.clone())
 }
 
+// Sessions
+
+const SESSION_COOKIE: &str = "session";
+
+fn session_user(store: &Store, token: Option<&str>) -> Option<String> {
+    store.sessions.lock().unwrap().get(token?).cloned()
+}
+
+/// Signs the user in and returns the `Set-Cookie` value that carries the new session.
+fn start_session(store: &Store, username: &str) -> String {
+    let token = Uuid::new_v4().simple().to_string();
+    store
+        .sessions
+        .lock()
+        .unwrap()
+        .insert(token.clone(), username.to_owned());
+    // HttpOnly hides the token from page scripts and SameSite=Strict stops other sites from
+    // sending it. A real site must also add Secure; it is left out here because the demo runs on
+    // plain http://localhost.
+    format!("{SESSION_COOKIE}={token}; HttpOnly; SameSite=Strict; Path=/")
+}
+
+/// Anyone may create a new account, but only its signed-in owner may add a passkey to one.
+fn check_may_register(
+    users: &HashMap<String, User>,
+    signed_in: Option<&str>,
+    username: &str,
+) -> Result<(), warp::Rejection> {
+    if users.contains_key(username) && signed_in != Some(username) {
+        return Err(warp::reject::custom(AppError(format!(
+            "Sign in as {username} to add a passkey"
+        ))));
+    }
+    Ok(())
+}
+
 // Handlers
 
 async fn index() -> Result<impl Reply, warp::Rejection> {
@@ -212,16 +262,17 @@ async fn index() -> Result<impl Reply, warp::Rejection> {
 /// needs to create a credential.
 async fn register_start(
     state: AppState,
+    token: Option<String>,
     req: RegisterStartRequest,
 ) -> Result<impl Reply, warp::Rejection> {
+    let signed_in = session_user(&state.store, token.as_deref());
+
     // Passkeys the user already has, which the authenticator must refuse to register a second time.
-    let existing = state
-        .store
-        .users
-        .lock()
-        .unwrap()
-        .get(&req.username)
-        .map(|u| (u.id, u.passkeys.clone()));
+    let existing = {
+        let users = state.store.users.lock().unwrap();
+        check_may_register(&users, signed_in.as_deref(), &req.username)?;
+        users.get(&req.username).map(|u| (u.id, u.passkeys.clone()))
+    };
 
     // Random and opaque rather than the username, so it cannot be used to track the user across
     // sites. A returning user keeps their first ID, because sign-in finds the user by it.
@@ -270,11 +321,14 @@ async fn register_start(
 /// POST /register/finish - Complete passkey registration
 ///
 /// Verifies the new credential, stores it, and reports whether the passkey supports
-/// the PRF extension.
+/// the PRF extension. A new account is signed in straight away.
 async fn register_finish(
     state: AppState,
+    token: Option<String>,
     credential: RegistrationCredential,
 ) -> Result<impl Reply, warp::Rejection> {
+    let signed_in = session_user(&state.store, token.as_deref());
+
     // The challenge says which pending ceremony this belongs to.
     let client_data = ClientData::from_base64(&credential.response.client_data_json)
         .map_err(|e| warp::reject::custom(AppError(e.to_string())))?;
@@ -311,6 +365,11 @@ async fn register_finish(
         .map_err(|e| warp::reject::custom(AppError(e.to_string())))?;
 
     let mut users = state.store.users.lock().unwrap();
+    // Checked again, because someone else may have created the account since the start call.
+    check_may_register(&users, signed_in.as_deref(), &reg_state.user.name)?;
+    let cookie = (!users.contains_key(&reg_state.user.name))
+        .then(|| start_session(&state.store, &reg_state.user.name));
+
     let user = users
         .entry(reg_state.user.name.clone())
         .and_modify(|user| {
@@ -340,7 +399,7 @@ async fn register_finish(
         ..Default::default()
     };
 
-    Ok(reply::json(&ApiResponse {
+    let body = reply::json(&ApiResponse {
         success: true,
         message: "Registration successful".into(),
         username: None,
@@ -351,7 +410,12 @@ async fn register_finish(
         prf_supported: Some(prf_supported),
         prf_output: None,
         signals: Some(signals),
-    }))
+    });
+
+    Ok(match cookie {
+        Some(cookie) => reply::with_header(body, SET_COOKIE, cookie).into_response(),
+        None => body.into_response(),
+    })
 }
 
 /// POST /auth/start - Begin passkey authentication
@@ -404,8 +468,8 @@ async fn auth_start(state: AppState, req: AuthStartRequest) -> Result<impl Reply
 
 /// POST /auth/finish - Complete passkey authentication
 ///
-/// Verifies the signature and, when a PRF salt was sent, returns the derived key hex-encoded
-/// in `prf_output`.
+/// Verifies the signature, signs the user in and, when a PRF salt was sent, returns the derived
+/// key hex-encoded in `prf_output`.
 async fn auth_finish(
     state: AppState,
     credential: AuthenticationCredential,
@@ -463,7 +527,8 @@ async fn auth_finish(
                 ..Default::default()
             }),
             ..Default::default()
-        }));
+        })
+        .into_response());
     };
 
     let result = state
@@ -495,7 +560,9 @@ async fn auth_finish(
         .prf_first
         .map(|bytes| bytes.iter().map(|b| format!("{b:02x}")).collect());
 
-    Ok(reply::json(&ApiResponse {
+    let cookie = start_session(&state.store, &username);
+
+    let body = reply::json(&ApiResponse {
         success: true,
         message: format!("Welcome back, {}!", username),
         username: Some(username),
@@ -506,7 +573,40 @@ async fn auth_finish(
         aaguid: None,
         prf_output,
         signals: Some(signals),
-    }))
+    });
+
+    Ok(reply::with_header(body, SET_COOKIE, cookie).into_response())
+}
+
+/// GET /session - The protected route: answers only to a signed-in user
+async fn session(state: AppState, token: Option<String>) -> Result<impl Reply, warp::Rejection> {
+    Ok(match session_user(&state.store, token.as_deref()) {
+        Some(username) => reply::json(&ApiResponse {
+            success: true,
+            message: format!("Signed in as {username}"),
+            username: Some(username),
+            ..Default::default()
+        })
+        .into_response(),
+        None => reply::with_status("Not signed in", StatusCode::UNAUTHORIZED).into_response(),
+    })
+}
+
+/// POST /logout - End the session
+async fn logout(state: AppState, token: Option<String>) -> Result<impl Reply, warp::Rejection> {
+    if let Some(token) = token {
+        state.store.sessions.lock().unwrap().remove(&token);
+    }
+    let body = reply::json(&ApiResponse {
+        success: true,
+        message: "Signed out".into(),
+        ..Default::default()
+    });
+    Ok(reply::with_header(
+        body,
+        SET_COOKIE,
+        format!("{SESSION_COOKIE}=; Max-Age=0; Path=/"),
+    ))
 }
 
 // Main
@@ -529,12 +629,14 @@ async fn main() {
     let register_start = warp::path!("register" / "start")
         .and(warp::post())
         .and(with_state(state.clone()))
+        .and(warp::cookie::optional::<String>(SESSION_COOKIE))
         .and(warp::body::json())
         .and_then(register_start);
 
     let register_finish = warp::path!("register" / "finish")
         .and(warp::post())
         .and(with_state(state.clone()))
+        .and(warp::cookie::optional::<String>(SESSION_COOKIE))
         .and(warp::body::json())
         .and_then(register_finish);
 
@@ -550,11 +652,25 @@ async fn main() {
         .and(warp::body::json())
         .and_then(auth_finish);
 
+    let session = warp::path!("session")
+        .and(warp::get())
+        .and(with_state(state.clone()))
+        .and(warp::cookie::optional::<String>(SESSION_COOKIE))
+        .and_then(session);
+
+    let logout = warp::path!("logout")
+        .and(warp::post())
+        .and(with_state(state.clone()))
+        .and(warp::cookie::optional::<String>(SESSION_COOKIE))
+        .and_then(logout);
+
     let routes = index
         .or(register_start)
         .or(register_finish)
         .or(auth_start)
         .or(auth_finish)
+        .or(session)
+        .or(logout)
         .recover(handle_rejection);
 
     println!("Server starting on http://localhost:3000");

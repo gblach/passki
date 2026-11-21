@@ -37,6 +37,12 @@
 //! it, returned hex-encoded in `prf_output`. The same passkey and salt always yield the same bytes,
 //! which makes them usable as an encryption key.
 //!
+//! ## Sessions
+//! A successful sign-in, or a registration that creates a new account, sets a session cookie.
+//! `GET /session` is a protected route that answers only with that cookie, and `POST /logout`
+//! ends the session. Adding a passkey to an existing account needs a session for that account,
+//! otherwise anyone could add their own passkey to someone else's account.
+//!
 //! ## Signal API
 //! Responses carry a `signals` object for the page to hand to the browser's
 //! `PublicKeyCredential.signal*` methods. Registration and sign-in send the account's passkey list
@@ -58,7 +64,7 @@ use passki::{
     PrfRegistrationInput, RegistrationChallenge, RegistrationCredential, RegistrationExtensions,
     RegistrationOptions, RegistrationState, StoredPasskey, UnknownCredentialSignal,
 };
-use rocket::http::Status;
+use rocket::http::{Cookie, CookieJar, SameSite, Status};
 use rocket::response::content::RawHtml;
 use rocket::serde::json::Json;
 use rocket::{Build, Rocket, State};
@@ -109,6 +115,9 @@ struct Store {
 
     /// Authentications waiting for their finish call, keyed by challenge.
     pending_authentications: Mutex<HashMap<String, AuthenticationState>>,
+
+    /// Signed-in usernames, keyed by the token in the session cookie.
+    sessions: Mutex<HashMap<String, String>>,
 }
 
 /// A registered user and their passkeys.
@@ -199,6 +208,46 @@ struct Signals {
     current_user_details: Option<CurrentUserDetailsSignal>,
 }
 
+// Sessions
+
+const SESSION_COOKIE: &str = "session";
+
+fn session_user(store: &Store, cookies: &CookieJar<'_>) -> Option<String> {
+    let cookie = cookies.get(SESSION_COOKIE)?;
+    store.sessions.lock().unwrap().get(cookie.value()).cloned()
+}
+
+/// Signs the user in by giving them a new session cookie.
+fn start_session(store: &Store, cookies: &CookieJar<'_>, username: &str) {
+    let token = Uuid::new_v4().simple().to_string();
+    store
+        .sessions
+        .lock()
+        .unwrap()
+        .insert(token.clone(), username.to_owned());
+    // HttpOnly hides the token from page scripts and SameSite=Strict stops other sites from
+    // sending it. A real site must also add Secure; it is left out here because the demo runs on
+    // plain http://localhost.
+    cookies.add(
+        Cookie::build((SESSION_COOKIE, token))
+            .http_only(true)
+            .same_site(SameSite::Strict)
+            .path("/"),
+    );
+}
+
+/// Anyone may create a new account, but only its signed-in owner may add a passkey to one.
+fn check_may_register(
+    users: &HashMap<String, User>,
+    signed_in: Option<&str>,
+    username: &str,
+) -> Result<(), AppError> {
+    if users.contains_key(username) && signed_in != Some(username) {
+        return Err(AppError(format!("Sign in as {username} to add a passkey")));
+    }
+    Ok(())
+}
+
 // Handlers
 
 #[get("/")]
@@ -214,15 +263,17 @@ fn index() -> RawHtml<&'static str> {
 fn register_start(
     passki: &State<Passki>,
     store: &State<Store>,
+    cookies: &CookieJar<'_>,
     req: Json<RegisterStartRequest>,
 ) -> AppResult<RegistrationChallenge> {
+    let signed_in = session_user(store, cookies);
+
     // Passkeys the user already has, which the authenticator must refuse to register a second time.
-    let existing = store
-        .users
-        .lock()
-        .unwrap()
-        .get(&req.username)
-        .map(|u| (u.id, u.passkeys.clone()));
+    let existing = {
+        let users = store.users.lock().unwrap();
+        check_may_register(&users, signed_in.as_deref(), &req.username)?;
+        users.get(&req.username).map(|u| (u.id, u.passkeys.clone()))
+    };
 
     // Random and opaque rather than the username, so it cannot be used to track the user across
     // sites. A returning user keeps their first ID, because sign-in finds the user by it.
@@ -267,13 +318,15 @@ fn register_start(
 /// POST /register/finish - Complete passkey registration
 ///
 /// Verifies the new credential, stores it, and reports whether the passkey supports
-/// the PRF extension.
+/// the PRF extension. A new account is signed in straight away.
 #[post("/register/finish", data = "<credential>")]
 fn register_finish(
     passki: &State<Passki>,
     store: &State<Store>,
+    cookies: &CookieJar<'_>,
     credential: Json<RegistrationCredential>,
 ) -> AppResult<ApiResponse> {
+    let signed_in = session_user(store, cookies);
     let credential = credential.into_inner();
 
     // The challenge says which pending ceremony this belongs to.
@@ -305,6 +358,12 @@ fn register_finish(
     let user_id = Uuid::from_slice(&user_id_bytes)?;
 
     let mut users = store.users.lock().unwrap();
+    // Checked again, because someone else may have created the account since the start call.
+    check_may_register(&users, signed_in.as_deref(), &reg_state.user.name)?;
+    if !users.contains_key(&reg_state.user.name) {
+        start_session(store, cookies, &reg_state.user.name);
+    }
+
     let user = users
         .entry(reg_state.user.name.clone())
         .and_modify(|user| {
@@ -397,12 +456,13 @@ fn auth_start(
 
 /// POST /auth/finish - Complete passkey authentication
 ///
-/// Verifies the signature and, when a PRF salt was sent, returns the derived key hex-encoded
-/// in `prf_output`.
+/// Verifies the signature, signs the user in and, when a PRF salt was sent, returns the derived
+/// key hex-encoded in `prf_output`.
 #[post("/auth/finish", data = "<credential>")]
 fn auth_finish(
     passki: &State<Passki>,
     store: &State<Store>,
+    cookies: &CookieJar<'_>,
     credential: Json<AuthenticationCredential>,
 ) -> AppResult<ApiResponse> {
     let credential = credential.into_inner();
@@ -481,6 +541,8 @@ fn auth_finish(
         .prf_first
         .map(|bytes| bytes.iter().map(|b| format!("{b:02x}")).collect());
 
+    start_session(store, cookies, &username);
+
     Ok(Json(ApiResponse {
         success: true,
         message: format!("Welcome back, {}!", username),
@@ -493,6 +555,32 @@ fn auth_finish(
         prf_output,
         signals: Some(signals),
     }))
+}
+
+/// GET /session - The protected route: answers only to a signed-in user
+#[get("/session")]
+fn session(store: &State<Store>, cookies: &CookieJar<'_>) -> Result<Json<ApiResponse>, Status> {
+    let username = session_user(store, cookies).ok_or(Status::Unauthorized)?;
+    Ok(Json(ApiResponse {
+        success: true,
+        message: format!("Signed in as {username}"),
+        username: Some(username),
+        ..Default::default()
+    }))
+}
+
+/// POST /logout - End the session
+#[post("/logout")]
+fn logout(store: &State<Store>, cookies: &CookieJar<'_>) -> Json<ApiResponse> {
+    if let Some(cookie) = cookies.get(SESSION_COOKIE) {
+        store.sessions.lock().unwrap().remove(cookie.value());
+    }
+    cookies.remove(SESSION_COOKIE);
+    Json(ApiResponse {
+        success: true,
+        message: "Signed out".into(),
+        ..Default::default()
+    })
 }
 
 // Main
@@ -516,6 +604,8 @@ fn rocket() -> Rocket<Build> {
                 register_finish,
                 auth_start,
                 auth_finish,
+                session,
+                logout,
             ],
         )
 }
