@@ -196,17 +196,21 @@ async fn register_start(
     passki: Data<&Arc<Passki>>,
     store: Data<&Store>,
 ) -> AppResult<RegistrationChallenge> {
-    // Random and opaque rather than the username, so it cannot be used to track the user across
-    // sites.
-    let user_id = Uuid::new_v4().as_bytes().to_vec();
-
     // Passkeys the user already has, which the authenticator must refuse to register a second time.
     let existing = store
         .users
         .lock()
         .unwrap()
         .get(&req.username)
-        .map(|u| u.passkeys.clone());
+        .map(|u| (u.id, u.passkeys.clone()));
+
+    // Random and opaque rather than the username, so it cannot be used to track the user across
+    // sites. A returning user keeps their first ID, because sign-in finds the user by it.
+    let user_id = existing
+        .as_ref()
+        .map_or_else(Uuid::new_v4, |(id, _)| *id)
+        .as_bytes()
+        .to_vec();
 
     // An eval-less PRF input just asks whether PRF is supported. Requesting a derivation here
     // instead would report a false negative on authenticators that only support
@@ -221,7 +225,7 @@ async fn register_start(
     } else {
         AttestationConveyancePreference::None
     };
-    options.exclude_credentials = existing.as_deref();
+    options.exclude_credentials = existing.as_ref().map(|(_, passkeys)| passkeys.as_slice());
     options.extensions = Some(extensions);
 
     let (challenge, state) = passki
