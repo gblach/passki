@@ -15,19 +15,20 @@ A simple and secure WebAuthn/Passkey implementation for Rust.
 - 📦 **Framework Agnostic** - No web framework lock-in, works with any HTTP server
 - 📨 **Spec JSON Shapes** - Both ceremonies take `credential.toJSON()` as the browser produces it,
   so the front end remaps nothing
-- 🔑 **[Extensions](docs/extensions.md)** - Support for `credProps` (discoverable credential reporting), PRF (key
-  derivation / E2E encryption), `largeBlob` (blob storage on the authenticator), `credProtect`
-  (user verification policy on security keys) and `minPinLength` (PIN policy on managed keys)
-- 💡 **[Hints](docs/hints.md)** - Steer the browser's UI toward a security key, this device or a phone, without
-  ruling any of them out
-- 🌐 **[Related Origins](docs/related-origins.md)** - One passkey across several domains, with a helper for
-  the `.well-known/webauthn` file
-- 🖼️ **[Cross-origin Iframes](docs/cross-origin-iframes.md)** - Refused by default, with an opt-in allowlist of embedding origins
-  checked against `topOrigin`
-- 📡 **[Signal API](docs/signal-api.md)** - Payloads that tell the browser when a passkey or a username changed,
-  so stale ones stop being offered
-- 📜 **[Attestation](docs/attestation.md)** - Statement verification for `packed`, `tpm`, `android-key` and `fido-u2f`,
-  with opt-in trust path validation against your own roots
+- 🔑 **[Extensions](docs/extensions.md)** - Support for `credProps` (discoverable credential
+  reporting), PRF (key derivation / E2E encryption), `largeBlob` (blob storage on the
+  authenticator), `credProtect` (user verification policy on security keys) and `minPinLength`
+  (PIN policy on managed keys)
+- 💡 **[Hints](docs/hints.md)** - Steer the browser's UI toward a security key, this device or a
+  phone, without ruling any of them out
+- 🌐 **[Related Origins](docs/related-origins.md)** - One passkey across several domains, with a
+  helper for the `.well-known/webauthn` file
+- 🖼️ **[Cross-origin Iframes](docs/cross-origin-iframes.md)** - Refused by default, with an
+  opt-in allowlist of embedding origins checked against `topOrigin`
+- 📡 **[Signal API](docs/signal-api.md)** - Payloads that tell the browser when a passkey or a
+  username changed, so stale ones stop being offered
+- 📜 **[Attestation](docs/attestation.md)** - Statement verification for `packed`, `tpm`,
+  `android-key` and `fido-u2f`, with opt-in trust path validation against your own roots
 - 🦀 **Three Crypto Backends** - Pure Rust [RustCrypto](https://github.com/RustCrypto) by default,
   [aws-lc-rs](https://crates.io/crates/aws-lc-rs) with the `aws-lc-rs` feature or
   [graviola](https://crates.io/crates/graviola) with the `graviola` feature (see
@@ -131,8 +132,8 @@ stored_passkey.counter = result.counter;
 
 The `examples/` directory has complete registration and authentication flows for several
 web frameworks: [Actix-web](examples/actix-web.rs) | [Axum](examples/axum.rs)
-| [Poem](examples/poem.rs)
-| [Rocket](examples/rocket.rs) | [Salvo](examples/salvo.rs) | [Warp](examples/warp.rs)
+| [Poem](examples/poem.rs) | [Rocket](examples/rocket.rs) | [Salvo](examples/salvo.rs)
+| [Warp](examples/warp.rs)
 
 Each one also demonstrates `credProps`, PRF key derivation and the Signal API.
 
