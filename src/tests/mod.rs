@@ -34,6 +34,7 @@ mod related_origins;
 mod serde;
 mod signal;
 mod signature;
+mod tpm;
 mod transports;
 mod trust_path;
 mod user_handle;

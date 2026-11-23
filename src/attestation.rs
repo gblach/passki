@@ -47,9 +47,17 @@ const OID_TCG_KP_AIK: ObjectIdentifier = ObjectIdentifier::new_unwrap("2.23.133.
 
 /// Public key parameters, in whichever encoding they were found, so keys from different sources
 /// can be compared.
-enum PublicKey {
-    Ec { x: Vec<u8>, y: Vec<u8> },
-    Rsa { n: Vec<u8>, e: Vec<u8> },
+pub(crate) enum PublicKey {
+    /// `crv` is the COSE curve id.
+    Ec {
+        crv: i64,
+        x: Vec<u8>,
+        y: Vec<u8>,
+    },
+    Rsa {
+        n: Vec<u8>,
+        e: Vec<u8>,
+    },
 }
 
 /// What an attestation statement offered once its format-specific checks passed.
@@ -179,7 +187,7 @@ fn verify_fido_u2f(
     let cert = parse_cert(&x5c[0])?;
 
     let (x, y) = match cose_public_key(&parsed.public_key)? {
-        PublicKey::Ec { x, y } => (x, y),
+        PublicKey::Ec { x, y, .. } => (x, y),
         PublicKey::Rsa { .. } => {
             return Err(PasskiError::InvalidAttestation(
                 "fido-u2f credential key must be an EC key".to_string(),
@@ -528,7 +536,7 @@ fn cert_key_matches(cert: &Certificate, key: &PublicKey) -> Result<bool> {
         })?;
 
     Ok(match key {
-        PublicKey::Ec { x, y } => {
+        PublicKey::Ec { x, y, .. } => {
             let mut point = Vec::with_capacity(1 + x.len() + y.len());
             point.push(0x04);
             point.extend_from_slice(x);
@@ -550,6 +558,7 @@ fn cose_public_key(cose_key_bytes: &[u8]) -> Result<PublicKey> {
 
     match kty {
         KTY_EC2 => Ok(PublicKey::Ec {
+            crv: Passki::cose_int(&map, -1, "crv")?,
             x: Passki::cose_field(&map, -2, "x coordinate")?.to_vec(),
             y: Passki::cose_field(&map, -3, "y coordinate")?.to_vec(),
         }),
@@ -563,10 +572,17 @@ fn cose_public_key(cose_key_bytes: &[u8]) -> Result<PublicKey> {
     }
 }
 
-fn public_keys_match(tpm_key: &PublicKey, cose_key: &PublicKey) -> bool {
+pub(crate) fn public_keys_match(tpm_key: &PublicKey, cose_key: &PublicKey) -> bool {
     match (tpm_key, cose_key) {
         (PublicKey::Rsa { n, e }, PublicKey::Rsa { n: cn, e: ce }) => be_eq(n, cn) && be_eq(e, ce),
-        (PublicKey::Ec { x, y }, PublicKey::Ec { x: cx, y: cy }) => be_eq(x, cx) && be_eq(y, cy),
+        (
+            PublicKey::Ec { crv, x, y },
+            PublicKey::Ec {
+                crv: ccrv,
+                x: cx,
+                y: cy,
+            },
+        ) => crv == ccrv && be_eq(x, cx) && be_eq(y, cy),
         _ => false,
     }
 }
@@ -689,8 +705,58 @@ fn authz_origin_and_purpose_ok(list: &[u8]) -> Result<bool> {
 
 // TPM structure parsing
 
+/// `TPM_ALG_NULL`, which leaves an optional TPM field empty.
+const TPM_ALG_NULL: u16 = 0x0010;
+
+/// Skips a `TPMT_SYM_DEF_OBJECT`. Any algorithm other than NULL carries a key size and a mode.
+fn skip_tpm_symmetric(reader: &mut BeReader) -> Result<()> {
+    if reader.u16()? != TPM_ALG_NULL {
+        reader.take(4)?;
+    }
+    Ok(())
+}
+
+/// Skips a `TPMT_RSA_SCHEME` or `TPMT_ECC_SCHEME`, whose detail size depends on the scheme.
+fn skip_tpm_scheme(reader: &mut BeReader) -> Result<()> {
+    let details = match reader.u16()? {
+        // NULL, RSAES
+        TPM_ALG_NULL | 0x0015 => 0,
+        // RSASSA, RSAPSS, OAEP, ECDSA, ECDH, SM2, ECSCHNORR, ECMQV: a hash algorithm
+        0x0014 | 0x0016 | 0x0017 | 0x0018 | 0x0019 | 0x001B | 0x001C | 0x001D => 2,
+        // ECDAA: a hash algorithm and a counter
+        0x001A => 4,
+        _ => {
+            return Err(PasskiError::InvalidAttestation(
+                "Unsupported TPM key scheme".to_string(),
+            ));
+        }
+    };
+    reader.take(details)?;
+    Ok(())
+}
+
+/// Skips a `TPMT_KDF_SCHEME`. Any scheme other than NULL carries a hash algorithm.
+fn skip_tpm_kdf(reader: &mut BeReader) -> Result<()> {
+    if reader.u16()? != TPM_ALG_NULL {
+        reader.take(2)?;
+    }
+    Ok(())
+}
+
+/// Maps a TPM `curveID` to the COSE curve id.
+fn cose_curve_for_tpm(curve_id: u16) -> Result<i64> {
+    match curve_id {
+        0x0003 => Ok(1), // NIST P-256
+        0x0004 => Ok(2), // NIST P-384
+        0x0005 => Ok(3), // NIST P-521
+        _ => Err(PasskiError::InvalidAttestation(
+            "Unsupported TPM curve".to_string(),
+        )),
+    }
+}
+
 /// Parses a `TPMT_PUBLIC`, returning the name algorithm id and the public key.
-fn parse_tpmt_public(pub_area: &[u8]) -> Result<(u16, PublicKey)> {
+pub(crate) fn parse_tpmt_public(pub_area: &[u8]) -> Result<(u16, PublicKey)> {
     let mut reader = BeReader::new(pub_area);
     let key_type = reader.u16()?;
     let name_alg = reader.u16()?;
@@ -700,8 +766,8 @@ fn parse_tpmt_public(pub_area: &[u8]) -> Result<(u16, PublicKey)> {
     let key = match key_type {
         0x0001 => {
             // TPMS_RSA_PARMS
-            reader.u16()?; // symmetric
-            reader.u16()?; // scheme
+            skip_tpm_symmetric(&mut reader)?;
+            skip_tpm_scheme(&mut reader)?;
             reader.u16()?; // keyBits
             let exponent = reader.u32()?;
             let modulus = reader.sized_u16()?;
@@ -713,13 +779,13 @@ fn parse_tpmt_public(pub_area: &[u8]) -> Result<(u16, PublicKey)> {
         }
         0x0023 => {
             // TPMS_ECC_PARMS
-            reader.u16()?; // symmetric
-            reader.u16()?; // scheme
-            reader.u16()?; // curveID
-            reader.u16()?; // kdf
+            skip_tpm_symmetric(&mut reader)?;
+            skip_tpm_scheme(&mut reader)?;
+            let crv = cose_curve_for_tpm(reader.u16()?)?;
+            skip_tpm_kdf(&mut reader)?;
             let x = reader.sized_u16()?.to_vec();
             let y = reader.sized_u16()?.to_vec();
-            PublicKey::Ec { x, y }
+            PublicKey::Ec { crv, x, y }
         }
         _ => {
             return Err(PasskiError::InvalidAttestation(
@@ -728,11 +794,13 @@ fn parse_tpmt_public(pub_area: &[u8]) -> Result<(u16, PublicKey)> {
         }
     };
 
+    reader.finish()?;
     Ok((name_alg, key))
 }
 
-/// Parses a `TPMS_ATTEST`, returning `(magic, type, extraData, attested name)`.
-fn parse_tpms_attest(cert_info: &[u8]) -> Result<(u32, u16, Vec<u8>, Vec<u8>)> {
+/// Parses a `TPMS_ATTEST` holding a `TPMS_CERTIFY_INFO`, returning
+/// `(magic, type, extraData, attested name)`.
+pub(crate) fn parse_tpms_attest(cert_info: &[u8]) -> Result<(u32, u16, Vec<u8>, Vec<u8>)> {
     let mut reader = BeReader::new(cert_info);
     let magic = reader.u32()?;
     let attest_type = reader.u16()?;
@@ -741,6 +809,8 @@ fn parse_tpms_attest(cert_info: &[u8]) -> Result<(u32, u16, Vec<u8>, Vec<u8>)> {
     reader.take(17)?; // TPMS_CLOCK_INFO (8 + 4 + 4 + 1)
     reader.take(8)?; // firmwareVersion
     let name = reader.sized_u16()?.to_vec(); // attested TPMS_CERTIFY_INFO name
+    reader.sized_u16()?; // qualifiedName
+    reader.finish()?;
     Ok((magic, attest_type, extra_data, name))
 }
 
@@ -799,6 +869,16 @@ impl<'a> BeReader<'a> {
     fn sized_u16(&mut self) -> Result<&'a [u8]> {
         let len = self.u16()? as usize;
         self.take(len)
+    }
+
+    /// Fails if any bytes are left, which would mean the structure was not what it claimed.
+    fn finish(&self) -> Result<()> {
+        if self.pos != self.bytes.len() {
+            return Err(PasskiError::InvalidAttestation(
+                "Trailing bytes after TPM structure".to_string(),
+            ));
+        }
+        Ok(())
     }
 }
 
