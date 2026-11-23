@@ -20,6 +20,8 @@
 use std::fmt;
 use std::str::FromStr;
 
+use serde::Deserialize;
+
 use crate::types::{PasskiError, Result};
 
 /// The type of WebAuthn operation.
@@ -60,6 +62,20 @@ impl fmt::Display for ClientDataType {
     }
 }
 
+// Required fields are optional here so that a missing one still reports
+// `MissingClientDataField` rather than a generic JSON error.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct RawClientData {
+    #[serde(rename = "type")]
+    type_: Option<String>,
+    challenge: Option<String>,
+    origin: Option<String>,
+    #[serde(default)]
+    cross_origin: bool,
+    top_origin: Option<String>,
+}
+
 /// The client data JSON the browser sent, parsed.
 #[derive(Debug)]
 #[non_exhaustive]
@@ -88,34 +104,15 @@ impl ClientData {
     ///
     /// Returns an error if the JSON is invalid or a required field is missing.
     pub fn from_bytes(bytes: &[u8]) -> Result<ClientData> {
-        let json: serde_json::Value = serde_json::from_slice(bytes)?;
-
-        let type_str = json["type"]
-            .as_str()
-            .ok_or_else(|| PasskiError::MissingClientDataField("type".to_string()))?;
-
-        let type_ = type_str.parse::<ClientDataType>()?;
-
-        let challenge = json["challenge"]
-            .as_str()
-            .ok_or_else(|| PasskiError::MissingClientDataField("challenge".to_string()))?
-            .to_string();
-
-        let origin = json["origin"]
-            .as_str()
-            .ok_or_else(|| PasskiError::MissingClientDataField("origin".to_string()))?
-            .to_string();
-
-        let cross_origin = json["crossOrigin"].as_bool().unwrap_or(false);
-
-        let top_origin = json["topOrigin"].as_str().map(str::to_string);
+        let raw: RawClientData = serde_json::from_slice(bytes)?;
+        let missing = |field: &str| PasskiError::MissingClientDataField(field.to_string());
 
         Ok(ClientData {
-            type_,
-            challenge,
-            origin,
-            cross_origin,
-            top_origin,
+            type_: raw.type_.ok_or_else(|| missing("type"))?.parse()?,
+            challenge: raw.challenge.ok_or_else(|| missing("challenge"))?,
+            origin: raw.origin.ok_or_else(|| missing("origin"))?,
+            cross_origin: raw.cross_origin,
+            top_origin: raw.top_origin,
         })
     }
 

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{ClientData, ClientDataType, Passki};
+use crate::{ClientData, ClientDataType, Passki, PasskiError};
 
 // ClientData::verify tests
 
@@ -549,6 +549,48 @@ fn test_from_base64_missing_cross_origin_defaults_to_false() {
     let result = ClientData::from_base64(&encoded).unwrap();
 
     assert!(!result.cross_origin);
+}
+
+#[test]
+fn test_from_base64_rejects_non_boolean_cross_origin() {
+    let challenge = Passki::base64_encode(&Passki::generate_challenge());
+
+    for cross_origin in [
+        serde_json::json!("true"),
+        serde_json::json!(1),
+        serde_json::json!(null),
+    ] {
+        let client_data = serde_json::json!({
+            "type": "webauthn.create",
+            "challenge": challenge,
+            "origin": "http://localhost:3000",
+            "crossOrigin": cross_origin
+        });
+
+        let encoded = Passki::base64_encode(&serde_json::to_vec(&client_data).unwrap());
+        let result = ClientData::from_base64(&encoded);
+
+        assert!(
+            matches!(result, Err(PasskiError::InvalidClientDataJson(_))),
+            "crossOrigin {cross_origin} should be rejected"
+        );
+    }
+}
+
+#[test]
+fn test_from_base64_rejects_non_string_top_origin() {
+    let client_data = serde_json::json!({
+        "type": "webauthn.get",
+        "challenge": Passki::base64_encode(&Passki::generate_challenge()),
+        "origin": "https://example.com",
+        "crossOrigin": true,
+        "topOrigin": 42
+    });
+
+    let encoded = Passki::base64_encode(&serde_json::to_vec(&client_data).unwrap());
+    let result = ClientData::from_base64(&encoded);
+
+    assert!(matches!(result, Err(PasskiError::InvalidClientDataJson(_))));
 }
 
 #[test]
