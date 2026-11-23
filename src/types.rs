@@ -15,6 +15,7 @@
 //! Data structures and error types for WebAuthn/Passkey operations.
 
 use std::collections::BTreeMap;
+use std::fmt;
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -819,6 +820,11 @@ pub struct CredPropsResult {
     pub rk: Option<bool>,
 }
 
+/// Stands in for a secret in `Debug` output, keeping only whether it is present.
+pub(crate) fn redacted<T>(value: &Option<T>) -> Option<&'static str> {
+    value.as_ref().map(|_| "<redacted>")
+}
+
 /// `prf` extension result returned by the client.
 #[derive(Deserialize, Debug)]
 pub struct PrfExtensionResult {
@@ -829,7 +835,9 @@ pub struct PrfExtensionResult {
 }
 
 /// The secrets the authenticator derived from the PRF inputs.
-#[derive(Deserialize, Debug)]
+///
+/// `Debug` hides the outputs.
+#[derive(Deserialize)]
 pub struct PrfResults {
     /// Base64url-encoded first PRF output.
     pub first: Option<String>,
@@ -837,11 +845,22 @@ pub struct PrfResults {
     pub second: Option<String>,
 }
 
+impl fmt::Debug for PrfResults {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("PrfResults")
+            .field("first", &redacted(&self.first))
+            .field("second", &redacted(&self.second))
+            .finish()
+    }
+}
+
 /// `largeBlob` extension result returned by the client.
 ///
 /// Which field is set follows what was asked for: `supported` answers a registration input, `blob`
 /// a read, `written` a write.
-#[derive(Deserialize, Debug)]
+///
+/// `Debug` hides the blob.
+#[derive(Deserialize)]
 pub struct LargeBlobResult {
     /// Set at registration: whether the new credential can store a blob.
     pub supported: Option<bool>,
@@ -849,6 +868,16 @@ pub struct LargeBlobResult {
     pub blob: Option<String>,
     /// Set after a write: whether the blob was stored.
     pub written: Option<bool>,
+}
+
+impl fmt::Debug for LargeBlobResult {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("LargeBlobResult")
+            .field("supported", &self.supported)
+            .field("blob", &redacted(&self.blob))
+            .field("written", &self.written)
+            .finish()
+    }
 }
 
 // Signal API payloads

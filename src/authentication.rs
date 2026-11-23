@@ -15,6 +15,7 @@
 //! Passkey authentication functionality.
 
 use std::collections::BTreeMap;
+use std::fmt;
 
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -127,7 +128,8 @@ pub struct AuthenticationResponse {
 }
 
 /// Result of a successful authentication.
-#[derive(Debug)]
+///
+/// `Debug` hides the PRF outputs and the large blob.
 #[non_exhaustive]
 pub struct AuthenticationResult {
     /// The credential ID that was used for authentication.
@@ -154,6 +156,20 @@ pub struct AuthenticationResult {
     /// Whether a [`LargeBlobAuthenticationInput::Write`] was stored. `None` when no write
     /// was requested or the client did not report.
     pub large_blob_written: Option<bool>,
+}
+
+impl fmt::Debug for AuthenticationResult {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("AuthenticationResult")
+            .field("credential_id", &self.credential_id)
+            .field("counter", &self.counter)
+            .field("user_handle", &self.user_handle)
+            .field("prf_first", &redacted(&self.prf_first))
+            .field("prf_second", &redacted(&self.prf_second))
+            .field("large_blob", &redacted(&self.large_blob))
+            .field("large_blob_written", &self.large_blob_written)
+            .finish()
+    }
 }
 
 /// Options for starting a passkey authentication ceremony.

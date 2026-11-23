@@ -407,3 +407,18 @@ fn test_client_extension_results_without_large_blob() {
     let result: ClientExtensionResults = serde_json::from_str(json).unwrap();
     assert!(result.large_blob.is_none());
 }
+
+#[test]
+fn test_large_blob_result_debug_hides_blob() {
+    let result = LargeBlobResult {
+        supported: None,
+        blob: Some("c2VjcmV0".to_string()),
+        written: Some(true),
+    };
+
+    let debug = format!("{result:?}");
+
+    assert!(!debug.contains("c2VjcmV0"));
+    assert!(debug.contains(r#"blob: Some("<redacted>")"#));
+    assert!(debug.contains("written: Some(true)"));
+}

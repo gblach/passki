@@ -827,3 +827,17 @@ fn test_prf_extension_result_deserializes_partial_results() {
     assert!(results.first.is_some());
     assert!(results.second.is_none());
 }
+
+#[test]
+fn test_prf_results_debug_hides_outputs() {
+    let results = PrfResults {
+        first: Some("c2VjcmV0".to_string()),
+        second: None,
+    };
+
+    let debug = format!("{results:?}");
+
+    assert!(!debug.contains("c2VjcmV0"));
+    assert!(debug.contains(r#"first: Some("<redacted>")"#));
+    assert!(debug.contains("second: None"));
+}

@@ -725,3 +725,28 @@ fn test_finish_passkey_authentication_usernameless() {
             .contains("Credential not allowed")
     );
 }
+
+#[test]
+fn test_authentication_result_debug_hides_secrets() {
+    let result = AuthenticationResult {
+        credential_id: vec![1, 2],
+        counter: 7,
+        user_handle: None,
+        prf_first: Some(vec![0xAB; 32]),
+        prf_second: None,
+        large_blob: Some(vec![0xCD; 4]),
+        large_blob_written: None,
+    };
+
+    let debug = format!("{result:?}");
+
+    assert!(
+        !debug.contains("171"),
+        "PRF output byte 0xAB leaked: {debug}"
+    );
+    assert!(!debug.contains("205"), "blob byte 0xCD leaked: {debug}");
+    assert!(debug.contains(r#"prf_first: Some("<redacted>")"#));
+    assert!(debug.contains("prf_second: None"));
+    assert!(debug.contains(r#"large_blob: Some("<redacted>")"#));
+    assert!(debug.contains("credential_id: [1, 2]"));
+}
