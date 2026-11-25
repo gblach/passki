@@ -28,7 +28,7 @@ A simple and secure WebAuthn/Passkey implementation for Rust.
 - 📡 **[Signal API](docs/signal-api.md)** - Payloads that tell the browser when a passkey or a
   username changed, so stale ones stop being offered
 - 📜 **[Attestation](docs/attestation.md)** - Statement verification for `packed`, `tpm`,
-  `android-key` and `fido-u2f`, with opt-in trust path validation against your own roots
+  `android-key`, `apple` and `fido-u2f`, with opt-in trust path validation against your own roots
 - 🦀 **Three Crypto Backends** - Pure Rust [RustCrypto](https://github.com/RustCrypto) by default,
   [aws-lc-rs](https://crates.io/crates/aws-lc-rs) with the `aws-lc-rs` feature or
   [graviola](https://crates.io/crates/graviola) with the `graviola` feature (see
@@ -164,7 +164,7 @@ The initial recommendation. Defined the core protocol:
 - [x] Credential exclusion (`excludeCredentials`)
 - [x] `AttestationConveyancePreference` (`none` / `indirect` / `direct`)
 - [x] Attestation object CBOR parsing
-- [x] Attestation statement verification (`packed`, `tpm`, `android-key`, `fido-u2f`)
+- [x] Attestation statement verification (`packed`, `tpm`, `android-key`, `apple`, `fido-u2f`)
 - [x] rpId hash verification in authenticator data
 - [x] UP (user present) flag enforcement
 - [x] UV (user verified) flag enforcement

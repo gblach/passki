@@ -16,8 +16,8 @@
 //!
 //! An attestation statement is the authenticator's signed claim about what kind of hardware
 //! it is. Each vendor ecosystem has its own format; this module handles `packed`, `fido-u2f`,
-//! `android-key` and `tpm`, checking the statement's signature and the structure of the certificate
-//! it carries.
+//! `android-key`, `tpm` and `apple`, checking the statement's signature or nonce and the structure
+//! of the certificate it carries.
 //!
 //! Whether that certificate leads back to a root the relying party trusts is a separate question,
 //! answered by [`crate::trust`] afterwards.
@@ -44,6 +44,8 @@ const OID_ANDROID_KEY: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.3.6.1.
 const OID_SUBJECT_ALT_NAME: ObjectIdentifier = ObjectIdentifier::new_unwrap("2.5.29.17");
 /// tcg-kp-AIKCertificate extended key usage, required of TPM attestation certificates.
 const OID_TCG_KP_AIK: ObjectIdentifier = ObjectIdentifier::new_unwrap("2.23.133.8.3");
+/// Apple anonymous attestation extension, which carries the ceremony nonce.
+const OID_APPLE_NONCE: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.2.840.113635.100.8.2");
 
 /// Public key parameters, in whichever encoding they were found, so keys from different sources
 /// can be compared.
@@ -115,6 +117,7 @@ impl Passki {
             "fido-u2f" => verify_fido_u2f(&att_stmt, &auth_data, &parsed, client_data_hash)?,
             "android-key" => verify_android_key(&att_stmt, &auth_data, &parsed, client_data_hash)?,
             "tpm" => verify_tpm(&att_stmt, &auth_data, &parsed, client_data_hash)?,
+            "apple" => verify_apple(&att_stmt, &auth_data, &parsed, client_data_hash)?,
             other => {
                 return Err(PasskiError::UnsupportedAttestationFormat(other.to_string()));
             }
@@ -347,6 +350,55 @@ fn verify_tpm(
     Ok(Evidence::Chained {
         chain: x5c,
         anchored: AttestationType::AttCa,
+    })
+}
+
+/// Verifies an `apple` statement, produced by Apple devices. There is no signature: Apple's CA
+/// issues a certificate for the credential key that embeds a nonce over this ceremony.
+fn verify_apple(
+    att_stmt: &Value,
+    auth_data: &[u8],
+    parsed: &ParsedAttestation,
+    client_data_hash: &[u8],
+) -> Result<Evidence> {
+    let map = att_map(att_stmt)?;
+    let x5c = att_x5c(map)?.ok_or_else(|| {
+        PasskiError::InvalidAttestation("apple attestation is missing x5c".to_string())
+    })?;
+    let cert = parse_cert(&x5c[0])?;
+
+    let mut nonce_to_hash = auth_data.to_vec();
+    nonce_to_hash.extend_from_slice(client_data_hash);
+    let nonce = Sha256::digest(&nonce_to_hash);
+
+    let extension = cert_extension(&cert, &OID_APPLE_NONCE).ok_or_else(|| {
+        PasskiError::InvalidCertificate(
+            "apple attestation certificate is missing the nonce extension".to_string(),
+        )
+    })?;
+    // SEQUENCE { [1] EXPLICIT OCTET STRING }
+    let (class, constructed, tag, content) =
+        DerReader::new(extension).read_sequence()?.read_tlv()?;
+    if class != 0x80 || !constructed || tag != 1 {
+        return Err(PasskiError::InvalidCertificate(
+            "apple nonce extension is malformed".to_string(),
+        ));
+    }
+    if DerReader::new(content).read_octet_string()? != nonce.as_slice() {
+        return Err(PasskiError::InvalidAttestation(
+            "apple attestation nonce does not match".to_string(),
+        ));
+    }
+
+    if !cert_key_matches(&cert, &cose_public_key(&parsed.public_key)?)? {
+        return Err(PasskiError::InvalidAttestation(
+            "apple certificate public key does not match credential key".to_string(),
+        ));
+    }
+
+    Ok(Evidence::Chained {
+        chain: x5c,
+        anchored: AttestationType::AnonCa,
     })
 }
 

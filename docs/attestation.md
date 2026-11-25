@@ -67,20 +67,23 @@ records what the statement was worth:
 let passkey = passki.finish_passkey_registration(&credential, &state)?;
 
 match passkey.attestation_type {
-    AttestationType::Basic | AttestationType::AttCa => allow_model(passkey.aaguid),
+    AttestationType::Basic | AttestationType::AttCa | AttestationType::AnonCa => {
+        allow_model(passkey.aaguid)
+    }
     _ => treat_as_unattested(),
 }
 ```
 
-| `attestation_type` | Meaning                                                                       |
-| ------------------ | ----------------------------------------------------------------------------- |
-| `None`             | `fmt` was `none`. No statement to assess.                                     |
-| `SelfAttested`     | The credential key signed its own statement. Proves possession, not model.    |
-| `Unverified`       | An `x5c` chain arrived but the policy is `Ignore`, so it was never validated. |
-| `Basic` or `AttCa` | The chain validated up to one of your roots. `aaguid` is attested.            |
+| `attestation_type`           | Meaning                                                                       |
+| ---------------------------- | ----------------------------------------------------------------------------- |
+| `None`                       | `fmt` was `none`. No statement to assess.                                     |
+| `SelfAttested`               | The credential key signed its own statement. Proves possession, not model.    |
+| `Unverified`                 | An `x5c` chain arrived but the policy is `Ignore`, so it was never validated. |
+| `Basic`, `AttCa` or `AnonCa` | The chain validated up to one of your roots. `aaguid` is attested.            |
 
-`Basic` and `AttCa` differ in whether the vendor issues one certificate per production batch
-or one per device. Both mean the chain validated, so treat them alike.
+`Basic`, `AttCa` and `AnonCa` differ in whether the vendor issues one certificate per production
+batch, one per device, or one per credential (Apple, so that credentials cannot be linked). All
+three mean the chain validated, so treat them alike.
 
 ## Policies
 

@@ -15,6 +15,7 @@
 mod helpers;
 
 mod aaguid;
+mod apple;
 mod attestation;
 mod authentication;
 mod authenticator_attachment;

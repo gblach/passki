@@ -284,9 +284,9 @@ pub enum AttestationConveyancePreference {
 
 /// What an attestation statement turned out to be worth.
 ///
-/// [`AttestationType::Basic`] and [`AttestationType::AttCa`] are only reported after a certificate
-/// chain reached a trusted root, so either of them means the authenticator model is proven. Every
-/// other variant leaves it a claim.
+/// [`AttestationType::Basic`], [`AttestationType::AttCa`] and [`AttestationType::AnonCa`] are only
+/// reported after a certificate chain reached a trusted root, so any of them means
+/// the authenticator model is proven. Every other variant leaves it a claim.
 #[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Debug, Default)]
 #[serde(rename_all = "kebab-case")]
 #[non_exhaustive]
@@ -310,6 +310,10 @@ pub enum AttestationType {
 
     /// Validated chain from a per-device certificate issued by the vendor's CA.
     AttCa,
+
+    /// Validated chain from a per-credential certificate issued by the vendor's anonymization CA,
+    /// so credentials cannot be linked to each other. Reported for Apple devices.
+    AnonCa,
 }
 
 /// How strictly attestation certificate chains are checked, set together with the trust anchors
@@ -504,8 +508,8 @@ pub struct StoredPasskey {
     #[serde(default)]
     pub aaguid: [u8; 16],
 
-    /// Whether `aaguid` above was proven or merely claimed. Only [`AttestationType::Basic`]
-    /// and [`AttestationType::AttCa`] mean proven.
+    /// Whether `aaguid` above was proven or merely claimed. Only [`AttestationType::Basic`],
+    /// [`AttestationType::AttCa`] and [`AttestationType::AnonCa`] mean proven.
     #[serde(default)]
     pub attestation_type: AttestationType,
 

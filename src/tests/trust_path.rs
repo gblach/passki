@@ -37,7 +37,8 @@ const OID_EC_PUBLIC_KEY: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.2.84
 /// prime256v1 (P-256).
 const OID_PRIME256V1: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.2.840.10045.3.1.7");
 /// ecdsa-with-SHA256.
-const OID_ECDSA_SHA256: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.2.840.10045.4.3.2");
+pub(super) const OID_ECDSA_SHA256: ObjectIdentifier =
+    ObjectIdentifier::new_unwrap("1.2.840.10045.4.3.2");
 
 /// The certificate structures of RFC 5280, mirrored here because x509-cert 0.3 keeps its own fields
 /// private and offers construction only through a builder that enforces a profile. These tests need
@@ -45,24 +46,24 @@ const OID_ECDSA_SHA256: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.2.840
 /// own `pathLenConstraint`. Only the fields the tests set are modelled; the optional unique
 /// identifiers are always absent.
 #[derive(Sequence)]
-struct TbsCertificate {
+pub(super) struct TbsCertificate {
     #[asn1(context_specific = "0", tag_mode = "EXPLICIT")]
-    version: Version,
-    serial_number: SerialNumber,
-    signature: AlgorithmIdentifierOwned,
-    issuer: Name,
-    validity: Validity,
-    subject: Name,
-    subject_public_key_info: SubjectPublicKeyInfoOwned,
+    pub(super) version: Version,
+    pub(super) serial_number: SerialNumber,
+    pub(super) signature: AlgorithmIdentifierOwned,
+    pub(super) issuer: Name,
+    pub(super) validity: Validity,
+    pub(super) subject: Name,
+    pub(super) subject_public_key_info: SubjectPublicKeyInfoOwned,
     #[asn1(context_specific = "3", tag_mode = "EXPLICIT", optional = "true")]
-    extensions: Option<Vec<Extension>>,
+    pub(super) extensions: Option<Vec<Extension>>,
 }
 
 #[derive(Sequence)]
-struct Certificate {
-    tbs_certificate: TbsCertificate,
-    signature_algorithm: AlgorithmIdentifierOwned,
-    signature: BitString,
+pub(super) struct Certificate {
+    pub(super) tbs_certificate: TbsCertificate,
+    pub(super) signature_algorithm: AlgorithmIdentifierOwned,
+    pub(super) signature: BitString,
 }
 
 /// How a freshly issued certificate is allowed to be used.
@@ -75,10 +76,10 @@ enum Role {
 }
 
 /// An ES256 key pair together with the certificate that carries its public key.
-struct TestCert {
-    key_pair: SigningKey,
-    name: Name,
-    der: Vec<u8>,
+pub(super) struct TestCert {
+    pub(super) key_pair: SigningKey,
+    pub(super) name: Name,
+    pub(super) der: Vec<u8>,
 }
 
 /// Generates a fresh ES256 key pair.
@@ -88,7 +89,7 @@ fn generate_key() -> SigningKey {
 
 /// The `SubjectPublicKeyInfo` for an ES256 key pair, with the point in SEC1 compressed or
 /// uncompressed form.
-fn spki(key_pair: &SigningKey, compressed: bool) -> SubjectPublicKeyInfoOwned {
+pub(super) fn spki(key_pair: &SigningKey, compressed: bool) -> SubjectPublicKeyInfoOwned {
     SubjectPublicKeyInfoOwned {
         algorithm: AlgorithmIdentifierOwned {
             oid: OID_EC_PUBLIC_KEY,
@@ -133,7 +134,7 @@ fn validity(not_before: SystemTime, not_after: SystemTime) -> Validity {
 }
 
 /// A validity period covering the present.
-fn current() -> Validity {
+pub(super) fn current() -> Validity {
     let now = SystemTime::now();
     validity(
         now - Duration::from_secs(3600),
@@ -198,7 +199,7 @@ fn issue_certificate(
 
 impl TestCert {
     /// Creates a self-signed root CA.
-    fn root(common_name: &str) -> Self {
+    pub(super) fn root(common_name: &str) -> Self {
         Self::root_with(common_name, Role::Ca(None), current())
     }
 
@@ -326,12 +327,12 @@ fn packed_attestation(chain: &[&TestCert]) -> (Vec<u8>, Vec<u8>) {
 }
 
 /// A relying party that ignores trust paths, which is the default.
-fn passki() -> Passki {
+pub(super) fn passki() -> Passki {
     Passki::new("localhost", &["http://localhost:3000"], "Test")
 }
 
 /// A relying party anchored on `roots`.
-fn passki_trusting(roots: &[&TestCert], policy: AttestationTrustPolicy) -> Passki {
+pub(super) fn passki_trusting(roots: &[&TestCert], policy: AttestationTrustPolicy) -> Passki {
     let ders: Vec<&[u8]> = roots.iter().map(|root| root.der.as_slice()).collect();
     passki().with_attestation_trust(&ders, policy).unwrap()
 }
