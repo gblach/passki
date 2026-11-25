@@ -557,6 +557,8 @@ async fn auth_finish(
     // Must be stored: if the next login reports a counter that did not grow, the credential
     // has been cloned.
     passkey.counter = result.counter;
+    // Synced state can change after registration, e.g. when the user turns on a sync service.
+    passkey.bs = result.bs;
 
     // The passkey borrow is done, so the whole user is reachable again.
     let user = &users[&username];

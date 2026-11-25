@@ -114,6 +114,8 @@ let result = passki.finish_passkey_authentication(
 
 // Persist the new counter, or replay detection has nothing to compare against.
 stored_passkey.counter = result.counter;
+// The spec asks to keep the backup state current too.
+stored_passkey.bs = result.bs;
 ```
 
 ## Security Considerations

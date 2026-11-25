@@ -736,6 +736,9 @@ fn test_authentication_result_debug_hides_secrets() {
         prf_second: None,
         large_blob: Some(vec![0xCD; 4]),
         large_blob_written: None,
+        user_verified: false,
+        be: false,
+        bs: false,
     };
 
     let debug = format!("{result:?}");
@@ -749,4 +752,29 @@ fn test_authentication_result_debug_hides_secrets() {
     assert!(debug.contains("prf_second: None"));
     assert!(debug.contains(r#"large_blob: Some("<redacted>")"#));
     assert!(debug.contains("credential_id: [1, 2]"));
+}
+
+#[test]
+fn test_authentication_result_reports_flags() {
+    // flags: UP | UV | BE | BS
+    let result = authenticate(
+        UserVerificationRequirement::Preferred,
+        5,
+        6,
+        0x01 | 0x04 | 0x08 | 0x10,
+        false,
+    )
+    .unwrap();
+    assert!(result.user_verified);
+    assert!(result.be);
+    assert!(result.bs);
+}
+
+#[test]
+fn test_authentication_result_reports_cleared_flags() {
+    // flags: UP only
+    let result = authenticate(UserVerificationRequirement::Preferred, 5, 6, 0x01, false).unwrap();
+    assert!(!result.user_verified);
+    assert!(!result.be);
+    assert!(!result.bs);
 }

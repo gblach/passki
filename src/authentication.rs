@@ -156,6 +156,18 @@ pub struct AuthenticationResult {
     /// Whether a [`LargeBlobAuthenticationInput::Write`] was stored. `None` when no write
     /// was requested or the client did not report.
     pub large_blob_written: Option<bool>,
+
+    /// UV flag: the authenticator verified the user (PIN, biometric) in this ceremony, not just
+    /// their presence. Use it to decide whether this sign-in is strong enough for a sensitive
+    /// action.
+    pub user_verified: bool,
+
+    /// BE flag: the credential may be synced across the user's devices.
+    pub be: bool,
+
+    /// BS flag: the credential is currently synced. Can change between sign-ins, so store it on
+    /// the passkey each time.
+    pub bs: bool,
 }
 
 impl fmt::Debug for AuthenticationResult {
@@ -168,6 +180,9 @@ impl fmt::Debug for AuthenticationResult {
             .field("prf_second", &redacted(&self.prf_second))
             .field("large_blob", &redacted(&self.large_blob))
             .field("large_blob_written", &self.large_blob_written)
+            .field("user_verified", &self.user_verified)
+            .field("be", &self.be)
+            .field("bs", &self.bs)
             .finish()
     }
 }
@@ -409,6 +424,9 @@ impl Passki {
             prf_second,
             large_blob,
             large_blob_written,
+            user_verified: (flags & FLAG_UV) != 0,
+            be: (flags & FLAG_BE) != 0,
+            bs: (flags & FLAG_BS) != 0,
         })
     }
 
