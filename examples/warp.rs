@@ -653,6 +653,14 @@ async fn logout(state: AppState, token: Option<String>) -> Result<impl Reply, wa
 async fn main() {
     // The domain the passkeys are bound to, the origins allowed to use them, and the name
     // authenticators show in their prompt.
+    //
+    // For a real site, change these values:
+    // - The first value is the RP ID, the site's domain (e.g. "example.com"). Every passkey is
+    //   bound to it, so changing it later makes all registered passkeys unusable.
+    // - Origins must use https://, e.g. "https://example.com". localhost is the only plain-HTTP
+    //   origin browsers accept.
+    // - Behind a reverse proxy, the origin is the public URL users open in the browser, not the
+    //   address this server binds to.
     let state = AppState {
         passki: Arc::new(Passki::new(
             "localhost",

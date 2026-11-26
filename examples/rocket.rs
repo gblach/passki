@@ -627,6 +627,14 @@ fn logout(store: &State<Store>, cookies: &CookieJar<'_>) -> Json<ApiResponse> {
 fn rocket() -> Rocket<Build> {
     // The domain the passkeys are bound to, the origins allowed to use them, and the name
     // authenticators show in their prompt.
+    //
+    // For a real site, change these values:
+    // - The first value is the RP ID, the site's domain (e.g. "example.com"). Every passkey is
+    //   bound to it, so changing it later makes all registered passkeys unusable.
+    // - Origins must use https://, e.g. "https://example.com". localhost is the only plain-HTTP
+    //   origin browsers accept.
+    // - Behind a reverse proxy, the origin is the public URL users open in the browser, not the
+    //   address this server binds to.
     let passki = Passki::new("localhost", &["http://localhost:3000"], "Passkeys Demo");
 
     let figment = rocket::Config::figment().merge(("port", 3000));
