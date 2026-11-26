@@ -59,7 +59,7 @@ use passki::{
     AuthenticationExtensions, AuthenticationOptions, AuthenticationState, ClientData,
     CurrentUserDetailsSignal, Passki, PrfAuthenticationInput, PrfEval, PrfRegistrationInput,
     RegistrationCredential, RegistrationExtensions, RegistrationOptions, RegistrationState,
-    StoredPasskey, UnknownCredentialSignal,
+    StoredPasskey, UnknownCredentialSignal, UserVerificationRequirement,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -323,6 +323,10 @@ async fn register_start(
     extensions.prf = Some(PrfRegistrationInput::default());
 
     let mut options = RegistrationOptions::default();
+    // Passkeys are the only sign-in factor here, so a bare touch of a security key must not be
+    // enough. An app with a second factor can keep Preferred and check `user_verified` after
+    // sign-in instead, asking for the second factor when it is false.
+    options.user_verification = UserVerificationRequirement::Required;
     options.attestation = if req.attestation {
         AttestationConveyancePreference::Direct
     } else {
@@ -483,6 +487,8 @@ async fn auth_start(state: AppState, req: AuthStartRequest) -> Result<impl Reply
     });
 
     let mut options = AuthenticationOptions::default();
+    // Required for the same reason as at registration.
+    options.user_verification = UserVerificationRequirement::Required;
     options.extensions = extensions;
 
     let (challenge, auth_state) = state

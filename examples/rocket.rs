@@ -63,6 +63,7 @@ use passki::{
     ClientData, CurrentUserDetailsSignal, Passki, PasskiError, PrfAuthenticationInput, PrfEval,
     PrfRegistrationInput, RegistrationChallenge, RegistrationCredential, RegistrationExtensions,
     RegistrationOptions, RegistrationState, StoredPasskey, UnknownCredentialSignal,
+    UserVerificationRequirement,
 };
 use rocket::http::{Cookie, CookieJar, SameSite, Status};
 use rocket::response::content::RawHtml;
@@ -324,6 +325,10 @@ fn register_start(
     extensions.prf = Some(PrfRegistrationInput::default());
 
     let mut options = RegistrationOptions::default();
+    // Passkeys are the only sign-in factor here, so a bare touch of a security key must not be
+    // enough. An app with a second factor can keep Preferred and check `user_verified` after
+    // sign-in instead, asking for the second factor when it is false.
+    options.user_verification = UserVerificationRequirement::Required;
     options.attestation = if req.attestation {
         AttestationConveyancePreference::Direct
     } else {
@@ -475,6 +480,8 @@ fn auth_start(
     });
 
     let mut options = AuthenticationOptions::default();
+    // Required for the same reason as at registration.
+    options.user_verification = UserVerificationRequirement::Required;
     options.extensions = extensions;
 
     let (challenge, auth_state) = passki.start_passkey_authentication(&passkeys, options)?;
